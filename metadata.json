@@ -1,0 +1,7 @@
+{
+  "name": "TennisPro Russia",
+  "description": "Платформа для теннисистов РТТ и любителей. Поиск партнеров, тренеров и кортов.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
