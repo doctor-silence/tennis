@@ -1,5 +1,6 @@
 
 const pool = require('./db');
+const bcrypt = require('bcryptjs');
 
 const initDb = async () => {
   const client = await pool.connect();
@@ -129,10 +130,11 @@ const initDb = async () => {
     
     if (coachCheck.rows.length === 0) {
         console.log('🌱 Seeding default Coach user...');
+        const hashedPassword = await bcrypt.hash('123456', 10);
         await pool.query(`
             INSERT INTO users (name, email, password, role, city, avatar, rating, age, level)
-            VALUES ('Тренер Демо', $1, '123456', 'coach', 'Москва', 'https://ui-avatars.com/api/?name=Coach+Demo&background=0D8ABC&color=fff', 1500, 30, 'Coach')
-        `, [coachEmail]);
+            VALUES ('Тренер Демо', $1, $2, 'coach', 'Москва', 'https://ui-avatars.com/api/?name=Coach+Demo&background=0D8ABC&color=fff', 1500, 30, 'Coach')
+        `, [coachEmail, hashedPassword]);
     }
 
     // Seed Admin from Environment Variables
@@ -141,19 +143,20 @@ const initDb = async () => {
 
     if (adminEmail && adminPassword) {
         const adminCheck = await pool.query('SELECT id FROM users WHERE email = $1', [adminEmail]);
+        const hashedAdminPassword = await bcrypt.hash(adminPassword, 10);
         
         if (adminCheck.rows.length === 0) {
             console.log(`🌱 Creating Admin User (${adminEmail}) from .env...`);
             await pool.query(`
                 INSERT INTO users (name, email, password, role, city, avatar, rating, age, level)
                 VALUES ('Супер Админ', $1, $2, 'admin', 'HQ', 'https://ui-avatars.com/api/?name=Admin&background=000&color=fff', 9999, 99, 'GOD MODE')
-            `, [adminEmail, adminPassword]);
+            `, [adminEmail, hashedAdminPassword]);
         } else {
             console.log(`🔄 Updating Admin User (${adminEmail}) password from .env...`);
             // Ensure the existing admin has the correct password and role from .env
             await pool.query(`
                 UPDATE users SET password = $1, role = 'admin' WHERE email = $2
-            `, [adminPassword, adminEmail]);
+            `, [hashedAdminPassword, adminEmail]);
         }
     } else {
         console.warn('⚠️  ADMIN_EMAIL or ADMIN_PASSWORD not set in .env. Admin user check skipped.');

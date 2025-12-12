@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { GoogleGenAI } = require('@google/genai');
+const bcrypt = require('bcryptjs');
 const pool = require('./db');
 const initDb = require('./initDb');
 
@@ -79,7 +80,9 @@ app.post('/api/auth/register', async (req, res) => {
             return res.status(400).json({ error: 'Пользователь с таким email уже существует' });
         }
 
+        const hashedPassword = await bcrypt.hash(password, 10);
         const defaultAvatar = `https://ui-avatars.com/api/?name=${name.replace(' ', '+')}&background=random&color=fff`;
+        
         const result = await pool.query(
             `INSERT INTO users (name, email, password, city, avatar, role, rating, age, level, rtt_rank, rtt_category) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
@@ -87,7 +90,7 @@ app.post('/api/auth/register', async (req, res) => {
             [
                 name, 
                 email, 
-                password, 
+                hashedPassword, 
                 city, 
                 defaultAvatar, 
                 role || 'amateur', 
@@ -129,8 +132,9 @@ app.post('/api/auth/login', async (req, res) => {
         }
 
         const user = result.rows[0];
+        const isValidPassword = await bcrypt.compare(password, user.password);
 
-        if (user.password !== password) {
+        if (!isValidPassword) {
             await logSystemEvent('warning', `Failed login attempt for ${email}`, 'Auth');
             return res.status(401).json({ error: authError });
         }
@@ -212,7 +216,10 @@ app.post('/api/admin/users', async (req, res) => {
             return res.status(400).json({ error: 'Email already exists' });
         }
 
+        const plainPassword = password || '123456';
+        const hashedPassword = await bcrypt.hash(plainPassword, 10);
         const defaultAvatar = `https://ui-avatars.com/api/?name=${name.replace(' ', '+')}&background=random&color=fff`;
+        
         const result = await pool.query(
             `INSERT INTO users (name, email, password, city, avatar, role, rating, age, level, rtt_rank, rtt_category) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
@@ -220,7 +227,7 @@ app.post('/api/admin/users', async (req, res) => {
             [
                 name, 
                 email, 
-                password || '123456', // Default password if not provided
+                hashedPassword,
                 city || 'Москва', 
                 defaultAvatar, 
                 role || 'amateur', 
