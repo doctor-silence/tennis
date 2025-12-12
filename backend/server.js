@@ -116,15 +116,18 @@ app.post('/api/auth/login', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
         
+        // Use a generic error message for security and UX consistency
+        const authError = 'Неверный логин или пароль';
+
         if (result.rows.length === 0) {
-            return res.status(401).json({ error: 'Пользователь не найден' });
+            return res.status(401).json({ error: authError });
         }
 
         const user = result.rows[0];
 
         if (user.password !== password) {
             await logSystemEvent('warning', `Failed login attempt for ${email}`, 'Auth');
-            return res.status(401).json({ error: 'Неверный пароль' });
+            return res.status(401).json({ error: authError });
         }
 
         await logSystemEvent('info', `User logged in: ${email}`, 'Auth');
