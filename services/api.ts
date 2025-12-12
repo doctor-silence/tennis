@@ -56,34 +56,44 @@ const MOCK_MATCHES: Match[] = [
 export const api = {
     auth: {
         register: async (userData: any): Promise<User> => {
+            let res;
             try {
-                const res = await fetch(`${API_URL}/auth/register`, {
+                res = await fetch(`${API_URL}/auth/register`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(userData)
                 });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Ошибка регистрации. Проверьте сервер.');
-                return data;
-            } catch (e: any) {
+            } catch (networkError) {
+                // Если fetch упал (нет сети), только тогда используем Mock
                 console.warn("Backend offline. Falling back to Demo Mode.");
                 return { ...MOCK_USER, ...userData };
             }
+
+            const data = await res.json();
+            // Если сервер ответил ошибкой (например, email занят), выбрасываем её, чтобы UI показал ошибку
+            if (!res.ok) throw new Error(data.error || 'Ошибка регистрации. Проверьте сервер.');
+            return data;
         },
         login: async (credentials: any): Promise<User> => {
+            let res;
             try {
-                const res = await fetch(`${API_URL}/auth/login`, {
+                res = await fetch(`${API_URL}/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(credentials)
                 });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Ошибка входа');
-                return data;
-            } catch (e: any) {
+            } catch (networkError) {
+                // Если fetch упал (нет сети), только тогда используем Mock
                 console.warn("Backend offline. Falling back to Demo Mode.");
                 return MOCK_USER;
             }
+
+            const data = await res.json();
+            // Если сервер ответил 401 (неверный пароль), мы выбрасываем ошибку
+            // Она поймается в AuthPage и покажет красное сообщение пользователю
+            if (!res.ok) throw new Error(data.error || 'Ошибка входа');
+            
+            return data;
         }
     },
 
