@@ -289,6 +289,73 @@ app.delete('/api/admin/users/:id', async (req, res) => {
     }
 });
 
+// --- COURTS ROUTES (Public & Admin) ---
+
+app.get('/api/courts', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM courts ORDER BY id ASC');
+        const courts = result.rows.map(row => ({
+            id: row.id.toString(),
+            name: row.name,
+            address: row.address,
+            surface: row.surface,
+            pricePerHour: row.price_per_hour,
+            image: row.image,
+            rating: parseFloat(row.rating)
+        }));
+        res.json(courts);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/courts', async (req, res) => {
+    const { name, address, surface, pricePerHour, image, rating } = req.body;
+    try {
+        const result = await pool.query(
+            'INSERT INTO courts (name, address, surface, price_per_hour, image, rating) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [name, address, surface, pricePerHour, image, rating]
+        );
+        await logSystemEvent('info', `New court added: ${name}`, 'Admin');
+        const row = result.rows[0];
+        res.json({
+            id: row.id.toString(),
+            name: row.name,
+            address: row.address,
+            surface: row.surface,
+            pricePerHour: row.price_per_hour,
+            image: row.image,
+            rating: parseFloat(row.rating)
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/courts/:id', async (req, res) => {
+    const { id } = req.params;
+    const { name, address, surface, pricePerHour, image, rating } = req.body;
+    try {
+        await pool.query(
+            'UPDATE courts SET name=$1, address=$2, surface=$3, price_per_hour=$4, image=$5, rating=$6 WHERE id=$7',
+            [name, address, surface, pricePerHour, image, rating, id]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/courts/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM courts WHERE id = $1', [req.params.id]);
+        await logSystemEvent('warning', `Court deleted: ${req.params.id}`, 'Admin');
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- PRODUCT ROUTES (Shop & Admin) ---
 
 app.get('/api/products', async (req, res) => {

@@ -35,8 +35,161 @@ const MOCK_PARTNERS: Partner[] = [
     { id: '2', name: 'Мария Петрова', age: 24, level: 'NTRP 4.0', city: 'Москва', isPro: false, image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80' },
 ];
 
-const MOCK_COURTS: Court[] = [
-    { id: '1', name: 'Теннис Парк', address: 'ул. Ленина 12, Москва', surface: 'hard', pricePerHour: 2500, rating: 4.8, image: 'https://images.unsplash.com/photo-1620202755294-8531732e7071?q=80&w=600&auto=format&fit=crop' },
+// UPDATED: Extended Real Moscow Courts (Mutable for Offline Admin)
+let MOCK_COURTS: Court[] = [
+    { 
+        id: '1', 
+        name: 'Мультиспорт (Лужники)', 
+        address: 'ул. Лужники, 24, стр. 10, Москва', 
+        surface: 'hard', 
+        pricePerHour: 4500, 
+        rating: 5.0, 
+        image: 'https://images.unsplash.com/photo-1575217985390-3375c3dbb908?q=80&w=1200&auto=format&fit=crop' 
+    },
+    { 
+        id: '2', 
+        name: 'Теннис Парк', 
+        address: 'Рязанский просп., 4, Москва', 
+        surface: 'clay', 
+        pricePerHour: 2800, 
+        rating: 4.8, 
+        image: 'https://images.unsplash.com/photo-1620202755294-8531732e7071?q=80&w=1200&auto=format&fit=crop' 
+    },
+    { 
+        id: '3', 
+        name: 'Национальный Теннисный Центр', 
+        address: 'Ленинградское ш., 45-47, Москва', 
+        surface: 'hard', 
+        pricePerHour: 3500, 
+        rating: 4.9, 
+        image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop' 
+    },
+    { 
+        id: '4', 
+        name: 'Спартак (Ширяевка)', 
+        address: 'Майский просек, 7, Москва', 
+        surface: 'clay', 
+        pricePerHour: 2200, 
+        rating: 4.7, 
+        image: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1200&auto=format&fit=crop' 
+    },
+    { 
+        id: '5', 
+        name: 'Теннисный клуб "Чайка"', 
+        address: 'Коробейников пер., 1/2, Москва', 
+        surface: 'carpet', 
+        pricePerHour: 3200, 
+        rating: 4.6, 
+        image: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1200&auto=format&fit=crop' 
+    },
+    { 
+        id: '6', 
+        name: 'Теннисный клуб ЦСКА', 
+        address: 'Ленинградский пр-т, 39, Москва', 
+        surface: 'hard', 
+        pricePerHour: 3000, 
+        rating: 4.8, 
+        image: 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=1200&auto=format&fit=crop' 
+    },
+    { 
+        id: '7', 
+        name: 'Теннисный центр "Динамо"', 
+        address: 'Ленинградский пр-т, 36, Москва', 
+        surface: 'hard', 
+        pricePerHour: 3500, 
+        rating: 4.7, 
+        image: 'https://images.unsplash.com/photo-1588611910629-68897b69c693?q=80&w=1200&auto=format&fit=crop' 
+    },
+    { 
+        id: '8', 
+        name: 'ТК "Коломенский"', 
+        address: 'Коломенская наб., 20, Москва', 
+        surface: 'hard', 
+        pricePerHour: 2200, 
+        rating: 4.5, 
+        image: 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=1200&auto=format&fit=crop' 
+    },
+    { 
+        id: '9', 
+        name: 'Теннис.ру', 
+        address: 'Ленинский проспект, 101, Москва', 
+        surface: 'carpet', 
+        pricePerHour: 2500, 
+        rating: 4.6, 
+        image: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1200&auto=format&fit=crop' 
+    },
+    { 
+        id: '10', 
+        name: 'Академия Островского', 
+        address: 'Химки, ул. Юннатов, 1А', 
+        surface: 'hard', 
+        pricePerHour: 3800, 
+        rating: 5.0, 
+        image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop' 
+    },
+    { 
+        id: '11', 
+        name: 'Корты Парка Горького', 
+        address: 'Крымский Вал, 9, Москва', 
+        surface: 'hard', 
+        pricePerHour: 1500, 
+        rating: 4.4, 
+        image: 'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?q=80&w=1200&auto=format&fit=crop' 
+    },
+    { 
+        id: '12', 
+        name: 'Теннис-Арт', 
+        address: 'ул. Мосфильмовская, 41, Москва', 
+        surface: 'clay', 
+        pricePerHour: 2800, 
+        rating: 4.7, 
+        image: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1200&auto=format&fit=crop' 
+    },
+    { 
+        id: '13', 
+        name: 'Sport Station', 
+        address: 'Новоостаповская ул., 5, стр. 2, Москва', 
+        surface: 'hard', 
+        pricePerHour: 3200, 
+        rating: 4.8, 
+        image: 'https://images.unsplash.com/photo-1575217985390-3375c3dbb908?q=80&w=1200&auto=format&fit=crop' 
+    },
+    { 
+        id: '14', 
+        name: 'ТК "Магия Спорта"', 
+        address: 'Крылатская ул., 2, Москва', 
+        surface: 'hard', 
+        pricePerHour: 2900, 
+        rating: 4.6, 
+        image: 'https://images.unsplash.com/photo-1588611910629-68897b69c693?q=80&w=1200&auto=format&fit=crop' 
+    },
+    { 
+        id: '15', 
+        name: 'Теннисный центр "Жуковка"', 
+        address: 'Рублево-Успенское ш., Жуковка', 
+        surface: 'hard', 
+        pricePerHour: 5000, 
+        rating: 4.9, 
+        image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop' 
+    },
+    { 
+        id: '16', 
+        name: 'ТК "Пироговский"', 
+        address: 'Мытищи, ул. Совхозная, 2', 
+        surface: 'clay', 
+        pricePerHour: 2400, 
+        rating: 4.5, 
+        image: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1200&auto=format&fit=crop' 
+    },
+    { 
+        id: '17', 
+        name: 'PRO CLUB', 
+        address: 'ул. Лобачевского, 114, Москва', 
+        surface: 'clay', 
+        pricePerHour: 3100, 
+        rating: 4.7, 
+        image: 'https://images.unsplash.com/photo-1620202755294-8531732e7071?q=80&w=1200&auto=format&fit=crop' 
+    }
 ];
 
 const MOCK_LADDER: LadderPlayer[] = [
@@ -191,7 +344,10 @@ export const api = {
             const res = await fetch(`${API_URL}/courts`);
             if (!res.ok) throw new Error('Failed to fetch courts');
             return await res.json();
-        } catch (e) { return MOCK_COURTS; }
+        } catch (e) { 
+            console.warn("Backend offline. Serving in-memory courts.");
+            return MOCK_COURTS; 
+        }
     },
 
     getAdvice: async (query: string) => {
@@ -271,7 +427,7 @@ export const api = {
         saveProduct: async (product: Partial<Product>) => {
              try {
                  // Create or Update
-                 if (product.id && !product.id.startsWith('0.')) { // Assuming real IDs are not random floats
+                 if (product.id && !product.id.startsWith('0.')) { 
                      await fetch(`${API_URL}/products/${product.id}`, {
                          method: 'PUT',
                          headers: { 'Content-Type': 'application/json' },
@@ -290,6 +446,71 @@ export const api = {
             try {
                 await fetch(`${API_URL}/products/${id}`, { method: 'DELETE' });
             } catch (e) { console.error(e); }
+        },
+        // Courts Management
+        saveCourt: async (court: Partial<Court>) => {
+            try {
+                let res;
+                // Check if ID is present and valid (not temp '0.' or 'mock-')
+                if (court.id && !court.id.startsWith('0.') && !court.id.startsWith('mock-')) {
+                    res = await fetch(`${API_URL}/courts/${court.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(court)
+                    });
+                } else {
+                    const { id, ...newCourtData } = court;
+                    res = await fetch(`${API_URL}/courts`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(newCourtData)
+                    });
+                }
+                
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.error || 'Failed to save court');
+                }
+                
+                return await res.json();
+            } catch (e) { 
+                console.warn("Backend offline. Saving to in-memory mocks.");
+                
+                // Simulate backend logic for Offline Mode
+                const newCourt = {
+                    ...court,
+                    id: court.id || `mock-${Date.now()}`, // Generate mock ID
+                    rating: court.rating || 5.0,
+                    // Ensure defaults
+                    name: court.name || 'New Court',
+                    address: court.address || 'Address',
+                    surface: court.surface || 'hard',
+                    pricePerHour: court.pricePerHour || 0,
+                    image: court.image || ''
+                } as Court;
+
+                if (court.id) {
+                    const index = MOCK_COURTS.findIndex(c => c.id === court.id);
+                    if (index !== -1) {
+                        MOCK_COURTS[index] = newCourt;
+                    } else {
+                        MOCK_COURTS.push(newCourt);
+                    }
+                } else {
+                    MOCK_COURTS.push(newCourt);
+                }
+                
+                return newCourt;
+            }
+        },
+        deleteCourt: async (id: string) => {
+            try {
+                const res = await fetch(`${API_URL}/courts/${id}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error('Failed to delete');
+            } catch (e) { 
+                console.warn("Backend offline. Deleting from in-memory mocks.");
+                MOCK_COURTS = MOCK_COURTS.filter(c => c.id !== id);
+            }
         }
     },
 

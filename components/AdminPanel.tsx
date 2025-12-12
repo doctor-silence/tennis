@@ -19,10 +19,11 @@ import {
     AlertCircle,
     CheckCircle2,
     Info,
-    Image as ImageIcon
+    Image as ImageIcon,
+    Map
 } from 'lucide-react';
 import Button from './Button';
-import { User, Product, SystemLog } from '../types';
+import { User, Product, SystemLog, Court } from '../types';
 import { api } from '../services/api';
 
 interface AdminPanelProps {
@@ -31,18 +32,21 @@ interface AdminPanelProps {
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts'>('overview');
     
     // Data State
     const [stats, setStats] = useState({ revenue: 0, activeUsers: 0, newSignups: 0, serverLoad: 0 });
     const [users, setUsers] = useState<User[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
+    const [courts, setCourts] = useState<Court[]>([]);
     const [logs, setLogs] = useState<SystemLog[]>([]);
     
     // Modals
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+    const [isCourtModalOpen, setIsCourtModalOpen] = useState(false);
+    const [editingCourt, setEditingCourt] = useState<Partial<Court> | null>(null);
     
     // User Edit State
     // We extend User to include 'password' for creation logic, though it's not in the base User type
@@ -70,6 +74,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             const p = await api.admin.getProducts();
             if (Array.isArray(p)) setProducts(p);
         }
+        if (activeTab === 'courts') {
+            const c = await api.getCourts();
+            if (Array.isArray(c)) setCourts(c);
+        }
     };
 
     // Product Handlers
@@ -87,6 +95,35 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
         if (confirm('Вы уверены?')) {
             await api.admin.deleteProduct(id);
             setProducts(products.filter(p => p.id !== id));
+        }
+    };
+
+    // Court Handlers
+    const handleSaveCourt = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (editingCourt) {
+            try {
+                await api.admin.saveCourt(editingCourt);
+                await loadData();
+                setIsCourtModalOpen(false);
+                setEditingCourt(null);
+            } catch (e: any) {
+                alert('Ошибка сохранения: ' + e.message);
+                console.error("Save failed", e);
+            }
+        }
+    };
+
+    const handleDeleteCourt = async (id: string) => {
+        if (confirm('Удалить корт?')) {
+            try {
+                await api.admin.deleteCourt(id);
+                // Optimistic update
+                setCourts(courts.filter(c => c.id !== id));
+                await loadData();
+            } catch (e: any) {
+                alert('Ошибка удаления: ' + e.message);
+            }
         }
     };
 
@@ -157,6 +194,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         onClick={() => setActiveTab('users')} 
                     />
                     <SidebarLink 
+                        icon={<Map size={20}/>} 
+                        label="Корты" 
+                        active={activeTab === 'courts'} 
+                        onClick={() => setActiveTab('courts')} 
+                    />
+                    <SidebarLink 
                         icon={<ShoppingBag size={20}/>} 
                         label="Магазин" 
                         active={activeTab === 'shop'} 
@@ -191,6 +234,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         {activeTab === 'overview' && 'Экономика приложения'}
                         {activeTab === 'users' && 'Управление пользователями'}
                         {activeTab === 'shop' && 'Управление товарами'}
+                        {activeTab === 'courts' && 'Управление кортами'}
                         {activeTab === 'logs' && 'Системный мониторинг'}
                     </h2>
                     <div className="flex items-center gap-4">
@@ -393,6 +437,62 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         </div>
                     )}
 
+                    {activeTab === 'courts' && (
+                         <div className="animate-fade-in-up">
+                             <div className="flex justify-end mb-6">
+                                 <Button className="gap-2" onClick={() => {
+                                     setEditingCourt({ name: '', address: '', surface: 'hard', pricePerHour: 2000, rating: 5.0, image: '' });
+                                     setIsCourtModalOpen(true);
+                                 }}>
+                                     <Plus size={18}/> Добавить корт
+                                 </Button>
+                             </div>
+                             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                 <table className="w-full text-sm text-left">
+                                     <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs">
+                                         <tr>
+                                             <th className="px-6 py-4">Название</th>
+                                             <th className="px-6 py-4">Адрес</th>
+                                             <th className="px-6 py-4">Покрытие</th>
+                                             <th className="px-6 py-4">Цена</th>
+                                             <th className="px-6 py-4 text-right">Действия</th>
+                                         </tr>
+                                     </thead>
+                                     <tbody className="divide-y divide-slate-100">
+                                         {(courts || []).map(c => (
+                                             <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                                                 <td className="px-6 py-4 flex items-center gap-3">
+                                                     <div className="w-12 h-12 bg-slate-100 rounded-lg overflow-hidden shrink-0">
+                                                         <img src={c.image} className="w-full h-full object-cover" alt=""/>
+                                                     </div>
+                                                     <div className="font-bold text-slate-900">{c.name}</div>
+                                                 </td>
+                                                 <td className="px-6 py-4 text-slate-600">{c.address}</td>
+                                                 <td className="px-6 py-4">
+                                                     <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase ${
+                                                         c.surface === 'clay' ? 'bg-orange-100 text-orange-800' :
+                                                         c.surface === 'hard' ? 'bg-blue-100 text-blue-800' :
+                                                         c.surface === 'grass' ? 'bg-green-100 text-green-800' :
+                                                         'bg-indigo-100 text-indigo-800'
+                                                     }`}>
+                                                         {c.surface}
+                                                     </span>
+                                                 </td>
+                                                 <td className="px-6 py-4 font-bold">{c.pricePerHour} ₽/ч</td>
+                                                 <td className="px-6 py-4 text-right">
+                                                     <div className="flex justify-end gap-2">
+                                                         <button onClick={() => { setEditingCourt(c); setIsCourtModalOpen(true); }} className="p-2 hover:bg-slate-200 rounded-lg text-slate-600"><Edit size={16}/></button>
+                                                         <button onClick={() => handleDeleteCourt(c.id)} className="p-2 hover:bg-red-50 rounded-lg text-red-500"><Trash2 size={16}/></button>
+                                                     </div>
+                                                 </td>
+                                             </tr>
+                                         ))}
+                                     </tbody>
+                                 </table>
+                             </div>
+                         </div>
+                    )}
+
                     {activeTab === 'logs' && (
                         <div className="bg-slate-900 rounded-2xl p-6 shadow-2xl text-slate-300 font-mono text-sm h-[600px] overflow-y-auto animate-fade-in-up border border-slate-800">
                              <div className="flex items-center gap-2 mb-4 text-slate-500 border-b border-slate-800 pb-2">
@@ -448,6 +548,49 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                             <div className="flex gap-2">
                                 <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingProduct.image || ''} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} />
                                 {editingProduct.image && <img src={editingProduct.image} className="w-10 h-10 rounded-lg object-cover border border-slate-200" alt=""/>}
+                            </div>
+                        </div>
+                        <Button type="submit" className="w-full mt-4">Сохранить</Button>
+                    </form>
+                )}
+            </Modal>
+
+            {/* Court Modal */}
+            <Modal isOpen={isCourtModalOpen} onClose={() => setIsCourtModalOpen(false)} title={editingCourt?.id ? 'Редактировать корт' : 'Новый корт'}>
+                {editingCourt && (
+                    <form onSubmit={handleSaveCourt} className="space-y-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Название клуба</label>
+                            <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingCourt.name || ''} onChange={e => setEditingCourt({...editingCourt, name: e.target.value})} />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Адрес</label>
+                            <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingCourt.address || ''} onChange={e => setEditingCourt({...editingCourt, address: e.target.value})} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                             <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Цена (₽/час)</label>
+                                <input required type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingCourt.pricePerHour || ''} onChange={e => setEditingCourt({...editingCourt, pricePerHour: Number(e.target.value)})} />
+                            </div>
+                             <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Рейтинг</label>
+                                <input required type="number" step="0.1" max="5" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingCourt.rating || ''} onChange={e => setEditingCourt({...editingCourt, rating: Number(e.target.value)})} />
+                            </div>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Покрытие</label>
+                            <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingCourt.surface} onChange={e => setEditingCourt({...editingCourt, surface: e.target.value as any})}>
+                                <option value="hard">Хард</option>
+                                <option value="clay">Грунт</option>
+                                <option value="grass">Трава</option>
+                                <option value="carpet">Ковер (Carpet)</option>
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Ссылка на фото</label>
+                            <div className="flex gap-2">
+                                <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingCourt.image || ''} onChange={e => setEditingCourt({...editingCourt, image: e.target.value})} />
+                                {editingCourt.image && <img src={editingCourt.image} className="w-10 h-10 rounded-lg object-cover border border-slate-200" alt=""/>}
                             </div>
                         </div>
                         <Button type="submit" className="w-full mt-4">Сохранить</Button>
