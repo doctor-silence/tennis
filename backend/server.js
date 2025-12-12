@@ -75,6 +75,10 @@ app.post('/api/auth/register', async (req, res) => {
     const { name, email, password, city, role, age, rating, level, rttRank, rttCategory } = req.body;
     
     try {
+        if (!password || password.length < 6) {
+            return res.status(400).json({ error: 'Пароль должен содержать минимум 6 символов' });
+        }
+
         const userCheck = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
         if (userCheck.rows.length > 0) {
             return res.status(400).json({ error: 'Пользователь с таким email уже существует' });
@@ -112,6 +116,8 @@ app.post('/api/auth/register', async (req, res) => {
             rttCategory: user.rtt_category 
         });
     } catch (err) {
+        // Detailed logging for debugging
+        console.error("❌ Registration Error:", err);
         await logSystemEvent('error', `Registration failed: ${err.message}`, 'Auth');
         res.status(500).json({ error: 'Ошибка регистрации: ' + err.message });
     }
@@ -124,7 +130,6 @@ app.post('/api/auth/login', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
         
-        // Use a generic error message for security and UX consistency
         const authError = 'Неверный логин или пароль';
 
         if (result.rows.length === 0) {
@@ -132,6 +137,11 @@ app.post('/api/auth/login', async (req, res) => {
         }
 
         const user = result.rows[0];
+        
+        if (!user.password) {
+             return res.status(401).json({ error: 'Ошибка учетной записи. Обратитесь в поддержку.' });
+        }
+
         const isValidPassword = await bcrypt.compare(password, user.password);
 
         if (!isValidPassword) {
@@ -151,6 +161,7 @@ app.post('/api/auth/login', async (req, res) => {
         });
 
     } catch (err) {
+        console.error("❌ Login Error:", err);
         res.status(500).json({ error: 'Ошибка при входе: ' + err.message });
     }
 });
@@ -162,15 +173,13 @@ app.get('/api/admin/stats', async (req, res) => {
     try {
         const usersCount = await pool.query('SELECT COUNT(*) FROM users');
         const newSignups = await pool.query("SELECT COUNT(*) FROM users WHERE created_at > NOW() - INTERVAL '30 days'");
-        
-        // Mock revenue logic (e.g., sum of positive student balances + imaginary subscriptions)
-        const revenue = 1450000; // Hardcoded base for demo + logic
+        const revenue = 1450000;
         
         res.json({
             revenue: revenue,
             activeUsers: parseInt(usersCount.rows[0].count),
             newSignups: parseInt(newSignups.rows[0].count),
-            serverLoad: Math.floor(Math.random() * 20) + 10 // Mock load
+            serverLoad: Math.floor(Math.random() * 20) + 10
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -194,7 +203,6 @@ app.get('/api/admin/logs', async (req, res) => {
 
 app.get('/api/admin/users', async (req, res) => {
     try {
-        // Updated to select all relevant fields for admin editing
         const result = await pool.query('SELECT id, name, email, role, city, avatar, rating, level, age, rtt_rank, rtt_category FROM users ORDER BY id DESC');
         res.json(result.rows.map(u => ({
             ...u, 
@@ -210,7 +218,6 @@ app.get('/api/admin/users', async (req, res) => {
 app.post('/api/admin/users', async (req, res) => {
     const { name, email, password, role, city, age, rating, level, rttRank, rttCategory } = req.body;
     try {
-        // Basic check
         const userCheck = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
         if (userCheck.rows.length > 0) {
             return res.status(400).json({ error: 'Email already exists' });
@@ -242,6 +249,7 @@ app.post('/api/admin/users', async (req, res) => {
         await logSystemEvent('info', `Admin created user: ${email}`, 'Admin');
         res.json({ ...user, id: user.id.toString(), rttRank: user.rtt_rank, rttCategory: user.rtt_category });
     } catch (err) {
+        console.error("Admin Create User Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -351,7 +359,6 @@ app.get('/api/students', async (req, res) => {
 
     const coachIdInt = parseInt(coachId);
     if (isNaN(coachIdInt)) {
-        console.warn(`Invalid coachId received: ${coachId}. Likely a mock ID.`);
         return res.json([]);
     }
 

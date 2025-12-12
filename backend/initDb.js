@@ -21,7 +21,7 @@ const initDb = async () => {
         image TEXT
       );
     `);
-    console.log('✅ Table "partners" checked/created.');
+    console.log('✅ Table "partners" checked.');
 
     // 2. Create Courts Table
     await client.query(`
@@ -35,9 +35,9 @@ const initDb = async () => {
         image TEXT
       );
     `);
-    console.log('✅ Table "courts" checked/created.');
+    console.log('✅ Table "courts" checked.');
 
-    // 3. Create Users Table (Updated with created_at)
+    // 3. Create Users Table
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -55,7 +55,14 @@ const initDb = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ Table "users" checked/created.');
+    
+    // --- MIGRATIONS (Fix for existing tables) ---
+    // Ensure new columns exist even if table was created previously
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS rtt_rank INTEGER DEFAULT 0;`);
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS rtt_category VARCHAR(50);`);
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`);
+    
+    console.log('✅ Table "users" checked and updated.');
 
     // 4. Create Students Table (CRM)
     await client.query(`
@@ -73,7 +80,7 @@ const initDb = async () => {
         notes TEXT
       );
     `);
-    console.log('✅ Table "students" checked/created.');
+    console.log('✅ Table "students" checked.');
 
     // 5. Create Matches Table (Statistics)
     await client.query(`
@@ -88,7 +95,7 @@ const initDb = async () => {
         stats JSONB
       );
     `);
-    console.log('✅ Table "matches" checked/created.');
+    console.log('✅ Table "matches" checked.');
 
     // 6. Create System Logs Table
     await client.query(`
@@ -100,7 +107,7 @@ const initDb = async () => {
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ Table "system_logs" checked/created.');
+    console.log('✅ Table "system_logs" checked.');
 
     // 7. Create Products Table (Shop)
     await client.query(`
@@ -117,14 +124,13 @@ const initDb = async () => {
         is_hit BOOLEAN DEFAULT FALSE
       );
     `);
-    console.log('✅ Table "products" checked/created.');
+    console.log('✅ Table "products" checked.');
 
     await client.query('COMMIT');
 
     // --- SEED DATA ---
     
     // Seed Default User (Coach) if none exist
-    // Check if we need to seed the Coach
     const coachEmail = 'coach@test.com';
     const coachCheck = await pool.query('SELECT id FROM users WHERE email = $1', [coachEmail]);
     
@@ -152,8 +158,7 @@ const initDb = async () => {
                 VALUES ('Супер Админ', $1, $2, 'admin', 'HQ', 'https://ui-avatars.com/api/?name=Admin&background=000&color=fff', 9999, 99, 'GOD MODE')
             `, [adminEmail, hashedAdminPassword]);
         } else {
-            console.log(`🔄 Updating Admin User (${adminEmail}) password from .env...`);
-            // Ensure the existing admin has the correct password and role from .env
+            // Update admin password/role if env changed
             await pool.query(`
                 UPDATE users SET password = $1, role = 'admin' WHERE email = $2
             `, [hashedAdminPassword, adminEmail]);
