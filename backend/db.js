@@ -2,12 +2,16 @@
 require('dotenv').config();
 const { Pool } = require('pg');
 
-// Используем переменные окружения или стандартные настройки
+// Проверка наличия критических переменных
+if (!process.env.DB_PASSWORD) {
+    console.warn("⚠️  WARNING: DB_PASSWORD is not set in .env file. Database connection may fail.");
+}
+
 const pool = new Pool({
-  user: process.env.DB_USER || 'admin',
+  user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'postgres', // Changed from 'admin' to 'postgres'
-  password: process.env.DB_PASSWORD || 'Vek19866891!', 
+  database: process.env.DB_NAME || 'postgres',
+  password: process.env.DB_PASSWORD, // Пароль берется ТОЛЬКО из .env
   port: process.env.DB_PORT || 5432,
 });
 
