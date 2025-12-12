@@ -14,6 +14,11 @@ app.use(cors());
 app.use(express.json());
 
 // Initialize Google GenAI
+// CRITICAL: API Key must come from environment variables
+if (!process.env.API_KEY) {
+  console.error("❌ FATAL: API_KEY is missing in .env file");
+  process.exit(1);
+}
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // --- HELPERS ---
@@ -395,6 +400,21 @@ app.post('/api/matches', async (req, res) => {
         });
     } catch (err) {
         res.status(500).json({ error: 'Db error' });
+    }
+});
+
+// AI Coach Route (Actually using the Gemini API)
+app.post('/api/ai-coach', async (req, res) => {
+    const { query } = req.body;
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: `Ты профессиональный теннисный тренер. Ответь кратко и по делу на вопрос: "${query}"`,
+        });
+        res.json({ text: response.text });
+    } catch (err) {
+        console.error('Gemini API Error:', err);
+        res.status(500).json({ error: 'Failed to generate advice' });
     }
 });
 

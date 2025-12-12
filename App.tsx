@@ -129,9 +129,10 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center pt-20 bg-slate-900 overflow-hidden">
-        {/* Abstract Background Shapes */}
+        {/* Animated Abstract Background */}
         <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-lime-400/20 rounded-full blur-[120px] animate-pulse"></div>
         <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-emerald-600/20 rounded-full blur-[100px]"></div>
+        <div className="absolute top-[40%] left-[20%] w-[300px] h-[300px] bg-blue-500/10 rounded-full blur-[80px]"></div>
         
         {/* Background Texture */}
         <div className="absolute inset-0 z-0 opacity-20" style={{
@@ -147,7 +148,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
             
             <h1 className="text-6xl md:text-8xl font-bold text-white tracking-tighter mb-8 leading-[0.9]">
               ТВОЯ ИГРА <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-lime-400 to-emerald-400 text-glow">НОВЫЙ УРОВЕНЬ</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-lime-400 via-emerald-400 to-cyan-400 text-glow">НОВЫЙ УРОВЕНЬ</span>
             </h1>
             
             <p className="text-xl text-slate-300 max-w-xl mb-10 leading-relaxed font-light">
@@ -155,10 +156,10 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
             </p>
             
             <div className="flex flex-col sm:flex-row items-center gap-4">
-              <Button size="lg" variant="secondary" onClick={onRegisterClick} className="w-full sm:w-auto gap-2">
+              <Button size="lg" variant="secondary" onClick={onRegisterClick} className="w-full sm:w-auto gap-2 shadow-lg shadow-lime-400/20 hover:shadow-lime-400/40 transform hover:-translate-y-1 transition-all">
                 Начать сейчас <ArrowRight size={18} />
               </Button>
-              <Button variant="glass" size="lg" className="w-full sm:w-auto" onClick={onLoginClick}>
+              <Button variant="glass" size="lg" className="w-full sm:w-auto hover:bg-white/20" onClick={onLoginClick}>
                 Демо доступ
               </Button>
             </div>
@@ -169,12 +170,13 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                    <img key={i} src={`https://picsum.photos/seed/p${i}/50/50`} className="w-10 h-10 rounded-full border-2 border-slate-900" alt=""/>
                  ))}
                </div>
-               <p>Уже 15,000+ игроков в игре</p>
+               <p><span className="text-white font-bold">15,000+</span> игроков уже в игре</p>
             </div>
           </div>
 
           <div className="relative hidden lg:block animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-            <div className="relative z-10 transform rotate-[-5deg] hover:rotate-0 transition-all duration-500 group">
+            <div className="relative z-10 transform rotate-[-5deg] hover:rotate-0 transition-all duration-700 ease-out group perspective-1000">
+               <div className="absolute inset-0 bg-gradient-to-r from-lime-400 to-emerald-400 rounded-3xl transform translate-x-4 translate-y-4 -z-10 opacity-50 blur-lg"></div>
                <img 
                  src="https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=800&auto=format&fit=crop" 
                  alt="App Preview" 
