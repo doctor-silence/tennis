@@ -24,7 +24,8 @@ import {
   X,
   ListOrdered,
   Medal,
-  Loader2
+  Loader2,
+  Briefcase
 } from 'lucide-react';
 
 const App = () => {
@@ -453,7 +454,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () =>
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
   const [age, setAge] = useState('');
-  const [role, setRole] = useState<'amateur' | 'rtt_pro'>('amateur');
+  const [role, setRole] = useState<'amateur' | 'rtt_pro' | 'coach'>('amateur');
   const [level, setLevel] = useState('NTRP 3.0');
   
   // RTT Specific States
@@ -526,7 +527,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () =>
             city,
             age: parseInt(age),
             role,
-            level: role === 'amateur' ? level : undefined,
+            level: role === 'amateur' ? level : (role === 'coach' ? 'Coach' : undefined),
             // Mapping new RTT fields
             rating: role === 'rtt_pro' ? parseInt(rttPoints) : 0, // Points
             rttRank: role === 'rtt_pro' ? parseInt(rttRank) : 0,   // Position
@@ -692,7 +693,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () =>
 
                 <div className="pt-2">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Ваш статус</label>
-                    <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="grid grid-cols-3 gap-3 mb-4">
                         <div 
                             onClick={() => setRole('amateur')}
                             className={`cursor-pointer rounded-xl p-3 border text-center transition-all ${role === 'amateur' ? 'bg-lime-400 border-lime-400 text-slate-900' : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'}`}
@@ -707,9 +708,16 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () =>
                             <Medal className="mx-auto mb-1" size={20}/>
                             <div className="font-bold text-sm">Профи РТТ</div>
                         </div>
+                        <div 
+                            onClick={() => setRole('coach')}
+                            className={`cursor-pointer rounded-xl p-3 border text-center transition-all ${role === 'coach' ? 'bg-lime-400 border-lime-400 text-slate-900' : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'}`}
+                        >
+                            <Briefcase className="mx-auto mb-1" size={20}/>
+                            <div className="font-bold text-sm">Тренер</div>
+                        </div>
                     </div>
 
-                    {role === 'amateur' ? (
+                    {role === 'amateur' && (
                         <div className="bg-slate-800/30 p-4 rounded-xl border border-slate-700 animate-fade-in-up">
                             <label className="text-xs font-bold text-lime-400 uppercase tracking-wider mb-2 block flex items-center gap-2"><Activity size={14}/> Уровень игры (NTRP)</label>
                             <select 
@@ -721,7 +729,9 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () =>
                             </select>
                             <p className="text-[10px] text-slate-500 mt-2 leading-tight">Выберите уровень для корректного подбора соперников в лиге.</p>
                         </div>
-                    ) : (
+                    )}
+                    
+                    {role === 'rtt_pro' && (
                         <div className="bg-slate-800/30 p-4 rounded-xl border border-slate-700 space-y-4 animate-fade-in-up">
                             <div>
                                 <label className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2 block flex items-center gap-2"><ListOrdered size={14}/> Возрастная категория</label>
@@ -757,6 +767,15 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () =>
                                 </div>
                             </div>
                             <p className="text-[10px] text-slate-500 leading-tight">Данные будут проверены через базу РТТ.</p>
+                        </div>
+                    )}
+
+                    {role === 'coach' && (
+                        <div className="bg-slate-800/30 p-4 rounded-xl border border-slate-700 animate-fade-in-up">
+                            <p className="text-sm text-slate-400">
+                                Аккаунт тренера позволяет управлять учениками, расписанием и проводить видео-анализ. 
+                                <br/><span className="text-lime-400 text-xs mt-1 block">Дополнительные поля можно заполнить позже в профиле.</span>
+                            </p>
                         </div>
                     )}
                 </div>
