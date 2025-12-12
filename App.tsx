@@ -3,8 +3,8 @@ import React, { useState } from 'react';
 import { ViewState, User } from './types';
 import Dashboard from './components/Dashboard';
 import Button from './components/Button';
-import Shop from './components/Shop'; // Import Shop
-import AdminPanel from './components/AdminPanel'; // Import AdminPanel
+import Shop from './components/Shop';
+import AdminPanel from './components/AdminPanel';
 import { api } from './services/api';
 import { 
   ArrowRight, 
@@ -12,25 +12,19 @@ import {
   Users, 
   Map, 
   Star, 
-  ChevronRight, 
   Activity, 
   Zap, 
   Check, 
-  MessageCircle, 
-  TrendingUp, 
-  Calendar,
   Crown,
   BarChart3,
   Video,
   ShieldCheck,
-  ArrowLeft,
-  Loader2,
   User as UserIcon,
   Search,
   X,
-  ShoppingBag,
+  ListOrdered,
   Medal,
-  ListOrdered
+  Loader2
 } from 'lucide-react';
 
 const App = () => {
@@ -91,7 +85,7 @@ const App = () => {
 
 // --- Shared Header Component ---
 const PublicHeader = ({ onLogin, onRegister, onNavigate, transparent = false }: any) => (
-  <header className={`fixed top-0 w-full z-50 transition-all duration-300 ${transparent ? 'bg-transparent border-transparent' : 'glass-panel border-b-0 bg-white/80'}`}>
+  <header className={`fixed top-0 w-full z-50 transition-all duration-300 ${transparent ? 'bg-transparent border-transparent' : 'glass-panel border-b-0 bg-white/80 backdrop-blur-md'}`}>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
       <div 
         className="flex items-center gap-2 cursor-pointer group" 
