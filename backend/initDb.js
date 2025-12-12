@@ -36,8 +36,7 @@ const initDb = async () => {
     `);
     console.log('✅ Table "courts" checked/created.');
 
-    // 3. Create Users Table
-    // Updated with RTT specific fields
+    // 3. Create Users Table (Updated with created_at)
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -51,7 +50,8 @@ const initDb = async () => {
         age INTEGER,
         level VARCHAR(50),
         rtt_rank INTEGER DEFAULT 0,
-        rtt_category VARCHAR(50)
+        rtt_category VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
     console.log('✅ Table "users" checked/created.');
@@ -89,6 +89,35 @@ const initDb = async () => {
     `);
     console.log('✅ Table "matches" checked/created.');
 
+    // 6. Create System Logs Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS system_logs (
+        id SERIAL PRIMARY KEY,
+        level VARCHAR(20),
+        message TEXT,
+        module VARCHAR(50),
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Table "system_logs" checked/created.');
+
+    // 7. Create Products Table (Shop)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS products (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(200) NOT NULL,
+        category VARCHAR(50),
+        price INTEGER NOT NULL,
+        old_price INTEGER,
+        image TEXT,
+        rating NUMERIC(3, 1) DEFAULT 5.0,
+        reviews INTEGER DEFAULT 0,
+        is_new BOOLEAN DEFAULT FALSE,
+        is_hit BOOLEAN DEFAULT FALSE
+      );
+    `);
+    console.log('✅ Table "products" checked/created.');
+
     await client.query('COMMIT');
 
     // --- SEED DATA ---
@@ -101,41 +130,28 @@ const initDb = async () => {
             INSERT INTO users (name, email, password, role, city, avatar, rating, age, level)
             VALUES ('Тренер Демо', 'coach@test.com', '123456', 'coach', 'Москва', 'https://ui-avatars.com/api/?name=Coach+Demo&background=0D8ABC&color=fff', 1500, 30, 'Coach')
         `);
+        // Seed Admin
+        await pool.query(`
+            INSERT INTO users (name, email, password, role, city, avatar, rating, age, level)
+            VALUES ('Супер Админ', 'admin@tennis.pro', 'admin123', 'admin', 'HQ', 'https://ui-avatars.com/api/?name=Admin&background=000&color=fff', 9999, 99, 'GOD MODE')
+        `);
     }
 
-    // Seed Partners
-    const partnerCount = await pool.query('SELECT count(*) FROM partners');
-    if (parseInt(partnerCount.rows[0].count) === 0) {
-      console.log('🌱 Seeding partners...');
-      const partners = [
-        ['Алексей Иванов', 28, 'NTRP 4.5', 'Москва', true, 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80'],
-        ['Мария Петрова', 24, 'NTRP 4.0', 'Москва', false, 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80'],
-        ['Дмитрий Сидоров', 32, 'РТТ Топ-100', 'Санкт-Петербург', true, 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80']
-      ];
-      
-      for (const p of partners) {
-        await pool.query(
-          'INSERT INTO partners (name, age, level, city, is_pro, image) VALUES ($1, $2, $3, $4, $5, $6)',
-          p
-        );
-      }
-    }
-
-    // Seed Courts
-    const courtCount = await pool.query('SELECT count(*) FROM courts');
-    if (parseInt(courtCount.rows[0].count) === 0) {
-      console.log('🌱 Seeding courts...');
-      const courts = [
-        ['Теннис Парк', 'ул. Ленина 12, Москва', 'hard', 2500, 4.8, 'https://images.unsplash.com/photo-1620202755294-8531732e7071?q=80&w=600&auto=format&fit=crop'],
-        ['Академия Островского', 'Химки, Парковая 4', 'clay', 3000, 4.9, 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=600&auto=format&fit=crop']
-      ];
-
-      for (const c of courts) {
-        await pool.query(
-          'INSERT INTO courts (name, address, surface, price_per_hour, rating, image) VALUES ($1, $2, $3, $4, $5, $6)',
-          c
-        );
-      }
+    // Seed Products
+    const prodCount = await pool.query('SELECT count(*) FROM products');
+    if (parseInt(prodCount.rows[0].count) === 0) {
+       console.log('🌱 Seeding products...');
+       const products = [
+          ['Wilson Blade 98 v8', 'rackets', 24990, 'https://images.unsplash.com/photo-1617083934555-52951271b273?q=80&w=800&auto=format&fit=crop', true],
+          ['Babolat Pure Aero 2023', 'rackets', 26500, 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=800&auto=format&fit=crop', false],
+          ['Nike Court Zoom Vapor', 'shoes', 14990, 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=800&auto=format&fit=crop', false]
+       ];
+       for (const p of products) {
+           await pool.query(
+               'INSERT INTO products (title, category, price, image, is_hit) VALUES ($1, $2, $3, $4, $5)',
+               p
+           );
+       }
     }
 
     console.log('🚀 Database initialization complete.');

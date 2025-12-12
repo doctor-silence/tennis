@@ -30,77 +30,80 @@ interface AdminPanelProps {
     onLogout: () => void;
 }
 
-// Reuse mock products for demo purposes initially, normally fetched from API
-const INITIAL_PRODUCTS: Product[] = [
-    { id: '1', title: 'Wilson Blade 98 v8', category: 'rackets', price: 24990, image: 'https://images.unsplash.com/photo-1617083934555-52951271b273?q=80&w=800&auto=format&fit=crop', rating: 4.9, reviews: 124, isHit: true },
-    { id: '2', title: 'Babolat Pure Aero', category: 'rackets', price: 26500, image: 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=800&auto=format&fit=crop', rating: 4.8, reviews: 89, isNew: true },
-    { id: '3', title: 'Nike Court Zoom', category: 'shoes', price: 14990, image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=800&auto=format&fit=crop', rating: 4.7, reviews: 56 },
-];
-
-const INITIAL_USERS: User[] = [
-    { id: 'u1', name: 'Алексей Иванов', email: 'alex@mail.ru', role: 'rtt_pro', city: 'Москва', avatar: '', rating: 1450 },
-    { id: 'u2', name: 'Дмитрий Петров', email: 'dima@ya.ru', role: 'coach', city: 'Сочи', avatar: '', rating: 0 },
-    { id: 'u3', name: 'Елена Смирнова', email: 'elena@gmail.com', role: 'amateur', city: 'Казань', avatar: '', rating: 3.5 },
-];
-
 const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs'>('overview');
     
     // Data State
     const [stats, setStats] = useState({ revenue: 0, activeUsers: 0, newSignups: 0, serverLoad: 0 });
-    const [users, setUsers] = useState<User[]>(INITIAL_USERS);
-    const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+    const [users, setUsers] = useState<User[]>([]);
+    const [products, setProducts] = useState<Product[]>([]);
     const [logs, setLogs] = useState<SystemLog[]>([]);
     
     // Modals
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
-    const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+    const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
 
+    // Initial Data Load
     useEffect(() => {
-        // Mock data fetching
-        const loadData = async () => {
+        loadData();
+    }, [activeTab]); // Refresh when tab changes
+
+    const loadData = async () => {
+        if (activeTab === 'overview') {
             const s = await api.admin.getStats();
             setStats(s);
+        }
+        if (activeTab === 'logs') {
             const l = await api.admin.getLogs();
             setLogs(l);
-        };
-        loadData();
-    }, []);
+        }
+        if (activeTab === 'users') {
+            const u = await api.admin.getUsers();
+            setUsers(u);
+        }
+        if (activeTab === 'shop') {
+            const p = await api.admin.getProducts();
+            setProducts(p);
+        }
+    };
 
     // Product Handlers
-    const handleSaveProduct = (e: React.FormEvent) => {
+    const handleSaveProduct = async (e: React.FormEvent) => {
         e.preventDefault();
         if (editingProduct) {
-            if (products.find(p => p.id === editingProduct.id)) {
-                setProducts(products.map(p => p.id === editingProduct.id ? editingProduct : p));
-            } else {
-                setProducts([editingProduct, ...products]);
-            }
+            await api.admin.saveProduct(editingProduct);
+            await loadData(); // Reload to get IDs
         }
         setIsProductModalOpen(false);
         setEditingProduct(null);
     };
 
-    const handleDeleteProduct = (id: string) => {
-        if (confirm('Вы уверены?')) setProducts(products.filter(p => p.id !== id));
+    const handleDeleteProduct = async (id: string) => {
+        if (confirm('Вы уверены?')) {
+            await api.admin.deleteProduct(id);
+            setProducts(products.filter(p => p.id !== id));
+        }
     };
 
     // User Handlers
-    const handleSaveUser = (e: React.FormEvent) => {
+    const handleSaveUser = async (e: React.FormEvent) => {
         e.preventDefault();
         if (editingUser) {
-             setUsers(users.map(u => u.id === editingUser.id ? editingUser : u));
+             await api.admin.updateUser(editingUser.id, editingUser);
+             await loadData();
         }
         setIsUserModalOpen(false);
         setEditingUser(null);
     };
 
-    const handleDeleteUser = (id: string) => {
-         if (confirm('Заблокировать пользователя?')) setUsers(users.filter(u => u.id !== id));
+    const handleDeleteUser = async (id: string) => {
+         if (confirm('Удалить пользователя?')) {
+             await api.admin.deleteUser(id);
+             setUsers(users.filter(u => u.id !== id));
+         }
     };
-
 
     return (
         <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
@@ -180,7 +183,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                                 <StatCard 
                                     title="Общая выручка" 
-                                    value={`${(stats.revenue / 1000000).toFixed(1)}M ₽`} 
+                                    value={`${(stats.revenue / 1000).toFixed(0)}k ₽`} 
                                     change="+12.5%" 
                                     icon={<DollarSign className="text-lime-600"/>}
                                     color="lime"
@@ -325,7 +328,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         <div className="animate-fade-in-up">
                             <div className="flex justify-end mb-6">
                                 <Button className="gap-2" onClick={() => {
-                                    setEditingProduct({ id: Math.random().toString(), title: '', price: 0, category: 'rackets', image: '', rating: 0, reviews: 0 });
+                                    setEditingProduct({ title: '', price: 0, category: 'rackets', image: '', rating: 5, reviews: 0 });
                                     setIsProductModalOpen(true);
                                 }}>
                                     <Plus size={18}/> Добавить товар
@@ -362,9 +365,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                  <Terminal size={16}/> System Logs / Live Stream
                              </div>
                              <div className="space-y-2">
-                                 {logs.map((log, i) => (
+                                 {logs.length === 0 && <div className="text-slate-600">No logs found in database.</div>}
+                                 {logs.map((log) => (
                                      <div key={log.id} className="flex gap-4 hover:bg-white/5 p-1 rounded transition-colors">
-                                         <span className="text-slate-500 shrink-0">{log.timestamp}</span>
+                                         <span className="text-slate-500 shrink-0 w-20">{log.timestamp}</span>
                                          <span className={`font-bold uppercase text-xs w-16 text-center rounded px-1 py-0.5 shrink-0 h-fit ${
                                              log.level === 'info' ? 'bg-blue-900 text-blue-400' :
                                              log.level === 'warning' ? 'bg-amber-900 text-amber-400' :
@@ -383,17 +387,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             </main>
 
             {/* Product Modal */}
-            <Modal isOpen={isProductModalOpen} onClose={() => setIsProductModalOpen(false)} title={products.find(p => p.id === editingProduct?.id) ? 'Редактировать товар' : 'Новый товар'}>
+            <Modal isOpen={isProductModalOpen} onClose={() => setIsProductModalOpen(false)} title={editingProduct?.id ? 'Редактировать товар' : 'Новый товар'}>
                 {editingProduct && (
                     <form onSubmit={handleSaveProduct} className="space-y-4">
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Название</label>
-                            <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingProduct.title} onChange={e => setEditingProduct({...editingProduct, title: e.target.value})} />
+                            <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingProduct.title || ''} onChange={e => setEditingProduct({...editingProduct, title: e.target.value})} />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Цена (₽)</label>
-                                <input required type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: Number(e.target.value)})} />
+                                <input required type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingProduct.price || ''} onChange={e => setEditingProduct({...editingProduct, price: Number(e.target.value)})} />
                             </div>
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Категория</label>
@@ -408,7 +412,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Ссылка на фото</label>
                             <div className="flex gap-2">
-                                <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingProduct.image} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} />
+                                <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingProduct.image || ''} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} />
                                 {editingProduct.image && <img src={editingProduct.image} className="w-10 h-10 rounded-lg object-cover border border-slate-200" alt=""/>}
                             </div>
                         </div>
