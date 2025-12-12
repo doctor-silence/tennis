@@ -44,7 +44,8 @@ let MOCK_COURTS: Court[] = [
         surface: 'hard', 
         pricePerHour: 4500, 
         rating: 5.0, 
-        image: 'https://images.unsplash.com/photo-1575217985390-3375c3dbb908?q=80&w=1200&auto=format&fit=crop' 
+        image: 'https://images.unsplash.com/photo-1575217985390-3375c3dbb908?q=80&w=1200&auto=format&fit=crop',
+        website: 'https://multisport.ru'
     },
     { 
         id: '2', 
@@ -53,7 +54,8 @@ let MOCK_COURTS: Court[] = [
         surface: 'clay', 
         pricePerHour: 2800, 
         rating: 4.8, 
-        image: 'https://images.unsplash.com/photo-1620202755294-8531732e7071?q=80&w=1200&auto=format&fit=crop' 
+        image: 'https://images.unsplash.com/photo-1620202755294-8531732e7071?q=80&w=1200&auto=format&fit=crop',
+        website: 'https://tennis-park.ru'
     },
     { 
         id: '3', 
@@ -62,7 +64,8 @@ let MOCK_COURTS: Court[] = [
         surface: 'hard', 
         pricePerHour: 3500, 
         rating: 4.9, 
-        image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop' 
+        image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop',
+        website: 'https://lovetennis.ru'
     },
     { 
         id: '4', 
@@ -71,7 +74,8 @@ let MOCK_COURTS: Court[] = [
         surface: 'clay', 
         pricePerHour: 2200, 
         rating: 4.7, 
-        image: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1200&auto=format&fit=crop' 
+        image: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1200&auto=format&fit=crop',
+        website: 'https://tennis-spartak.ru'
     },
     { 
         id: '5', 

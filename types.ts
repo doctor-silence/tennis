@@ -55,6 +55,7 @@ export interface Court {
   pricePerHour: number;
   image: string;
   rating: number;
+  website?: string;
 }
 
 export interface ChatMessage {

@@ -57,7 +57,8 @@ import {
   Globe,
   MessageCircle,
   BarChart2,
-  Map
+  Map,
+  ExternalLink
 } from 'lucide-react';
 import { User, DashboardTab, Partner, Court, ChatMessage, Conversation, Notification, Student, LadderPlayer, Challenge, Match } from '../types';
 import Button from './Button';
@@ -580,6 +581,7 @@ const ProfileView = ({ user }: { user: User }) => {
   );
 };
 
+// ... other views (PartnerSearchView) remain unchanged ...
 // 2. PartnerSearchView
 const PartnerSearchView = ({ onNavigate }: { onNavigate: (tab: DashboardTab) => void }) => {
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -691,11 +693,12 @@ const PartnerSearchView = ({ onNavigate }: { onNavigate: (tab: DashboardTab) => 
   );
 };
 
-// 3. CourtBookingView
+// 3. CourtBookingView (UPDATED: Expandable Card Pattern)
 const CourtBookingView = () => {
   const [courts, setCourts] = useState<Court[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [selectedCourtId, setSelectedCourtId] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -709,41 +712,127 @@ const CourtBookingView = () => {
     load();
   }, []);
 
+  const handleBook = (court: Court) => {
+      // Use provided website or fallback to search query
+      const url = court.website || `https://yandex.ru/search/?text=${encodeURIComponent(court.name + ' теннисный корт ' + court.address)}`;
+      window.open(url, '_blank');
+  };
+
+  const toggleCourt = (id: string) => {
+      if (selectedCourtId === id) setSelectedCourtId(null);
+      else setSelectedCourtId(id);
+  }
+
   return (
     <div className="space-y-6">
        {loading ? (
          <div className="flex justify-center py-12"><Loader2 className="animate-spin text-slate-400" size={40} /></div>
        ) : (
-         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {courts.map(c => (
-              <div key={c.id} className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200 flex flex-col sm:flex-row h-auto sm:h-56 group cursor-pointer hover:shadow-xl transition-all duration-300">
-                 <div className="w-full sm:w-56 h-48 sm:h-full bg-slate-200 shrink-0 relative overflow-hidden">
-                    <img src={c.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={c.name} />
-                    <div className="absolute top-3 left-3 flex flex-col gap-2">
-                       <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm text-white ${c.surface === 'clay' ? 'bg-orange-600' : c.surface === 'hard' ? 'bg-blue-600' : 'bg-emerald-600'}`}>
-                          {c.surface === 'clay' ? 'Грунт' : c.surface === 'hard' ? 'Хард' : 'Ковер'}
-                       </span>
-                       <span className="px-3 py-1 rounded-lg text-xs font-bold bg-white text-slate-900 flex items-center gap-1">
-                          <Star size={10} className="fill-amber-400 text-amber-400"/> {c.rating}
-                       </span>
-                    </div>
-                 </div>
-                 <div className="p-6 flex flex-col justify-between w-full">
-                    <div>
-                        <h3 className="text-xl font-bold text-slate-900">{c.name}</h3>
-                        <p className="text-slate-500 text-sm mt-1 flex items-center gap-1"><MapPin size={14}/> {c.address}</p>
-                    </div>
-                    
-                    <div className="flex items-end justify-between mt-4">
-                        <div>
-                          <div className="text-xs text-slate-400 font-bold uppercase">Цена</div>
-                          <div className="text-xl font-bold text-slate-900">{c.pricePerHour} ₽ <span className="text-sm font-normal text-slate-400">/ час</span></div>
+         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 auto-rows-auto grid-flow-row-dense">
+            {courts.map(c => {
+              const isSelected = selectedCourtId === c.id;
+              return (
+              <div 
+                key={c.id} 
+                onClick={() => toggleCourt(c.id)}
+                className={`bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200 transition-all duration-300 cursor-pointer ${
+                    isSelected ? 'lg:col-span-2 row-span-2 shadow-xl ring-1 ring-lime-400 z-10' : 'hover:shadow-xl flex flex-col sm:flex-row h-auto sm:h-56 group'
+                }`}
+              >
+                 {isSelected ? (
+                    // EXPANDED DETAILS VIEW
+                    <div className="flex flex-col w-full h-full animate-fade-in-up">
+                        <div className="h-64 sm:h-80 w-full relative shrink-0">
+                            <img src={c.image} className="w-full h-full object-cover" alt={c.name} />
+                            <button onClick={(e) => { e.stopPropagation(); setSelectedCourtId(null); }} className="absolute top-4 right-4 bg-white/90 p-2 rounded-full text-slate-900 hover:bg-white transition-colors shadow-md z-20">
+                                <X size={20}/>
+                            </button>
+                            <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-lg text-sm font-bold flex items-center gap-1 shadow-sm">
+                                <Star size={14} className="fill-amber-400 text-amber-400"/> {c.rating}
+                            </div>
                         </div>
-                        <Button size="sm">Забронировать</Button>
+                        <div className="p-6 sm:p-8 flex flex-col justify-between flex-1">
+                            <div className="flex flex-col sm:flex-row justify-between items-start mb-6 gap-4">
+                                <div>
+                                    <h3 className="text-2xl sm:text-3xl font-bold text-slate-900">{c.name}</h3>
+                                    <p className="text-slate-500 text-lg flex items-center gap-2 mt-2"><MapPin size={20} className="text-lime-500"/> {c.address}</p>
+                                </div>
+                                <div className="text-left sm:text-right shrink-0 bg-slate-50 p-3 rounded-xl sm:bg-transparent sm:p-0">
+                                    <div className="text-3xl font-bold text-slate-900">{c.pricePerHour} ₽</div>
+                                    <div className="text-xs text-slate-400 uppercase font-bold">за час</div>
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
+                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                    <div className="text-xs text-slate-400 uppercase font-bold mb-1">Покрытие</div>
+                                    <div className="font-bold text-slate-900 capitalize flex items-center gap-2">
+                                        <span className={`w-2 h-2 rounded-full ${c.surface === 'clay' ? 'bg-orange-500' : c.surface === 'hard' ? 'bg-blue-500' : 'bg-emerald-500'}`}></span>
+                                        {c.surface}
+                                    </div>
+                                </div>
+                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                    <div className="text-xs text-slate-400 uppercase font-bold mb-1">Рейтинг клуба</div>
+                                    <div className="font-bold text-slate-900 flex items-center gap-1">
+                                        <Star size={14} className="fill-amber-400 text-amber-400"/> {c.rating} / 5.0
+                                    </div>
+                                </div>
+                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 hidden sm:block">
+                                    <div className="text-xs text-slate-400 uppercase font-bold mb-1">Статус</div>
+                                    <div className="font-bold text-green-600 flex items-center gap-1">
+                                        <CheckCircle2 size={14}/> Открыто
+                                    </div>
+                                </div>
+                            </div>
+
+                            <Button className="w-full gap-2 py-4 text-lg shadow-xl shadow-lime-400/20" onClick={(e) => { e.stopPropagation(); handleBook(c); }}>
+                                <ExternalLink size={20}/> Перейти к бронированию
+                            </Button>
+                            <p className="text-center text-xs text-slate-400 mt-4">
+                                Вы будете перенаправлены на сайт партнера для выбора времени.
+                            </p>
+                        </div>
                     </div>
-                 </div>
+                 ) : (
+                    // COMPACT VIEW
+                    <>
+                        <div className="w-full sm:w-56 h-48 sm:h-full bg-slate-200 shrink-0 relative overflow-hidden">
+                            <img src={c.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={c.name} />
+                            <div className="absolute top-3 left-3 flex flex-col gap-2">
+                            <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm text-white ${c.surface === 'clay' ? 'bg-orange-600' : c.surface === 'hard' ? 'bg-blue-600' : 'bg-emerald-600'}`}>
+                                {c.surface === 'clay' ? 'Грунт' : c.surface === 'hard' ? 'Хард' : 'Ковер'}
+                            </span>
+                            <span className="px-3 py-1 rounded-lg text-xs font-bold bg-white text-slate-900 flex items-center gap-1">
+                                <Star size={10} className="fill-amber-400 text-amber-400"/> {c.rating}
+                            </span>
+                            </div>
+                        </div>
+                        <div className="p-6 flex flex-col justify-between w-full">
+                            <div>
+                                <h3 className="text-xl font-bold text-slate-900 group-hover:text-lime-600 transition-colors">{c.name}</h3>
+                                <p className="text-slate-500 text-sm mt-1 flex items-center gap-1"><MapPin size={14}/> {c.address}</p>
+                            </div>
+                            
+                            <div className="flex items-end justify-between mt-4">
+                                <div>
+                                <div className="text-xs text-slate-400 font-bold uppercase">Цена</div>
+                                <div className="text-xl font-bold text-slate-900">{c.pricePerHour} ₽ <span className="text-sm font-normal text-slate-400">/ час</span></div>
+                                </div>
+                                <Button 
+                                    size="sm" 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleBook(c);
+                                    }}
+                                >
+                                    Забронировать
+                                </Button>
+                            </div>
+                        </div>
+                    </>
+                 )}
               </div>
-            ))}
+            )})}
          </div>
        )}
        
@@ -779,6 +868,7 @@ const CourtBookingView = () => {
   );
 };
 
+// ... Rest of the file remains unchanged ...
 // 4. AiCoachView
 const AiCoachView = ({ user }: { user: User }) => {
    const [messages, setMessages] = useState<ChatMessage[]>([

@@ -31,6 +31,17 @@ interface AdminPanelProps {
     onLogout: () => void;
 }
 
+// Collection of high-quality tennis court images for auto-assignment
+const COURT_IMAGES = [
+    'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1200&auto=format&fit=crop', // Clay
+    'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=1200&auto=format&fit=crop', // Hard Blue
+    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop', // Hard Green/Blue
+    'https://images.unsplash.com/photo-1575217985390-3375c3dbb908?q=80&w=1200&auto=format&fit=crop', // Indoor Hard
+    'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1200&auto=format&fit=crop', // Red Clay
+    'https://images.unsplash.com/photo-1620202755294-8531732e7071?q=80&w=1200&auto=format&fit=crop', // Outdoor Clay
+    'https://images.unsplash.com/photo-1588611910629-68897b69c693?q=80&w=1200&auto=format&fit=crop'  // Hard Green
+];
+
 const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts'>('overview');
     
@@ -103,7 +114,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
         e.preventDefault();
         if (editingCourt) {
             try {
-                await api.admin.saveCourt(editingCourt);
+                // Auto-fill image logic: if empty, pick a random one
+                const courtData = { ...editingCourt };
+                if (!courtData.image || courtData.image.trim() === '') {
+                    courtData.image = COURT_IMAGES[Math.floor(Math.random() * COURT_IMAGES.length)];
+                }
+
+                await api.admin.saveCourt(courtData);
                 await loadData();
                 setIsCourtModalOpen(false);
                 setEditingCourt(null);
@@ -589,7 +606,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Ссылка на фото</label>
                             <div className="flex gap-2">
-                                <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingCourt.image || ''} onChange={e => setEditingCourt({...editingCourt, image: e.target.value})} />
+                                <input 
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none placeholder:text-slate-400" 
+                                    placeholder="Оставьте пустым для авто-подбора"
+                                    value={editingCourt.image || ''} 
+                                    onChange={e => setEditingCourt({...editingCourt, image: e.target.value})} 
+                                />
                                 {editingCourt.image && <img src={editingCourt.image} className="w-10 h-10 rounded-lg object-cover border border-slate-200" alt=""/>}
                             </div>
                         </div>
