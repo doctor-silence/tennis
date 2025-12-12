@@ -21,6 +21,11 @@ if (!process.env.API_KEY) {
 }
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+// Check for Admin Credentials
+if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD) {
+    console.warn("⚠️  WARNING: ADMIN_EMAIL or ADMIN_PASSWORD is missing in .env. Admin user might not be created or updated.");
+}
+
 // --- HELPERS ---
 
 // Helper to log system events to DB

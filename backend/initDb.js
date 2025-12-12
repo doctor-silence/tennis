@@ -123,18 +123,40 @@ const initDb = async () => {
     // --- SEED DATA ---
     
     // Seed Default User (Coach) if none exist
-    const userCount = await pool.query('SELECT count(*) FROM users');
-    if (parseInt(userCount.rows[0].count) === 0) {
-        console.log('🌱 Seeding default user...');
+    // Check if we need to seed the Coach
+    const coachEmail = 'coach@test.com';
+    const coachCheck = await pool.query('SELECT id FROM users WHERE email = $1', [coachEmail]);
+    
+    if (coachCheck.rows.length === 0) {
+        console.log('🌱 Seeding default Coach user...');
         await pool.query(`
             INSERT INTO users (name, email, password, role, city, avatar, rating, age, level)
-            VALUES ('Тренер Демо', 'coach@test.com', '123456', 'coach', 'Москва', 'https://ui-avatars.com/api/?name=Coach+Demo&background=0D8ABC&color=fff', 1500, 30, 'Coach')
-        `);
-        // Seed Admin
-        await pool.query(`
-            INSERT INTO users (name, email, password, role, city, avatar, rating, age, level)
-            VALUES ('Супер Админ', 'admin@tennis.pro', 'admin123', 'admin', 'HQ', 'https://ui-avatars.com/api/?name=Admin&background=000&color=fff', 9999, 99, 'GOD MODE')
-        `);
+            VALUES ('Тренер Демо', $1, '123456', 'coach', 'Москва', 'https://ui-avatars.com/api/?name=Coach+Demo&background=0D8ABC&color=fff', 1500, 30, 'Coach')
+        `, [coachEmail]);
+    }
+
+    // Seed Admin from Environment Variables
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+
+    if (adminEmail && adminPassword) {
+        const adminCheck = await pool.query('SELECT id FROM users WHERE email = $1', [adminEmail]);
+        
+        if (adminCheck.rows.length === 0) {
+            console.log(`🌱 Creating Admin User (${adminEmail}) from .env...`);
+            await pool.query(`
+                INSERT INTO users (name, email, password, role, city, avatar, rating, age, level)
+                VALUES ('Супер Админ', $1, $2, 'admin', 'HQ', 'https://ui-avatars.com/api/?name=Admin&background=000&color=fff', 9999, 99, 'GOD MODE')
+            `, [adminEmail, adminPassword]);
+        } else {
+            console.log(`🔄 Updating Admin User (${adminEmail}) password from .env...`);
+            // Ensure the existing admin has the correct password and role from .env
+            await pool.query(`
+                UPDATE users SET password = $1, role = 'admin' WHERE email = $2
+            `, [adminPassword, adminEmail]);
+        }
+    } else {
+        console.warn('⚠️  ADMIN_EMAIL or ADMIN_PASSWORD not set in .env. Admin user check skipped.');
     }
 
     // Seed Products
