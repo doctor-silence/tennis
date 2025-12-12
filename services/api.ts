@@ -18,6 +18,18 @@ const MOCK_USER: User = {
   level: 'NTRP 3.5'
 };
 
+const MOCK_ADMIN: User = {
+  id: 'mock-admin-1',
+  name: 'Супер Админ (Демо)',
+  email: 'admin@tennis.pro',
+  role: 'admin',
+  city: 'HQ',
+  avatar: 'https://ui-avatars.com/api/?name=Admin&background=000&color=fff',
+  rating: 9999,
+  age: 99,
+  level: 'GOD MODE'
+};
+
 const MOCK_PARTNERS: Partner[] = [
     { id: '1', name: 'Алексей Иванов', age: 28, level: 'NTRP 4.5', city: 'Москва', isPro: true, image: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80' },
     { id: '2', name: 'Мария Петрова', age: 24, level: 'NTRP 4.0', city: 'Москва', isPro: false, image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80' },
@@ -83,14 +95,19 @@ export const api = {
                     body: JSON.stringify(credentials)
                 });
             } catch (networkError) {
-                // Если fetch упал (нет сети), только тогда используем Mock
+                // Если fetch упал (нет сети), используем Mock
                 console.warn("Backend offline. Falling back to Demo Mode.");
+                
+                // ИСПРАВЛЕНИЕ: Если ввели email админа, возвращаем MOCK_ADMIN
+                if (credentials.email === 'admin@tennis.pro') {
+                    return MOCK_ADMIN;
+                }
+                
                 return MOCK_USER;
             }
 
             const data = await res.json();
             // Если сервер ответил 401 (неверный пароль), мы выбрасываем ошибку
-            // Она поймается в AuthPage и покажет красное сообщение пользователю
             if (!res.ok) throw new Error(data.error || 'Ошибка входа');
             
             return data;
