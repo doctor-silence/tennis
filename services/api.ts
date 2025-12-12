@@ -232,6 +232,20 @@ export const api = {
                 return await res.json();
             } catch(e) { return []; }
         },
+        createUser: async (data: Partial<User> & { password?: string }): Promise<User | null> => {
+            try {
+                const res = await fetch(`${API_URL}/admin/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) throw new Error('Failed to create user');
+                return await res.json();
+            } catch (e) {
+                console.error(e);
+                return null;
+            }
+        },
         updateUser: async (id: string, data: Partial<User>) => {
             try {
                 await fetch(`${API_URL}/admin/users/${id}`, {

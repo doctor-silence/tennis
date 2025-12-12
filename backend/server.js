@@ -190,8 +190,50 @@ app.get('/api/admin/logs', async (req, res) => {
 
 app.get('/api/admin/users', async (req, res) => {
     try {
-        const result = await pool.query('SELECT id, name, email, role, city, avatar, rating, level FROM users ORDER BY id DESC');
-        res.json(result.rows.map(u => ({...u, id: u.id.toString()})));
+        // Updated to select all relevant fields for admin editing
+        const result = await pool.query('SELECT id, name, email, role, city, avatar, rating, level, age, rtt_rank, rtt_category FROM users ORDER BY id DESC');
+        res.json(result.rows.map(u => ({
+            ...u, 
+            id: u.id.toString(),
+            rttRank: u.rtt_rank,
+            rttCategory: u.rtt_category
+        })));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/admin/users', async (req, res) => {
+    const { name, email, password, role, city, age, rating, level, rttRank, rttCategory } = req.body;
+    try {
+        // Basic check
+        const userCheck = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+        if (userCheck.rows.length > 0) {
+            return res.status(400).json({ error: 'Email already exists' });
+        }
+
+        const defaultAvatar = `https://ui-avatars.com/api/?name=${name.replace(' ', '+')}&background=random&color=fff`;
+        const result = await pool.query(
+            `INSERT INTO users (name, email, password, city, avatar, role, rating, age, level, rtt_rank, rtt_category) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
+             RETURNING id, name, email, role, city, avatar, rating, age, level, rtt_rank, rtt_category`,
+            [
+                name, 
+                email, 
+                password || '123456', // Default password if not provided
+                city || 'Москва', 
+                defaultAvatar, 
+                role || 'amateur', 
+                rating || 0, 
+                age || null, 
+                level || '', 
+                rttRank || 0, 
+                rttCategory || null
+            ]
+        );
+        const user = result.rows[0];
+        await logSystemEvent('info', `Admin created user: ${email}`, 'Admin');
+        res.json({ ...user, id: user.id.toString(), rttRank: user.rtt_rank, rttCategory: user.rtt_category });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -199,10 +241,22 @@ app.get('/api/admin/users', async (req, res) => {
 
 app.put('/api/admin/users/:id', async (req, res) => {
     const { id } = req.params;
-    const { name, role } = req.body;
+    const { name, role, city, rating, level, rttRank, rttCategory, age } = req.body;
     try {
-        await pool.query('UPDATE users SET name = $1, role = $2 WHERE id = $3', [name, role, id]);
-        await logSystemEvent('warning', `Admin updated user ${id} role to ${role}`, 'Admin');
+        await pool.query(
+            `UPDATE users SET 
+                name = COALESCE($1, name), 
+                role = COALESCE($2, role),
+                city = COALESCE($3, city),
+                rating = COALESCE($4, rating),
+                level = COALESCE($5, level),
+                rtt_rank = COALESCE($6, rtt_rank),
+                rtt_category = COALESCE($7, rtt_category),
+                age = COALESCE($8, age)
+            WHERE id = $9`, 
+            [name, role, city, rating, level, rttRank, rttCategory, age, id]
+        );
+        await logSystemEvent('warning', `Admin updated user ${id}`, 'Admin');
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });

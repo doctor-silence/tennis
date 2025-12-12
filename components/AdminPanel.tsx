@@ -43,7 +43,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
-    const [editingUser, setEditingUser] = useState<User | null>(null);
+    
+    // User Edit State
+    // We extend User to include 'password' for creation logic, though it's not in the base User type
+    const [editingUser, setEditingUser] = useState<(Partial<User> & { password?: string }) | null>(null);
 
     // Initial Data Load
     useEffect(() => {
@@ -88,10 +91,31 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     };
 
     // User Handlers
+    const handleAddUser = () => {
+        setEditingUser({
+            name: '',
+            email: '',
+            password: '123',
+            role: 'amateur',
+            city: 'Москва',
+            level: 'NTRP 3.0',
+            rating: 0,
+            rttRank: 0,
+            rttCategory: 'Взрослые'
+        });
+        setIsUserModalOpen(true);
+    };
+
     const handleSaveUser = async (e: React.FormEvent) => {
         e.preventDefault();
         if (editingUser) {
-             await api.admin.updateUser(editingUser.id, editingUser);
+             if (editingUser.id) {
+                 // Update existing
+                 await api.admin.updateUser(editingUser.id, editingUser);
+             } else {
+                 // Create new
+                 await api.admin.createUser(editingUser);
+             }
              await loadData();
         }
         setIsUserModalOpen(false);
@@ -275,6 +299,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                         <input className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg w-full text-sm outline-none focus:ring-2 focus:ring-slate-900" placeholder="Поиск пользователя..."/>
                                     </div>
                                     <div className="flex gap-2">
+                                         <Button size="sm" onClick={handleAddUser} className="gap-2"><Plus size={16}/> Добавить</Button>
                                          <Button size="sm" variant="outline">Экспорт CSV</Button>
                                     </div>
                                 </div>
@@ -309,7 +334,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 text-slate-600">{u.city}</td>
-                                                <td className="px-6 py-4 font-mono font-medium">{u.rating || '-'}</td>
+                                                <td className="px-6 py-4 font-mono font-medium">
+                                                    {u.role === 'rtt_pro' ? (
+                                                        <div className="flex flex-col">
+                                                            <span>Rank: #{u.rttRank}</span>
+                                                            <span className="text-xs text-slate-400">Pts: {u.rating}</span>
+                                                        </div>
+                                                    ) : (
+                                                        u.level || '-'
+                                                    )}
+                                                </td>
                                                 <td className="px-6 py-4 text-right">
                                                     <div className="flex justify-end gap-2">
                                                         <button onClick={() => { setEditingUser(u); setIsUserModalOpen(true); }} className="p-2 hover:bg-slate-200 rounded-lg text-slate-600"><Edit size={16}/></button>
@@ -422,7 +456,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             </Modal>
 
             {/* User Modal */}
-            <Modal isOpen={isUserModalOpen} onClose={() => setIsUserModalOpen(false)} title="Редактировать пользователя">
+            <Modal isOpen={isUserModalOpen} onClose={() => setIsUserModalOpen(false)} title={editingUser?.id ? "Редактировать пользователя" : "Создать пользователя"}>
                 {editingUser && (
                     <form onSubmit={handleSaveUser} className="space-y-4">
                         <div className="space-y-1">
@@ -431,17 +465,87 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         </div>
                          <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
-                            <input disabled className="w-full bg-slate-100 border border-slate-200 rounded-xl px-4 py-2 outline-none text-slate-500" value={editingUser.email} />
+                            <input 
+                                disabled={!!editingUser.id} 
+                                className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none ${!!editingUser.id ? 'text-slate-500 bg-slate-100' : ''}`}
+                                value={editingUser.email} 
+                                onChange={e => setEditingUser({...editingUser, email: e.target.value})}
+                            />
                         </div>
-                         <div className="space-y-1">
-                                <label className="text-xs font-bold text-slate-500 uppercase">Роль</label>
-                                <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingUser.role} onChange={e => setEditingUser({...editingUser, role: e.target.value as any})}>
-                                    <option value="amateur">Любитель</option>
-                                    <option value="rtt_pro">Игрок РТТ</option>
-                                    <option value="coach">Тренер</option>
-                                    <option value="admin">Администратор</option>
-                                </select>
+                        {!editingUser.id && (
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Пароль</label>
+                                <input 
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none"
+                                    value={editingUser.password}
+                                    onChange={e => setEditingUser({...editingUser, password: e.target.value})}
+                                />
+                            </div>
+                        )}
+                         <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Роль</label>
+                                    <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingUser.role} onChange={e => setEditingUser({...editingUser, role: e.target.value as any})}>
+                                        <option value="amateur">Любитель</option>
+                                        <option value="rtt_pro">Игрок РТТ</option>
+                                        <option value="coach">Тренер</option>
+                                        <option value="admin">Администратор</option>
+                                    </select>
+                            </div>
+                            <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Город</label>
+                                    <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingUser.city} onChange={e => setEditingUser({...editingUser, city: e.target.value})} />
+                            </div>
                         </div>
+
+                        {/* Dynamic Fields based on Role */}
+                        {editingUser.role === 'amateur' && (
+                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Уровень (NTRP)</label>
+                                    <select className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none" value={editingUser.level} onChange={e => setEditingUser({...editingUser, level: e.target.value})}>
+                                        <option value="NTRP 2.0">NTRP 2.0 (Новичок)</option>
+                                        <option value="NTRP 3.0">NTRP 3.0 (Начальный)</option>
+                                        <option value="NTRP 3.5">NTRP 3.5 (Средний)</option>
+                                        <option value="NTRP 4.0">NTRP 4.0 (Продвинутый)</option>
+                                        <option value="NTRP 4.5">NTRP 4.5 (Полупрофи)</option>
+                                        <option value="NTRP 5.0">NTRP 5.0+ (Профи)</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Очки рейтинга (Внутренний)</label>
+                                    <input type="number" className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none" value={editingUser.rating} onChange={e => setEditingUser({...editingUser, rating: Number(e.target.value)})} />
+                                </div>
+                            </div>
+                        )}
+
+                        {editingUser.role === 'rtt_pro' && (
+                            <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 space-y-3">
+                                <div className="text-xs font-bold text-amber-700 uppercase mb-2">Настройки РТТ</div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Возрастная категория</label>
+                                    <select className="w-full bg-white border border-amber-200 rounded-lg px-3 py-2 outline-none" value={editingUser.rttCategory || 'Взрослые'} onChange={e => setEditingUser({...editingUser, rttCategory: e.target.value})}>
+                                        <option value="9-10 лет">9-10 лет</option>
+                                        <option value="до 13 лет">до 13 лет</option>
+                                        <option value="до 15 лет">до 15 лет</option>
+                                        <option value="до 17 лет">до 17 лет</option>
+                                        <option value="до 19 лет">до 19 лет</option>
+                                        <option value="Взрослые">Взрослые</option>
+                                    </select>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Классиф. Очки (РТТ)</label>
+                                        <input type="number" className="w-full bg-white border border-amber-200 rounded-lg px-3 py-2 outline-none" value={editingUser.rating} onChange={e => setEditingUser({...editingUser, rating: Number(e.target.value)})} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Позиция (Rank)</label>
+                                        <input type="number" className="w-full bg-white border border-amber-200 rounded-lg px-3 py-2 outline-none" value={editingUser.rttRank} onChange={e => setEditingUser({...editingUser, rttRank: Number(e.target.value)})} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         <Button type="submit" className="w-full mt-4">Сохранить</Button>
                     </form>
                 )}
