@@ -1518,6 +1518,12 @@ const StudentsView = ({ user }: { user: User }) => {
         setActiveModal('schedule');
     };
 
+    // Calculate Stats
+    const totalIncome = students.reduce((acc, curr) => acc + (curr.balance > 0 ? curr.balance : 0), 0);
+    // Logic for next lesson: Find first student with a valid future date string or just take first one if lazy
+    // Since date format is loose text ("Tomorrow 18:00"), we'll pick the first student with a value != "Не назначено"
+    const nextLessonStudent = students.find(s => s.nextLesson && s.nextLesson !== 'Не назначено');
+
     return (
         <div className="space-y-8">
             {/* Stats Row */}
@@ -1527,7 +1533,7 @@ const StudentsView = ({ user }: { user: User }) => {
                     <div className="relative z-10">
                         <div className="text-slate-500 font-medium text-sm mb-1 uppercase tracking-wider">Активные ученики</div>
                         <div className="text-4xl font-bold text-slate-900 flex items-baseline gap-2">
-                             {students.length} <span className="text-sm font-normal text-green-500 flex items-center bg-green-50 px-2 py-0.5 rounded-full"><TrendingUp size={12} className="mr-1"/> +1</span>
+                             {students.length} <span className="text-sm font-normal text-green-500 flex items-center bg-green-50 px-2 py-0.5 rounded-full"><TrendingUp size={12} className="mr-1"/> {students.length > 0 ? '+1' : '0'}</span>
                         </div>
                     </div>
                 </div>
@@ -1535,9 +1541,9 @@ const StudentsView = ({ user }: { user: User }) => {
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity"><Wallet size={80}/></div>
                     <div className="relative z-10">
-                        <div className="text-slate-500 font-medium text-sm mb-1 uppercase tracking-wider">Доход (Октябрь)</div>
+                        <div className="text-slate-500 font-medium text-sm mb-1 uppercase tracking-wider">Доход (Месяц)</div>
                         <div className="text-4xl font-bold text-slate-900">
-                             145k <span className="text-sm font-normal text-slate-400">₽</span>
+                             {(totalIncome / 1000).toFixed(0)}k <span className="text-sm font-normal text-slate-400">₽</span>
                         </div>
                     </div>
                 </div>
@@ -1546,10 +1552,21 @@ const StudentsView = ({ user }: { user: User }) => {
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Calendar size={80}/></div>
                     <div className="relative z-10">
                         <div className="text-slate-400 font-medium text-sm mb-1 uppercase tracking-wider">Следующая тренировка</div>
-                        <div className="text-2xl font-bold text-white mb-1">
-                             16:00
-                        </div>
-                        <div className="text-lime-400 text-sm font-bold">Михаил Волков</div>
+                        {nextLessonStudent ? (
+                            <>
+                                <div className="text-2xl font-bold text-white mb-1">
+                                    {nextLessonStudent.nextLesson}
+                                </div>
+                                <div className="text-lime-400 text-sm font-bold">{nextLessonStudent.name}</div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="text-2xl font-bold text-white mb-1">
+                                    Нет занятий
+                                </div>
+                                <div className="text-slate-500 text-sm font-bold">Расписание пусто</div>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
@@ -1633,9 +1650,10 @@ const StudentsView = ({ user }: { user: User }) => {
                         </div>
                     </div>
                 )) : (
-                    <div className="col-span-full py-12 text-center text-slate-400">
+                    <div className="col-span-full py-16 text-center text-slate-400 bg-white rounded-3xl border border-slate-200 border-dashed">
                         <Users size={48} className="mx-auto mb-3 opacity-20"/>
-                        <p>Ученики не найдены. Добавьте первого!</p>
+                        <p className="font-medium text-slate-500">Ученики не найдены. Добавьте первого!</p>
+                        <Button size="sm" variant="outline" className="mt-4" onClick={() => setIsAddModalOpen(true)}>Добавить ученика</Button>
                     </div>
                 )}
             </div>
@@ -1671,9 +1689,8 @@ const StudentsView = ({ user }: { user: User }) => {
                                 value={newStudent.level}
                                 onChange={e => setNewStudent({...newStudent, level: e.target.value})}
                              >
-                                 <option>Любитель</option>
-                                 <option>Юниор РТТ</option>
-                                 <option>Профи</option>
+                                 <option value="Любитель">Любитель</option>
+                                 <option value="Игрок РТТ">Игрок РТТ</option>
                              </select>
                         </div>
                     </div>
