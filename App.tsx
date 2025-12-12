@@ -30,6 +30,7 @@ import {
 const App = () => {
   const [view, setView] = useState<ViewState>('landing');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
 
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
@@ -50,18 +51,24 @@ const App = () => {
     window.scrollTo(0, 0);
   };
 
+  const handleAuthNavigate = (mode: 'login' | 'register') => {
+    setAuthInitialMode(mode);
+    setView('auth');
+    window.scrollTo(0, 0);
+  };
+
   return (
     <div className="min-h-screen font-sans bg-slate-50">
       {view === 'landing' && (
         <LandingPage 
-          onLoginClick={() => handleNavigate('auth')} 
-          onRegisterClick={() => handleNavigate('auth')}
+          onLoginClick={() => handleAuthNavigate('login')} 
+          onRegisterClick={() => handleAuthNavigate('register')}
           onNavigate={handleNavigate}
         />
       )}
       
       {view === 'pro' && (
-        <ProPage onBack={() => handleNavigate('landing')} onSubscribe={() => handleNavigate('auth')} />
+        <ProPage onBack={() => handleNavigate('landing')} onSubscribe={() => handleAuthNavigate('register')} />
       )}
       
       {view === 'shop' && (
@@ -69,7 +76,11 @@ const App = () => {
       )}
       
       {view === 'auth' && (
-        <AuthPage onBack={() => handleNavigate('landing')} onComplete={handleLoginSuccess} />
+        <AuthPage 
+            onBack={() => handleNavigate('landing')} 
+            onComplete={handleLoginSuccess} 
+            initialMode={authInitialMode}
+        />
       )}
 
       {view === 'dashboard' && currentUser && (
@@ -432,8 +443,8 @@ const ProPage = ({ onBack, onSubscribe }: { onBack: () => void, onSubscribe: () 
 
 // --- Auth Page Component ---
 
-const AuthPage = ({ onBack, onComplete }: { onBack: () => void, onComplete: (user: User) => void }) => {
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () => void, onComplete: (user: User) => void, initialMode?: 'login' | 'register' }) => {
+  const [authMode, setAuthMode] = useState<'login' | 'register'>(initialMode);
   const [registerStep, setRegisterStep] = useState<1 | 2>(1);
   
   // Registration States
