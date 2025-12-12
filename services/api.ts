@@ -212,12 +212,14 @@ export const api = {
         getLogs: async (): Promise<SystemLog[]> => {
              try {
                  const res = await fetch(`${API_URL}/admin/logs`);
+                 if (!res.ok) return [];
                  return await res.json();
              } catch(e) { return []; }
         },
         getStats: async () => {
             try {
                  const res = await fetch(`${API_URL}/admin/stats`);
+                 if (!res.ok) throw new Error("Failed");
                  return await res.json();
             } catch(e) { 
                 return { revenue: 0, activeUsers: 0, newSignups: 0, serverLoad: 0 }; 
@@ -226,44 +228,54 @@ export const api = {
         getUsers: async (): Promise<User[]> => {
             try {
                 const res = await fetch(`${API_URL}/admin/users`);
+                if (!res.ok) return [];
                 return await res.json();
             } catch(e) { return []; }
         },
         updateUser: async (id: string, data: Partial<User>) => {
-            await fetch(`${API_URL}/admin/users/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
+            try {
+                await fetch(`${API_URL}/admin/users/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+            } catch (e) { console.error(e); }
         },
         deleteUser: async (id: string) => {
-            await fetch(`${API_URL}/admin/users/${id}`, { method: 'DELETE' });
+            try {
+                await fetch(`${API_URL}/admin/users/${id}`, { method: 'DELETE' });
+            } catch (e) { console.error(e); }
         },
         // Products
         getProducts: async (): Promise<Product[]> => {
             try {
                 const res = await fetch(`${API_URL}/products`);
+                if (!res.ok) return [];
                 return await res.json();
             } catch(e) { return []; }
         },
         saveProduct: async (product: Partial<Product>) => {
-             // Create or Update
-             if (product.id && !product.id.startsWith('0.')) { // Assuming real IDs are not random floats
-                 await fetch(`${API_URL}/products/${product.id}`, {
-                     method: 'PUT',
-                     headers: { 'Content-Type': 'application/json' },
-                     body: JSON.stringify(product)
-                 });
-             } else {
-                 await fetch(`${API_URL}/products`, {
-                     method: 'POST',
-                     headers: { 'Content-Type': 'application/json' },
-                     body: JSON.stringify(product)
-                 });
-             }
+             try {
+                 // Create or Update
+                 if (product.id && !product.id.startsWith('0.')) { // Assuming real IDs are not random floats
+                     await fetch(`${API_URL}/products/${product.id}`, {
+                         method: 'PUT',
+                         headers: { 'Content-Type': 'application/json' },
+                         body: JSON.stringify(product)
+                     });
+                 } else {
+                     await fetch(`${API_URL}/products`, {
+                         method: 'POST',
+                         headers: { 'Content-Type': 'application/json' },
+                         body: JSON.stringify(product)
+                     });
+                 }
+             } catch (e) { console.error(e); }
         },
         deleteProduct: async (id: string) => {
-            await fetch(`${API_URL}/products/${id}`, { method: 'DELETE' });
+            try {
+                await fetch(`${API_URL}/products/${id}`, { method: 'DELETE' });
+            } catch (e) { console.error(e); }
         }
     },
 

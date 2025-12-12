@@ -57,15 +57,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
         }
         if (activeTab === 'logs') {
             const l = await api.admin.getLogs();
-            setLogs(l);
+            if (Array.isArray(l)) setLogs(l);
         }
         if (activeTab === 'users') {
             const u = await api.admin.getUsers();
-            setUsers(u);
+            if (Array.isArray(u)) setUsers(u);
         }
         if (activeTab === 'shop') {
             const p = await api.admin.getProducts();
-            setProducts(p);
+            if (Array.isArray(p)) setProducts(p);
         }
     };
 
@@ -183,28 +183,28 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                                 <StatCard 
                                     title="Общая выручка" 
-                                    value={`${(stats.revenue / 1000).toFixed(0)}k ₽`} 
+                                    value={`${((stats?.revenue || 0) / 1000).toFixed(0)}k ₽`} 
                                     change="+12.5%" 
                                     icon={<DollarSign className="text-lime-600"/>}
                                     color="lime"
                                 />
                                 <StatCard 
                                     title="Активные пользователи" 
-                                    value={stats.activeUsers.toLocaleString()} 
+                                    value={(stats?.activeUsers || 0).toLocaleString()} 
                                     change="+5.2%" 
                                     icon={<Users className="text-blue-600"/>}
                                     color="blue"
                                 />
                                 <StatCard 
                                     title="Новые регистрации" 
-                                    value={stats.newSignups.toString()} 
+                                    value={(stats?.newSignups || 0).toString()} 
                                     change="+18%" 
                                     icon={<TrendingUp className="text-purple-600"/>}
                                     color="purple"
                                 />
                                 <StatCard 
                                     title="Нагрузка сервера" 
-                                    value={`${stats.serverLoad}%`} 
+                                    value={`${stats?.serverLoad || 0}%`} 
                                     change="-2%" 
                                     icon={<Server className="text-amber-600"/>}
                                     color="amber"
@@ -289,7 +289,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {users.map(u => (
+                                        {(users || []).map(u => (
                                             <tr key={u.id} className="hover:bg-slate-50 transition-colors">
                                                 <td className="px-6 py-4 flex items-center gap-3">
                                                     <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-600">{u.name[0]}</div>
@@ -335,7 +335,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                 </Button>
                             </div>
                             <div className="grid grid-cols-1 gap-4">
-                                {products.map(p => (
+                                {(products || []).map(p => (
                                     <div key={p.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 group hover:border-lime-400 transition-colors">
                                         <div className="w-20 h-20 bg-slate-100 rounded-lg overflow-hidden shrink-0">
                                             <img src={p.image} className="w-full h-full object-cover" alt=""/>
@@ -365,8 +365,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                  <Terminal size={16}/> System Logs / Live Stream
                              </div>
                              <div className="space-y-2">
-                                 {logs.length === 0 && <div className="text-slate-600">No logs found in database.</div>}
-                                 {logs.map((log) => (
+                                 {(logs || []).length === 0 && <div className="text-slate-600">No logs found in database.</div>}
+                                 {(logs || []).map((log) => (
                                      <div key={log.id} className="flex gap-4 hover:bg-white/5 p-1 rounded transition-colors">
                                          <span className="text-slate-500 shrink-0 w-20">{log.timestamp}</span>
                                          <span className={`font-bold uppercase text-xs w-16 text-center rounded px-1 py-0.5 shrink-0 h-fit ${
@@ -463,21 +463,37 @@ const SidebarLink = ({ icon, label, active, onClick }: any) => (
     </button>
 );
 
-const StatCard = ({ title, value, change, icon, color }: any) => (
-    <div className={`bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden group`}>
-        <div className={`absolute top-0 right-0 w-24 h-24 rounded-bl-full opacity-10 transition-transform group-hover:scale-110 bg-${color}-500`}></div>
-        <div className="relative z-10">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 bg-${color}-50`}>
-                {icon}
-            </div>
-            <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">{title}</div>
-            <div className="flex items-end gap-2">
-                <div className="text-2xl font-bold text-slate-900">{value}</div>
-                <div className={`text-xs font-bold mb-1 ${change.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>{change}</div>
+const StatCard = ({ title, value, change, icon, color }: { title: string, value: string, change: string, icon: React.ReactNode, color: 'lime' | 'blue' | 'purple' | 'amber' }) => {
+    // Tailwind needs full class names to parse them. We cannot use dynamic string interpolation like `bg-${color}-50`.
+    const bgColors = {
+        lime: 'bg-lime-50',
+        blue: 'bg-blue-50',
+        purple: 'bg-purple-50',
+        amber: 'bg-amber-50'
+    };
+    const accentColors = {
+        lime: 'bg-lime-500',
+        blue: 'bg-blue-500',
+        purple: 'bg-purple-500',
+        amber: 'bg-amber-500'
+    };
+
+    return (
+        <div className={`bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden group`}>
+            <div className={`absolute top-0 right-0 w-24 h-24 rounded-bl-full opacity-10 transition-transform group-hover:scale-110 ${accentColors[color]}`}></div>
+            <div className="relative z-10">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${bgColors[color]}`}>
+                    {icon}
+                </div>
+                <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">{title}</div>
+                <div className="flex items-end gap-2">
+                    <div className="text-2xl font-bold text-slate-900">{value}</div>
+                    <div className={`text-xs font-bold mb-1 ${change.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>{change}</div>
+                </div>
             </div>
         </div>
-    </div>
-);
+    );
+};
 
 // Copied Modal from Dashboard to avoid export dependency issues
 const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean; onClose: () => void; title: string; children?: React.ReactNode }) => {
