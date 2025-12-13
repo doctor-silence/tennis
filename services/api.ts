@@ -14,6 +14,7 @@ const MOCK_USER: User = {
   city: 'Москва',
   avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80',
   rating: 1200,
+  xp: 150, // Added XP to mock
   age: 25,
   level: 'NTRP 3.5'
 };
@@ -26,6 +27,7 @@ const MOCK_ADMIN: User = {
   city: 'HQ',
   avatar: 'https://ui-avatars.com/api/?name=Admin&background=000&color=fff',
   rating: 9999,
+  xp: 9999,
   age: 99,
   level: 'GOD MODE'
 };
@@ -235,7 +237,7 @@ export const api = {
             } catch (networkError) {
                 // Если fetch упал (нет сети), только тогда используем Mock
                 console.warn("Backend offline. Falling back to Demo Mode.");
-                return { ...MOCK_USER, ...userData };
+                return { ...MOCK_USER, ...userData, xp: 0 };
             }
 
             const data = await res.json();

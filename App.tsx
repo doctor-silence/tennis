@@ -42,6 +42,12 @@ const App = () => {
     }
   };
 
+  const handleUserUpdate = (updatedData: Partial<User>) => {
+    if (currentUser) {
+        setCurrentUser({ ...currentUser, ...updatedData });
+    }
+  };
+
   const handleLogout = () => {
     setCurrentUser(null);
     setView('landing');
@@ -85,7 +91,11 @@ const App = () => {
       )}
 
       {view === 'dashboard' && currentUser && (
-        <Dashboard user={currentUser} onLogout={handleLogout} />
+        <Dashboard 
+            user={currentUser} 
+            onLogout={handleLogout} 
+            onUserUpdate={handleUserUpdate}
+        />
       )}
       
       {view === 'admin' && currentUser && (
@@ -334,7 +344,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
   );
 };
 
-// --- PRO Page Component ---
+// ... ProPage and AuthPage components (same as before) ...
 const ProPage = ({ onBack, onSubscribe }: { onBack: () => void, onSubscribe: () => void }) => {
   return (
     <div className="bg-slate-900 min-h-screen text-white">
@@ -442,8 +452,7 @@ const ProPage = ({ onBack, onSubscribe }: { onBack: () => void, onSubscribe: () 
   );
 };
 
-// --- Auth Page Component ---
-
+// ... AuthPage (same as before) ...
 const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () => void, onComplete: (user: User) => void, initialMode?: 'login' | 'register' }) => {
   const [authMode, setAuthMode] = useState<'login' | 'register'>(initialMode);
   const [registerStep, setRegisterStep] = useState<1 | 2>(1);

@@ -8,6 +8,7 @@ export interface User {
   email: string;
   role: 'amateur' | 'rtt_pro' | 'coach' | 'admin';
   rating?: number; // NTRP (converted) or RTT Points (Очки классификации)
+  xp?: number; // Experience Points (Gamification)
   rttRank?: number; // RTT Rating/Position (Рейтинг в категории)
   rttCategory?: string; // Age category for RTT
   level?: string; // Text representation (e.g. "NTRP 4.0")

@@ -48,6 +48,7 @@ const initDb = async () => {
         city VARCHAR(100),
         avatar TEXT,
         rating INTEGER DEFAULT 0,
+        xp INTEGER DEFAULT 0,
         age INTEGER,
         level VARCHAR(50),
         rtt_rank INTEGER DEFAULT 0,
@@ -61,6 +62,7 @@ const initDb = async () => {
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS rtt_rank INTEGER DEFAULT 0;`);
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS rtt_category VARCHAR(50);`);
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`);
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS xp INTEGER DEFAULT 0;`);
     
     console.log('✅ Table "users" checked and updated.');
 
@@ -286,34 +288,34 @@ const initDb = async () => {
             {
                 name: 'ТК "Магия Спорта"',
                 address: 'Крылатская ул., 2, Москва',
-                surface: 'hard',
-                price: 2900,
-                rating: 4.6,
-                image: 'https://images.unsplash.com/photo-1588611910629-68897b69c693?q=80&w=1200&auto=format&fit=crop'
+                surface: 'hard', 
+                price: 2900, 
+                rating: 4.6, 
+                image: 'https://images.unsplash.com/photo-1588611910629-68897b69c693?q=80&w=1200&auto=format&fit=crop' 
             },
-            {
-                name: 'Теннисный центр "Жуковка"',
-                address: 'Рублево-Успенское ш., Жуковка',
-                surface: 'hard',
-                price: 5000,
-                rating: 4.9,
-                image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop'
+            { 
+                name: 'Теннисный центр "Жуковка"', 
+                address: 'Рублево-Успенское ш., Жуковка', 
+                surface: 'hard', 
+                price: 5000, 
+                rating: 4.9, 
+                image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop' 
             },
-            {
-                name: 'ТК "Пироговский"',
-                address: 'Мытищи, ул. Совхозная, 2',
-                surface: 'clay',
-                price: 2400,
-                rating: 4.5,
-                image: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1200&auto=format&fit=crop'
+            { 
+                name: 'ТК "Пироговский"', 
+                address: 'Мытищи, ул. Совхозная, 2', 
+                surface: 'clay', 
+                price: 2400, 
+                rating: 4.5, 
+                image: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1200&auto=format&fit=crop' 
             },
-            {
-                name: 'PRO CLUB',
-                address: 'ул. Лобачевского, 114, Москва',
-                surface: 'clay',
-                price: 3100,
-                rating: 4.7,
-                image: 'https://images.unsplash.com/photo-1620202755294-8531732e7071?q=80&w=1200&auto=format&fit=crop'
+            { 
+                name: 'PRO CLUB', 
+                address: 'ул. Лобачевского, 114, Москва', 
+                surface: 'clay', 
+                price: 3100, 
+                rating: 4.7, 
+                image: 'https://images.unsplash.com/photo-1620202755294-8531732e7071?q=80&w=1200&auto=format&fit=crop' 
             }
         ];
 

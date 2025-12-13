@@ -12,7 +12,8 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+// Increased limit to 50mb to allow base64 image uploads
+app.use(express.json({ limit: '50mb' }));
 
 // Initialize Google GenAI
 // CRITICAL: API Key must come from environment variables
@@ -88,9 +89,9 @@ app.post('/api/auth/register', async (req, res) => {
         const defaultAvatar = `https://ui-avatars.com/api/?name=${name.replace(' ', '+')}&background=random&color=fff`;
         
         const result = await pool.query(
-            `INSERT INTO users (name, email, password, city, avatar, role, rating, age, level, rtt_rank, rtt_category) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
-             RETURNING id, name, email, role, city, avatar, rating, age, level, rtt_rank, rtt_category`,
+            `INSERT INTO users (name, email, password, city, avatar, role, rating, age, level, rtt_rank, rtt_category, xp) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0) 
+             RETURNING id, name, email, role, city, avatar, rating, age, level, rtt_rank, rtt_category, xp`,
             [
                 name, 
                 email, 
@@ -203,7 +204,7 @@ app.get('/api/admin/logs', async (req, res) => {
 
 app.get('/api/admin/users', async (req, res) => {
     try {
-        const result = await pool.query('SELECT id, name, email, role, city, avatar, rating, level, age, rtt_rank, rtt_category FROM users ORDER BY id DESC');
+        const result = await pool.query('SELECT id, name, email, role, city, avatar, rating, level, age, rtt_rank, rtt_category, xp FROM users ORDER BY id DESC');
         res.json(result.rows.map(u => ({
             ...u, 
             id: u.id.toString(),
@@ -228,13 +229,13 @@ app.post('/api/admin/users', async (req, res) => {
         const defaultAvatar = `https://ui-avatars.com/api/?name=${name.replace(' ', '+')}&background=random&color=fff`;
         
         const result = await pool.query(
-            `INSERT INTO users (name, email, password, city, avatar, role, rating, age, level, rtt_rank, rtt_category) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
-             RETURNING id, name, email, role, city, avatar, rating, age, level, rtt_rank, rtt_category`,
+            `INSERT INTO users (name, email, password, city, avatar, role, rating, age, level, rtt_rank, rtt_category, xp) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0) 
+             RETURNING id, name, email, role, city, avatar, rating, age, level, rtt_rank, rtt_category, xp`,
             [
                 name, 
                 email, 
-                hashedPassword,
+                hashedPassword, 
                 city || 'Москва', 
                 defaultAvatar, 
                 role || 'amateur', 
@@ -256,7 +257,7 @@ app.post('/api/admin/users', async (req, res) => {
 
 app.put('/api/admin/users/:id', async (req, res) => {
     const { id } = req.params;
-    const { name, role, city, rating, level, rttRank, rttCategory, age } = req.body;
+    const { name, role, city, rating, level, rttRank, rttCategory, age, xp, avatar } = req.body;
     try {
         await pool.query(
             `UPDATE users SET 
@@ -267,9 +268,11 @@ app.put('/api/admin/users/:id', async (req, res) => {
                 level = COALESCE($5, level),
                 rtt_rank = COALESCE($6, rtt_rank),
                 rtt_category = COALESCE($7, rtt_category),
-                age = COALESCE($8, age)
-            WHERE id = $9`, 
-            [name, role, city, rating, level, rttRank, rttCategory, age, id]
+                age = COALESCE($8, age),
+                xp = COALESCE($9, xp),
+                avatar = COALESCE($10, avatar)
+            WHERE id = $11`, 
+            [name, role, city, rating, level, rttRank, rttCategory, age, xp, avatar, id]
         );
         await logSystemEvent('warning', `Admin updated user ${id}`, 'Admin');
         res.json({ success: true });
