@@ -433,6 +433,40 @@ app.get('/api/cities', async (req, res) => {
     }
 });
 
+app.get('/api/partners', async (req, res) => {
+    const { city, level, search } = req.query;
+
+    try {
+        let query = "SELECT id, name, age, level, city, avatar as image, (role = 'rtt_pro' or role = 'coach') as isPro FROM users WHERE role != 'admin'";
+        const queryParams = [];
+
+        if (city) {
+            queryParams.push(city);
+            query += ` AND city = $${queryParams.length}`;
+        }
+
+        if (level && level !== 'all') {
+            queryParams.push(level);
+            query += ` AND level = $${queryParams.length}`;
+        }
+
+        if (search) {
+            queryParams.push(`%${search}%`);
+            query += ` AND name ILIKE $${queryParams.length}`;
+        }
+        
+        query += ' ORDER BY xp DESC, name ASC';
+
+        const result = await pool.query(query, queryParams);
+        
+        res.json(result.rows.map(r => ({ ...r, id: r.id.toString() })));
+
+    } catch (err) {
+        console.error("Fetch Partners Error:", err);
+        res.status(500).json({ error: 'Failed to fetch partners' });
+    }
+});
+
 // --- STUDENTS CRM ROUTES ---
 
 app.get('/api/students', async (req, res) => {
