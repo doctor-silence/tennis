@@ -90,7 +90,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
             {activeTab === 'messages' && <MessagesView />}
             {activeTab === 'settings' && <SettingsView user={user} />}
             {activeTab === 'notifications' && <NotificationsView />}
-            {activeTab === 'tactics' && <TacticsView />}
+            {activeTab === 'tactics' && <TacticsView user={user} />}
             {activeTab === 'students' && <StudentsView user={user} />}
             {activeTab === 'video_analysis' && <VideoAnalysisView />}
             {activeTab === 'ladder' && <LadderView user={user} />}

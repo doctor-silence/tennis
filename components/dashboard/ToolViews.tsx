@@ -1,9 +1,13 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { BookOpen, Video, Upload, Users, Plus, Undo, Trash2, Eraser, PenTool, Download } from 'lucide-react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { BookOpen, Video, Upload, Users, Plus, Loader2 } from 'lucide-react';
 import { User, Student } from '../../types';
 import Button from '../Button';
 import { api } from '../../services/api';
+
+// Lazy load the 3D component
+const TennisCourt3D = lazy(() => import('./TennisCourt3D'));
+
 
 export const SettingsView = ({ user }: { user: User }) => (
     <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200 max-w-2xl mx-auto">
@@ -28,189 +32,16 @@ export const SettingsView = ({ user }: { user: User }) => (
     </div>
 );
 
-export const TacticsView = () => {
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [isDrawing, setIsDrawing] = useState(false);
-    const [color, setColor] = useState('#bef264'); // Default lime
-    const [tool, setTool] = useState<'pen' | 'eraser'>('pen');
-    
-    // Setup canvas resolution
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        
-        const resizeCanvas = () => {
-            const parent = canvas.parentElement;
-            if (parent) {
-                canvas.width = parent.offsetWidth;
-                canvas.height = parent.offsetHeight;
-                
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                    ctx.lineCap = 'round';
-                    ctx.lineJoin = 'round';
-                    ctx.strokeStyle = color;
-                    ctx.lineWidth = 3;
-                }
-            }
-        };
-        
-        resizeCanvas();
-        window.addEventListener('resize', resizeCanvas);
-        return () => window.removeEventListener('resize', resizeCanvas);
-    }, []);
-
-    // Update context when color/tool changes
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-            ctx.strokeStyle = tool === 'eraser' ? 'rgba(0,0,0,0)' : color;
-            ctx.lineWidth = tool === 'eraser' ? 20 : 3;
-            ctx.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
-        }
-    }, [color, tool]);
-
-    const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        setIsDrawing(true);
-        const { offsetX, offsetY } = getCoordinates(e, canvas);
-        ctx.beginPath();
-        ctx.moveTo(offsetX, offsetY);
-    };
-
-    const draw = (e: React.MouseEvent | React.TouchEvent) => {
-        if (!isDrawing) return;
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        const { offsetX, offsetY } = getCoordinates(e, canvas);
-        ctx.lineTo(offsetX, offsetY);
-        ctx.stroke();
-    };
-
-    const stopDrawing = () => {
-        setIsDrawing(false);
-        const canvas = canvasRef.current;
-        if (canvas) {
-            const ctx = canvas.getContext('2d');
-            ctx?.beginPath(); // Reset path to avoid connecting lines
-        }
-    };
-
-    const getCoordinates = (e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) => {
-        let clientX, clientY;
-        if ('touches' in e) {
-            clientX = e.touches[0].clientX;
-            clientY = e.touches[0].clientY;
-        } else {
-            clientX = (e as React.MouseEvent).clientX;
-            clientY = (e as React.MouseEvent).clientY;
-        }
-        
-        const rect = canvas.getBoundingClientRect();
-        return {
-            offsetX: clientX - rect.left,
-            offsetY: clientY - rect.top
-        };
-    };
-
-    const clearBoard = () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-    };
-
+export const TacticsView = ({ user }: { user: User }) => {
     return (
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden h-[700px] flex flex-col">
-            <div className="p-4 border-b border-slate-200 flex flex-wrap gap-4 items-center justify-between bg-white z-10">
-                <div className="flex items-center gap-2">
-                    <BookOpen className="text-lime-500" size={24}/>
-                    <h3 className="font-bold text-lg">Тактическая доска</h3>
+        <div className="h-[700px]">
+            <Suspense fallback={
+                <div className="w-full h-full bg-slate-100 rounded-3xl flex items-center justify-center text-slate-500">
+                    <Loader2 className="animate-spin mr-2" /> Загрузка 3D-модели...
                 </div>
-                
-                <div className="flex gap-2">
-                    <button 
-                        onClick={() => setTool('pen')} 
-                        className={`p-2 rounded-lg transition-colors ${tool === 'pen' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}
-                        title="Карандаш"
-                    >
-                        <PenTool size={18}/>
-                    </button>
-                    <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
-                        {['#bef264', '#ef4444', '#3b82f6', '#ffffff'].map(c => (
-                            <button 
-                                key={c} 
-                                onClick={() => { setColor(c); setTool('pen'); }}
-                                className={`w-6 h-6 rounded-md border border-slate-200 ${color === c && tool === 'pen' ? 'ring-2 ring-slate-900' : ''}`}
-                                style={{ backgroundColor: c }}
-                            />
-                        ))}
-                    </div>
-                    <button 
-                        onClick={() => setTool('eraser')} 
-                        className={`p-2 rounded-lg transition-colors ${tool === 'eraser' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}
-                        title="Ластик"
-                    >
-                        <Eraser size={18}/>
-                    </button>
-                    <div className="w-px h-8 bg-slate-200 mx-2"></div>
-                    <button onClick={clearBoard} className="p-2 hover:bg-red-50 text-red-500 rounded-lg transition-colors" title="Очистить">
-                        <Trash2 size={18}/>
-                    </button>
-                </div>
-            </div>
-
-            <div className="flex-1 relative bg-[#4a8a3a] overflow-hidden cursor-crosshair select-none touch-none">
-                {/* Tennis Court CSS Representation - Corrected Dimensions */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-60">
-                    {/* Main Court Rectangle (Doubles) */}
-                    <div className="w-[80%] h-[90%] border-4 border-white relative box-border">
-                         
-                         {/* Singles Sidelines (12.5% from each side to approximate 4.5ft alleys on 36ft width) */}
-                         <div className="absolute inset-y-0 left-[12.5%] border-l-4 border-white"></div>
-                         <div className="absolute inset-y-0 right-[12.5%] border-r-4 border-white"></div>
-                         
-                         {/* Service Lines (23% from top and bottom to approximate 18ft from baseline in 39ft half) */}
-                         <div className="absolute top-[23%] left-[12.5%] right-[12.5%] border-t-4 border-white"></div>
-                         <div className="absolute bottom-[23%] left-[12.5%] right-[12.5%] border-b-4 border-white"></div>
-                        
-                         {/* Center Service Line */}
-                         <div className="absolute top-[23%] bottom-[23%] left-1/2 w-1 bg-white -translate-x-1/2"></div>
-                        
-                         {/* Net */}
-                         <div className="absolute top-1/2 left-[-4%] right-[-4%] h-1 bg-white/90 border-y border-black/10 -translate-y-1/2 z-0 shadow-sm"></div>
-                        
-                         {/* Center Marks */}
-                         <div className="absolute top-0 left-1/2 w-1 h-3 bg-white -translate-x-1/2"></div>
-                         <div className="absolute bottom-0 left-1/2 w-1 h-3 bg-white -translate-x-1/2"></div>
-                    </div>
-                </div>
-
-                <canvas 
-                    ref={canvasRef}
-                    className="absolute inset-0 w-full h-full z-10 touch-none"
-                    onMouseDown={startDrawing}
-                    onMouseMove={draw}
-                    onMouseUp={stopDrawing}
-                    onMouseLeave={stopDrawing}
-                    onTouchStart={startDrawing}
-                    onTouchMove={draw}
-                    onTouchEnd={stopDrawing}
-                />
-            </div>
-            
-            <div className="p-3 bg-slate-50 border-t border-slate-200 text-xs text-center text-slate-400">
-                Используйте разные цвета для обозначения движения игрока и полета мяча.
-            </div>
+            }>
+                <TennisCourt3D user={user} />
+            </Suspense>
         </div>
     );
 };

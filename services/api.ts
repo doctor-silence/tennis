@@ -1,5 +1,6 @@
 
-import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Match, Product } from '../types';
+import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Match, Product, PlayerProfile, Trajectory } from '../types';
+import * as THREE from 'three'; // Import THREE for Vector3 deserialization
 
 // Frontend API Service
 const API_URL = 'http://localhost:3001/api';
@@ -14,7 +15,7 @@ const MOCK_USER: User = {
   city: 'Москва',
   avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80',
   rating: 1200,
-  xp: 150, // Added XP to mock
+  xp: 150,
   age: 25,
   level: 'NTRP 3.5'
 };
@@ -37,7 +38,6 @@ const MOCK_PARTNERS: Partner[] = [
     { id: '2', name: 'Мария Петрова', age: 24, level: 'NTRP 4.0', city: 'Москва', isPro: false, image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80' },
 ];
 
-// UPDATED: Extended Real Moscow Courts (Mutable for Offline Admin)
 let MOCK_COURTS: Court[] = [
     { 
         id: '1', 
@@ -224,6 +224,54 @@ const MOCK_MATCHES: Match[] = [
     }
 ];
 
+const MOCK_PLAYER_PROFILES: { [key: string]: PlayerProfile } = {
+    'u10': {
+        ...MOCK_LADDER[0],
+        joinDate: '2023-05-12',
+        bio: 'Профессиональный игрок, специализируется на быстрых кортах. Агрессивный стиль игры с мощной подачей.',
+        stats: { wins: 40, losses: 5, bestRank: 1, currentStreak: 8 },
+        rankHistory: [
+            { month: 'Май', rank: 10 }, { month: 'Июнь', rank: 8 }, { month: 'Июль', rank: 5 },
+            { month: 'Авг', rank: 3 }, { month: 'Сен', rank: 2 }, { month: 'Окт', rank: 1 }
+        ],
+        recentMatches: [
+            { id: 'm1', userId: 'u10', opponentName: 'Андрей Р.', score: '6:3, 6:4', date: '2024-10-15', result: 'win', surface: 'hard' },
+            { id: 'm2', userId: 'u10', opponentName: 'Карен Х.', score: '7:6, 6:2', date: '2024-10-02', result: 'win', surface: 'hard' },
+        ]
+    },
+    'mock-user-1': {
+        ...MOCK_LADDER[4],
+        joinDate: '2024-08-01',
+        bio: 'Любитель, активно улучшающий свою игру. Предпочитает играть на задней линии.',
+        stats: { wins: 18, losses: 10, bestRank: 5, currentStreak: -1 },
+        rankHistory: [
+            { month: 'Май', rank: 25 }, { month: 'Июнь', rank: 18 }, { month: 'Июль', rank: 15 },
+            { month: 'Авг', rank: 9 }, { month: 'Сен', rank: 7 }, { month: 'Окт', rank: 5 }
+        ],
+        recentMatches: [
+             { id: 'm3', userId: 'mock-user-1', opponentName: 'Игрок №6', score: '6:4, 2:6, 4:6', date: '2024-10-22', result: 'loss', surface: 'clay' },
+             { id: 'm4', userId: 'mock-user-1', opponentName: 'Игрок №8', score: '6:3, 7:5', date: '2024-10-18', result: 'win', surface: 'hard' },
+        ]
+    }
+};
+
+const MOCK_TACTICS: Trajectory[] = [
+    {
+        id: 'mock-tactic-1',
+        points: [
+            new THREE.Vector3(-5, 0.01, -10),
+            new THREE.Vector3(0, 0.01, 0),
+            new THREE.Vector3(5, 0.01, 10)
+        ],
+        color: '#FFFFFF',
+        arcHeight: 2.5,
+        name: 'Подача',
+        annotation: 'Подача в левый угол, высокий отскок',
+        playerType: 'user',
+        playerName: 'Гость (Демо Режим)'
+    }
+];
+
 export const api = {
     auth: {
         register: async (userData: any): Promise<User> => {
@@ -235,13 +283,11 @@ export const api = {
                     body: JSON.stringify(userData)
                 });
             } catch (networkError) {
-                // Если fetch упал (нет сети), только тогда используем Mock
                 console.warn("Backend offline. Falling back to Demo Mode.");
                 return { ...MOCK_USER, ...userData, xp: 0 };
             }
 
             const data = await res.json();
-            // Если сервер ответил ошибкой (например, email занят), выбрасываем её, чтобы UI показал ошибку
             if (!res.ok) throw new Error(data.error || 'Ошибка регистрации. Проверьте сервер.');
             return data;
         },
@@ -254,10 +300,8 @@ export const api = {
                     body: JSON.stringify(credentials)
                 });
             } catch (networkError) {
-                // Если fetch упал (нет сети), используем Mock
                 console.warn("Backend offline. Falling back to Demo Mode.");
                 
-                // ИСПРАВЛЕНИЕ: Если ввели email админа, возвращаем MOCK_ADMIN
                 if (credentials.email === 'admin@tennis.pro') {
                     return MOCK_ADMIN;
                 }
@@ -266,7 +310,6 @@ export const api = {
             }
 
             const data = await res.json();
-            // Если сервер ответил 401 (неверный пароль), мы выбрасываем ошибку
             if (!res.ok) throw new Error(data.error || 'Ошибка входа');
             
             return data;
@@ -353,6 +396,18 @@ export const api = {
         } catch (e) { 
             console.warn("Backend offline. Serving in-memory courts.");
             return MOCK_COURTS; 
+        }
+    },
+    
+    getCities: async (): Promise<string[]> => {
+        try {
+            const res = await fetch(`${API_URL}/cities`);
+            if (!res.ok) throw new Error('Failed to fetch cities');
+            return await res.json();
+        } catch (e) {
+            console.warn("Backend offline or failed to fetch cities. Returning mock data.");
+            // Fallback to a mock list of cities if backend is offline or request fails
+            return ['Москва', 'Санкт-Петербург', 'Казань', 'Сочи'];
         }
     },
 
@@ -458,20 +513,19 @@ export const api = {
             try {
                 let res;
                 // Check if ID is present and valid (not temp '0.' or 'mock-')
-                if (court.id && !court.id.startsWith('0.') && !court.id.startsWith('mock-')) {
-                    res = await fetch(`${API_URL}/courts/${court.id}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(court)
-                    });
-                } else {
-                    const { id, ...newCourtData } = court;
-                    res = await fetch(`${API_URL}/courts`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(newCourtData)
-                    });
-                }
+                if (court.id && !court.id.startsWith('0.')) { 
+                     await fetch(`${API_URL}/courts/${court.id}`, {
+                         method: 'PUT',
+                         headers: { 'Content-Type': 'application/json' },
+                         body: JSON.stringify(court)
+                     });
+                 } else {
+                     await fetch(`${API_URL}/courts`, {
+                         method: 'POST',
+                         headers: { 'Content-Type': 'application/json' },
+                         body: JSON.stringify(court)
+                     });
+                 }
                 
                 if (!res.ok) {
                     const errorData = await res.json();
@@ -511,8 +565,7 @@ export const api = {
         },
         deleteCourt: async (id: string) => {
             try {
-                const res = await fetch(`${API_URL}/courts/${id}`, { method: 'DELETE' });
-                if (!res.ok) throw new Error('Failed to delete');
+                await fetch(`${API_URL}/courts/${id}`, { method: 'DELETE' });
             } catch (e) { 
                 console.warn("Backend offline. Deleting from in-memory mocks.");
                 MOCK_COURTS = MOCK_COURTS.filter(c => c.id !== id);
@@ -527,6 +580,24 @@ export const api = {
         getChallenges: async (): Promise<Challenge[]> => {
              return new Promise(resolve => setTimeout(() => resolve(MOCK_CHALLENGES), 400));
         },
+        getPlayerProfile: async (userId: string): Promise<PlayerProfile | null> => {
+            console.log(`Fetching profile for ${userId}`);
+            const profile = MOCK_PLAYER_PROFILES[userId];
+            // If no specific profile, create a generic one from the ladder list
+            if (!profile) {
+                const ladderInfo = MOCK_LADDER.find(p => p.userId === userId);
+                if (!ladderInfo) return null;
+                return new Promise(resolve => setTimeout(() => resolve({
+                    ...ladderInfo,
+                    joinDate: '2024-01-01',
+                    bio: 'Нет дополнительной информации об этом игроке.',
+                    stats: { wins: Math.round(ladderInfo.matches * (ladderInfo.winRate/100)), losses: Math.round(ladderInfo.matches * (1-(ladderInfo.winRate/100))), bestRank: ladderInfo.rank, currentStreak: 1 },
+                    rankHistory: [{ month: 'Окт', rank: ladderInfo.rank }],
+                    recentMatches: []
+                }), 400));
+            }
+            return new Promise(resolve => setTimeout(() => resolve(profile), 400));
+        },
         createChallenge: async (challenger: LadderPlayer, defender: LadderPlayer): Promise<Challenge> => {
             return {
                 id: Math.random().toString(),
@@ -538,6 +609,69 @@ export const api = {
                 status: 'pending',
                 deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
             };
+        }
+    },
+
+    tactics: {
+        getAll: async (userId: string): Promise<Trajectory[]> => {
+            try {
+                const res = await fetch(`${API_URL}/tactics/list/${userId}`);
+                if (!res.ok) throw new Error('Failed to fetch tactics list');
+                const data = await res.json();
+                
+                // The backend returns tactics_data, we need to deserialize it
+                return data.map(tactic => {
+                    const trajectories = tactic.tactics_data || [];
+                    return {
+                        ...tactic,
+                        // Ensure points are converted back to THREE.Vector3 objects
+                        points: trajectories.map(p => new THREE.Vector3(p.x, p.y, p.z)),
+                    };
+                });
+            } catch (e) {
+                console.warn("Backend offline or failed to fetch tactics. Returning mock data.", e);
+                return MOCK_TACTICS; 
+            }
+        },
+        create: async (userId: string, tactic: Omit<Trajectory, 'id' | 'user_id'>): Promise<Trajectory> => {
+            const res = await fetch(`${API_URL}/tactics`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId,
+                    name: tactic.name,
+                    trajectories: tactic.points 
+                })
+            });
+            if (!res.ok) {
+                 const err = await res.json();
+                 throw new Error(err.error || 'Failed to create tactic');
+            }
+            return await res.json();
+        },
+        update: async (tacticId: string, tactic: Trajectory): Promise<Trajectory> => {
+            const res = await fetch(`${API_URL}/tactic/${tacticId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: tactic.name,
+                    trajectories: tactic.points
+                })
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Failed to update tactic');
+            }
+            return await res.json();
+        },
+        delete: async (tacticId: string): Promise<void> => {
+            const res = await fetch(`${API_URL}/tactic/${tacticId}`, {
+                method: 'DELETE'
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Failed to delete tactic');
+            }
         }
     }
 };

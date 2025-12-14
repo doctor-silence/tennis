@@ -1,5 +1,6 @@
 
-require('dotenv').config();
+
+require('dotenv').config({ path: __dirname + '/.env' });
 const express = require('express');
 const cors = require('cors');
 const { GoogleGenAI } = require('@google/genai');
@@ -421,6 +422,17 @@ app.delete('/api/products/:id', async (req, res) => {
     }
 });
 
+// New route to get unique cities
+app.get('/api/cities', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT DISTINCT city FROM users WHERE city IS NOT NULL AND city != \'\' ORDER BY city');
+        res.json(result.rows.map(row => row.city));
+    } catch (err) {
+        console.error("Fetch Cities Error:", err);
+        res.status(500).json({ error: 'Failed to fetch cities' });
+    }
+});
+
 // --- STUDENTS CRM ROUTES ---
 
 app.get('/api/students', async (req, res) => {
@@ -548,6 +560,99 @@ app.post('/api/matches', async (req, res) => {
         res.status(500).json({ error: 'Db error' });
     }
 });
+
+
+// --- TACTICS ROUTES ---
+
+// GET a list of all tactic schemes for a user
+app.get('/api/tactics/list/:userId', async (req, res) => {
+    const { userId } = req.params;
+    console.log('Fetching tactics for user:', userId);
+    try {
+        const result = await pool.query('SELECT * FROM tactics WHERE user_id = $1 ORDER BY updated_at DESC', [parseInt(userId)]);
+        res.json(result.rows.map(r => ({ ...r, id: r.id.toString() })));
+    } catch (err) {
+        console.error("Fetch Tactics Error:", err);
+        res.status(500).json({ error: 'Failed to fetch tactics list' });
+    }
+});
+
+// GET a single tactic by its ID
+app.get('/api/tactic/:tacticId', async (req, res) => {
+    const { tacticId } = req.params;
+    try {
+        const result = await pool.query('SELECT * FROM tactics WHERE id = $1', [tacticId]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Tactic not found' });
+        }
+        res.json(result.rows[0] || []);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch tactic' });
+    }
+});
+
+// POST (create) a new tactic
+app.post('/api/tactics', async (req, res) => {
+    console.log('Received request to save tactic:', req.body);
+    const { userId, name, trajectories } = req.body;
+
+    if (!userId || !name || !trajectories) {
+        console.error('Validation failed:', { userId, name, trajectories });
+        return res.status(400).json({ error: 'userId, name, and trajectories are required' });
+    }
+    
+    const parsedUserId = parseInt(userId);
+    if (isNaN(parsedUserId)) {
+        console.error('Invalid userId:', userId);
+        return res.status(400).json({ error: 'Invalid userId' });
+    }
+
+    try {
+        console.log('Executing INSERT query with:', { userId: parsedUserId, name, trajectories: JSON.stringify(trajectories).substring(0, 100) + '...' });
+        const result = await pool.query(
+            'INSERT INTO tactics (user_id, name, tactics_data) VALUES ($1, $2, $3) RETURNING *',
+            [parsedUserId, name, JSON.stringify(trajectories)]
+        );
+        console.log('Query successful, result:', result.rows[0]);
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error("Save New Tactic Error:", err);
+        res.status(500).json({ error: 'Failed to save new tactic' });
+    }
+});
+
+// PUT (update) an existing tactic
+app.put('/api/tactic/:tacticId', async (req, res) => {
+    const { tacticId } = req.params;
+    const { name, trajectories } = req.body;
+    try {
+        const result = await pool.query(
+            'UPDATE tactics SET name = $1, tactics_data = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
+            [name, JSON.stringify(trajectories), tacticId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Tactic not found' });
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error("Update Tactic Error:", err);
+        res.status(500).json({ error: 'Failed to update tactic' });
+    }
+});
+
+// DELETE a tactic
+app.delete('/api/tactic/:tacticId', async (req, res) => {
+    const { tacticId } = req.params;
+    try {
+        await pool.query('DELETE FROM tactics WHERE id = $1', [tacticId]);
+        res.status(200).json({ success: true });
+    } catch (err) {
+        console.error("Delete Tactic Error:", err);
+        res.status(500).json({ error: 'Failed to delete tactic' });
+    }
+});
+
+
 
 // AI Coach Route (Actually using the Gemini API)
 app.post('/api/ai-coach', async (req, res) => {

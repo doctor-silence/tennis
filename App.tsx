@@ -183,7 +183,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
             <div className="mt-12 flex items-center gap-6 text-slate-400 text-sm font-medium">
                <div className="flex -space-x-3">
                  {[1,2,3,4].map(i => (
-                   <img key={i} src={`https://picsum.photos/seed/p${i}/50/50`} className="w-10 h-10 rounded-full border-2 border-slate-900" alt=""/>
+                   <img key={i} src="/assets/avatar-placeholder.svg" className="w-10 h-10 rounded-full border-2 border-slate-900" alt=""/>
                  ))}
                </div>
                <p><span className="text-white font-bold">15,000+</span> игроков уже в игре</p>
@@ -194,7 +194,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
             <div className="relative z-10 transform rotate-[-5deg] hover:rotate-0 transition-all duration-700 ease-out group perspective-1000">
                <div className="absolute inset-0 bg-gradient-to-r from-lime-400 to-emerald-400 rounded-3xl transform translate-x-4 translate-y-4 -z-10 opacity-50 blur-lg"></div>
                <img 
-                 src="https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=800&auto=format&fit=crop" 
+                 src="/assets/landing-hero.jpg" 
                  alt="App Preview" 
                  className="rounded-3xl shadow-2xl border-4 border-white/10"
                />
@@ -556,7 +556,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () =>
     <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4 relative overflow-y-auto">
        {/* Ambient Backgorund */}
        <div className="fixed inset-0">
-          <img src="https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=2500&auto=format&fit=crop" className="w-full h-full object-cover opacity-20 grayscale" alt="court texture" />
+          <img src="/assets/auth-background.jpg" className="w-full h-full object-cover opacity-20 grayscale" alt="court texture" />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/80 to-transparent"></div>
        </div>
 

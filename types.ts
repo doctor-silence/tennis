@@ -137,6 +137,24 @@ export interface LadderPlayer {
     status: 'idle' | 'defending' | 'challenging';
 }
 
+export interface RankHistoryItem {
+    month: string;
+    rank: number;
+}
+
+export interface PlayerProfile extends LadderPlayer {
+    joinDate: string;
+    bio: string;
+    stats: {
+        wins: number;
+        losses: number;
+        bestRank: number;
+        currentStreak: number; // positive for wins, negative for losses
+    };
+    rankHistory: RankHistoryItem[];
+    recentMatches: Match[];
+}
+
 export interface Challenge {
     id: string;
     challengerId: string;
@@ -147,4 +165,17 @@ export interface Challenge {
     status: 'pending' | 'accepted' | 'scheduled' | 'completed';
     deadline: string; // ISO date string
     matchDate?: string;
+}
+
+export interface Trajectory {
+    id: string;
+    user_id: string;
+    name: string;
+    annotation: string;
+    playerType: 'user' | 'opponent';
+    playerName: string;
+    color: string;
+    arcHeight: number;
+    points: any[]; 
+    tactics_data?: any[];
 }

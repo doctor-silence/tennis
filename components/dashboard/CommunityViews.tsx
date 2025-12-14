@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Bell, Heart, MessageCircle, Share2, Swords, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
-import { User, LadderPlayer, Challenge } from '../../types';
+import { MessageSquare, Bell, Heart, MessageCircle, Share2, Swords, Clock, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { User, LadderPlayer, Challenge, PlayerProfile } from '../../types';
 import Button from '../Button';
 import { api } from '../../services/api';
 import { Modal } from '../Shared';
+import PlayerProfileFlyout from './PlayerProfileFlyout';
 
 export const MessagesView = () => (
     <div className="flex h-[600px] bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
@@ -53,6 +54,8 @@ export const LadderView = ({ user }: { user: User }) => {
     const [viewMode, setViewMode] = useState<'ranking' | 'challenges'>('ranking');
     const [selectedOpponent, setSelectedOpponent] = useState<LadderPlayer | null>(null);
     const [showChallengeModal, setShowChallengeModal] = useState(false);
+    const [selectedProfile, setSelectedProfile] = useState<PlayerProfile | null>(null);
+    const [isProfileLoading, setIsProfileLoading] = useState(false);
     
     useEffect(() => {
         const loadData = async () => {
@@ -67,6 +70,15 @@ export const LadderView = ({ user }: { user: User }) => {
     const handleChallengeClick = (opponent: LadderPlayer) => {
         setSelectedOpponent(opponent);
         setShowChallengeModal(true);
+    };
+
+    const handlePlayerClick = async (player: LadderPlayer) => {
+        setIsProfileLoading(true);
+        const profile = await api.ladder.getPlayerProfile(player.userId);
+        if (profile) {
+            setSelectedProfile(profile);
+        }
+        setIsProfileLoading(false);
     };
 
     const confirmChallenge = async () => {
@@ -89,6 +101,8 @@ export const LadderView = ({ user }: { user: User }) => {
 
     return (
         <div className="space-y-6">
+            {selectedProfile && <PlayerProfileFlyout profile={selectedProfile} onClose={() => setSelectedProfile(null)} />}
+
             {/* Header / Tabs */}
             <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-200 inline-flex">
                 <button 
@@ -118,59 +132,66 @@ export const LadderView = ({ user }: { user: User }) => {
                             <div className="text-[10px] font-bold text-slate-400 uppercase">Твой ранг</div>
                         </div>
                     </div>
-                    <table className="w-full text-left">
-                        <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs">
-                            <tr>
-                                <th className="px-6 py-4">Ранг</th>
-                                <th className="px-6 py-4">Игрок</th>
-                                <th className="px-6 py-4 text-center">Матчи</th>
-                                <th className="px-6 py-4 text-center">Винрейт</th>
-                                <th className="px-6 py-4 text-right">Действия</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {ranking.map((p, i) => (
-                                <tr key={p.id} className={`hover:bg-slate-50 transition-colors ${p.userId === user.id ? 'bg-lime-50/50' : ''}`}>
-                                    <td className="px-6 py-4">
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm ${i < 3 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
-                                            {p.rank}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="relative">
-                                                <img src={p.avatar} className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white shadow-sm" alt=""/>
-                                                {p.status === 'defending' && <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-amber-400 border-2 border-white rounded-full" title="Защищает место"></div>}
-                                            </div>
-                                            <div>
-                                                <div className="font-bold text-sm text-slate-900">{p.name} {p.userId === user.id && '(Вы)'}</div>
-                                                <div className="text-xs text-slate-500">{p.points} pts</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-center text-sm font-medium text-slate-700">{p.matches}</td>
-                                    <td className="px-6 py-4 text-center">
-                                        <div className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-                                            {p.winRate}%
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        {p.userId !== user.id && (
-                                            <Button 
-                                                size="sm" 
-                                                variant={p.rank < (ranking.find(r => r.userId === user.id)?.rank || 999) ? "secondary" : "outline"} 
-                                                className="h-8 text-xs"
-                                                onClick={() => handleChallengeClick(p)}
-                                                disabled={p.status === 'defending'}
-                                            >
-                                                {p.rank < (ranking.find(r => r.userId === user.id)?.rank || 999) ? 'Вызвать' : 'Спарринг'}
-                                            </Button>
-                                        )}
-                                    </td>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs">
+                                <tr>
+                                    <th className="px-6 py-4">Ранг</th>
+                                    <th className="px-6 py-4">Игрок</th>
+                                    <th className="px-6 py-4 text-center">Матчи</th>
+                                    <th className="px-6 py-4 text-center">Винрейт</th>
+                                    <th className="px-6 py-4 text-right">Действия</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {ranking.map((p, i) => (
+                                    <tr 
+                                        key={p.id} 
+                                        onClick={() => handlePlayerClick(p)}
+                                        className={`transition-colors cursor-pointer ${p.userId === user.id ? 'bg-lime-50/50 hover:bg-lime-50' : 'hover:bg-slate-50'}`}
+                                    >
+                                        <td className="px-6 py-4">
+                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm ${i < 3 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                {p.rank}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="relative">
+                                                    <img src={p.avatar} className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white shadow-sm" alt=""/>
+                                                    {p.status === 'defending' && <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-amber-400 border-2 border-white rounded-full" title="Защищает место"></div>}
+                                                    {isProfileLoading && selectedProfile?.userId === p.userId && <Loader2 className="absolute inset-0 m-auto animate-spin text-white" />}
+                                                </div>
+                                                <div>
+                                                    <div className="font-bold text-sm text-slate-900">{p.name} {p.userId === user.id && '(Вы)'}</div>
+                                                    <div className="text-xs text-slate-500">{p.points} pts</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-center text-sm font-medium text-slate-700">{p.matches}</td>
+                                        <td className="px-6 py-4 text-center">
+                                            <div className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
+                                                {p.winRate}%
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            {p.userId !== user.id && (
+                                                <Button 
+                                                    size="sm" 
+                                                    variant={p.rank < (ranking.find(r => r.userId === user.id)?.rank || 999) ? "secondary" : "outline"} 
+                                                    className="h-8 text-xs"
+                                                    onClick={(e) => { e.stopPropagation(); handleChallengeClick(p); }}
+                                                    disabled={p.status === 'defending'}
+                                                >
+                                                    {p.rank < (ranking.find(r => r.userId === user.id)?.rank || 999) ? 'Вызвать' : 'Спарринг'}
+                                                </Button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
 

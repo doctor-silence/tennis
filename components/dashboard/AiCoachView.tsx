@@ -66,7 +66,7 @@ const AiCoachView = ({ user }: { user: User }) => {
                   placeholder="Спроси совет у тренера..."
                   value={input}
                   onChange={e => setInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleSend()}
+                  onKeyDown={e => e.key === 'Enter' && !loading && handleSend()}
                 />
                 <Button onClick={handleSend} disabled={loading} className="w-12 px-0"><Send size={20}/></Button>
             </div>

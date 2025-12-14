@@ -27,3 +27,6 @@ out
 # OS files
 .DS_Store
 Thumbs.db
+
+# Gemini Summary
+PROJECT_SUMMARY.md

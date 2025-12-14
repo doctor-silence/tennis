@@ -8,10 +8,21 @@ import { api } from '../../services/api';
 const PartnerSearchView = ({ onNavigate }: { onNavigate: (tab: DashboardTab) => void }) => {
     const [partners, setPartners] = useState<Partner[]>([]);
     const [filter, setFilter] = useState({ city: '', level: 'all', search: '' });
+    const [cities, setCities] = useState<string[]>([]); // New state for cities
 
+    // Fetch partners when filter changes
     useEffect(() => {
         api.getPartners(filter).then(setPartners);
     }, [filter]);
+
+    // Fetch cities once on component mount
+    useEffect(() => {
+        const fetchCities = async () => {
+            const fetchedCities = await api.getCities();
+            setCities(fetchedCities);
+        };
+        fetchCities();
+    }, []);
 
     return (
         <div className="space-y-6">
@@ -21,11 +32,24 @@ const PartnerSearchView = ({ onNavigate }: { onNavigate: (tab: DashboardTab) => 
                     <Search className="absolute left-3 top-3 text-slate-400" size={18} />
                     <input 
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 outline-none focus:ring-2 focus:ring-lime-400"
-                        placeholder="Найти партнера..."
+                        placeholder="Поиск по имени..."
                         value={filter.search}
                         onChange={e => setFilter({...filter, search: e.target.value})}
                     />
                  </div>
+                <div className="flex-1 relative">
+                    <MapPin className="absolute left-3 top-3 text-slate-400" size={18} />
+                    <select
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 outline-none focus:ring-2 focus:ring-lime-400"
+                        value={filter.city}
+                        onChange={e => setFilter({...filter, city: e.target.value})}
+                    >
+                        <option value="">Все города</option>
+                        {cities.map(city => (
+                            <option key={city} value={city}>{city}</option>
+                        ))}
+                    </select>
+                </div>
                  <div className="flex gap-4">
                      <select 
                         className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 outline-none"

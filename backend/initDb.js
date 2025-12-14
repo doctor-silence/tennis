@@ -128,6 +128,19 @@ const initDb = async () => {
     `);
     console.log('✅ Table "products" checked.');
 
+    // 8. Create Tactics Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS tactics (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        tactics_data JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Table "tactics" checked.');
+
     await client.query('COMMIT');
 
     // --- SEED DATA ---
