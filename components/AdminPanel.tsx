@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
     LayoutDashboard, 
@@ -86,6 +87,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [courtSearchName, setCourtSearchName] = useState<string>('');
     const [courtSearchCity, setCourtSearchCity] = useState<string>('Все города');
 
+    // Confirmation Modal State
+    const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState<boolean>(false);
+    const [itemToDeleteId, setItemToDeleteId] = useState<string | null>(null);
+    const [deleteActionType, setDeleteActionType] = useState<'court' | 'user' | 'product' | null>(null);
+
     // Initial Data Load
     useEffect(() => {
         loadData();
@@ -114,6 +120,30 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
         }
     };
 
+
+    // Handlers for Confirmation Modal
+    const handleConfirmDelete = async () => {
+        if (!itemToDeleteId || !deleteActionType) return;
+
+        try {
+            if (deleteActionType === 'product') {
+                await api.admin.deleteProduct(itemToDeleteId);
+            } else if (deleteActionType === 'court') {
+                await api.admin.deleteCourt(itemToDeleteId);
+            } else if (deleteActionType === 'user') {
+                await api.admin.deleteUser(itemToDeleteId);
+            }
+            await loadData(); // Reload data after deletion
+        } catch (e: any) {
+            alert('Ошибка удаления: ' + e.message);
+            console.error("Deletion failed", e);
+        } finally {
+            setShowConfirmDeleteModal(false);
+            setItemToDeleteId(null);
+            setDeleteActionType(null);
+        }
+    };
+
     // Product Handlers
     const handleSaveProduct = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -125,11 +155,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
         setEditingProduct(null);
     };
 
-    const handleDeleteProduct = async (id: string) => {
-        if (confirm('Вы уверены?')) {
-            await api.admin.deleteProduct(id);
-            setProducts(products.filter(p => p.id !== id));
-        }
+    const handleDeleteProduct = (id: string) => {
+        setDeleteActionType('product');
+        setItemToDeleteId(id);
+        setShowConfirmDeleteModal(true);
     };
 
     // Court Handlers
@@ -154,17 +183,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
         }
     };
 
-    const handleDeleteCourt = async (id: string) => {
-        if (confirm('Удалить корт?')) {
-            try {
-                await api.admin.deleteCourt(id);
-                // Optimistic update
-                setCourts(courts.filter(c => c.id !== id));
-                await loadData();
-            } catch (e: any) {
-                alert('Ошибка удаления: ' + e.message);
-            }
-        }
+    const handleDeleteCourt = (id: string) => {
+        setDeleteActionType('court');
+        setItemToDeleteId(id);
+        setShowConfirmDeleteModal(true);
     };
     
     const handleSurfaceChange = (surface: string) => {
@@ -208,12 +230,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
         setEditingUser(null);
     };
 
-    const handleDeleteUser = async (id: string) => {
-         if (confirm('Удалить пользователя?')) {
-             await api.admin.deleteUser(id);
-             setUsers(users.filter(u => u.id !== id));
-         }
+    const handleDeleteUser = (id: string) => {
+        setDeleteActionType('user');
+        setItemToDeleteId(id);
+        setShowConfirmDeleteModal(true);
     };
+
 
     return (
         <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
@@ -795,6 +817,25 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         <Button type="submit" className="w-full mt-4">Сохранить</Button>
                     </form>
                 )}
+            </Modal>
+
+            {/* Confirmation Modal */}
+            <Modal isOpen={showConfirmDeleteModal} onClose={() => setShowConfirmDeleteModal(false)} title="Подтверждение удаления">
+                <div className="space-y-4">
+                    <p>Вы уверены, что хотите удалить этот элемент?</p>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => {
+                            setShowConfirmDeleteModal(false);
+                            setItemToDeleteId(null);
+                            setDeleteActionType(null);
+                        }}>
+                            Отмена
+                        </Button>
+                        <Button onClick={handleConfirmDelete}>
+                            Подтвердить
+                        </Button>
+                    </div>
+                </div>
             </Modal>
         </div>
     );
