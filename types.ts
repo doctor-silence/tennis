@@ -52,7 +52,7 @@ export interface Court {
   id: string;
   name: string;
   address: string;
-  surface: 'hard' | 'clay' | 'grass' | 'carpet';
+  surface: string[];
   pricePerHour: number;
   image: string;
   rating: number;

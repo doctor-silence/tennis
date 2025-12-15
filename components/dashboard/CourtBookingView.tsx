@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Search, Star, MapPin, Calendar, ArrowRight, Building2, HelpCircle, Filter, X, ExternalLink, Info, CheckCircle2, ChevronDown, ChevronUp, Clock, Phone, Globe } from 'lucide-react';
 import { Court } from '../../types';
@@ -31,14 +30,49 @@ const CourtBookingView = () => {
     // Use expanded state instead of modal state
     const [expandedCourtId, setExpandedCourtId] = useState<string | null>(null);
 
+    // Utility to parse PostgreSQL array string like {"hard","clay"}
+    const parsePgArray = (pgArrayString: string | string[] | undefined): string[] => {
+        if (typeof pgArrayString === 'undefined' || pgArrayString === null) return [];
+        if (Array.isArray(pgArrayString)) return pgArrayString; // Already an array
+
+        if (typeof pgArrayString === 'string') {
+            if (!pgArrayString.startsWith('{') || !pgArrayString.endsWith('}')) {
+                // If it's not a PostgreSQL array string, return it as a single element array
+                return [pgArrayString];
+            }
+            // Remove curly braces and split by comma, then trim quotes
+            return pgArrayString.substring(1, pgArrayString.length - 1)
+                                .split(',')
+                                .map(s => s.trim().replace(/"/g, ''))
+                                .filter(s => s !== '');
+        }
+        return [];
+    };
+
+    const surfaceTranslations: Record<string, string> = {
+        hard: 'Хард',
+        clay: 'Грунт',
+        grass: 'Трава',
+        carpet: 'Ковер'
+    };
+
     useEffect(() => { 
-        api.getCourts().then(setCourts); 
+        api.getCourts().then(courtsData => {
+            const processedCourts = courtsData.map(court => {
+                // Ensure surface is always an array, parsing if necessary
+                const parsedSurface = parsePgArray(court.surface);
+                return { ...court, surface: parsedSurface };
+            });
+            setCourts(processedCourts);
+        }); 
     }, []);
 
     const filteredCourts = courts.filter(c => {
         const matchesCity = activeCity === 'Все города' || c.address.includes(activeCity);
-        const surfaceMap: Record<string, string> = { 'hard': 'Хард', 'clay': 'Грунт', 'grass': 'Трава', 'carpet': 'Ковер' };
-        const matchesSurface = filter.surface === 'Все покрытия' || surfaceMap[c.surface] === filter.surface || c.surface === filter.surface; 
+        
+        const courtSurfacesTranslated = c.surface.map(s => surfaceTranslations[s] || s);
+        const matchesSurface = filter.surface === 'Все покрытия' || courtSurfacesTranslated.includes(filter.surface);
+                               
         const matchesSearch = c.name.toLowerCase().includes(filter.search.toLowerCase()) || 
                               c.address.toLowerCase().includes(filter.search.toLowerCase());
         return matchesCity && matchesSurface && matchesSearch;
@@ -110,6 +144,12 @@ const CourtBookingView = () => {
                 {filteredCourts.length > 0 ? (
                     filteredCourts.map(c => {
                         const isExpanded = expandedCourtId === c.id;
+                        // mainSurface for coloring logic, takes the first surface
+                        const mainSurface = c.surface && c.surface.length > 0 ? c.surface[0] : '';
+                        // displayedSurfaces for text content, maps all surfaces to translated names
+                        const displayedSurfaces = c.surface 
+                            ? c.surface.map(s => surfaceTranslations[s] || s).join(', ') 
+                            : '';
                         return (
                             <div 
                                 key={c.id} 
@@ -125,9 +165,9 @@ const CourtBookingView = () => {
                                     {/* Surface Badge */}
                                     <div className="absolute top-4 left-4">
                                         <div className={`text-white text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg shadow-md tracking-wider ${
-                                            c.surface === 'clay' ? 'bg-orange-600' : c.surface === 'hard' ? 'bg-blue-600' : 'bg-green-600'
+                                            mainSurface === 'clay' ? 'bg-orange-600' : mainSurface === 'hard' ? 'bg-blue-600' : mainSurface === 'grass' ? 'bg-green-600' : 'bg-indigo-600'
                                         }`}>
-                                            {c.surface === 'clay' ? 'ГРУНТ' : c.surface === 'hard' ? 'ХАРД' : c.surface === 'grass' ? 'Трава' : 'КОВЕР'}
+                                            {displayedSurfaces}
                                         </div>
                                     </div>
 
@@ -193,8 +233,8 @@ const CourtBookingView = () => {
                                                     <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 text-center">
                                                         <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Покрытие</div>
                                                         <div className="font-bold text-xs text-slate-900 flex justify-center items-center gap-1.5">
-                                                            <div className={`w-2 h-2 rounded-full ${c.surface === 'clay' ? 'bg-orange-500' : c.surface === 'hard' ? 'bg-blue-500' : 'bg-green-500'}`}></div>
-                                                            {c.surface === 'clay' ? 'Грунт' : c.surface === 'hard' ? 'Хард' : c.surface === 'grass' ? 'Трава' : 'Ковер'}
+                                                            <div className={`w-2 h-2 rounded-full ${mainSurface === 'clay' ? 'bg-orange-500' : mainSurface === 'hard' ? 'bg-blue-500' : mainSurface === 'grass' ? 'bg-green-500' : 'bg-indigo-500'}`}></div>
+                                                            {displayedSurfaces}
                                                         </div>
                                                     </div>
 
@@ -253,7 +293,7 @@ const CourtBookingView = () => {
                     <p className="text-slate-400 text-lg mb-8 leading-relaxed">
                         Мы постоянно добавляем новые локации. Оставьте заявку, и мы уведомим вас, когда в вашем районе появится партнерский клуб.
                     </p>
-                    <button className="bg-lime-400 text-slate-900 font-bold text-lg px-8 py-4 rounded-xl hover:bg-lime-500 transition-all shadow-[0_0_20px_rgba(163,230,53,0.3)] hover:shadow-[0_0_30px_rgba(163,230,53,0.5)] active:scale-95">
+                    <button className="bg-lime-400 text-slate-900 font-bold text-lg px-8 py-4 rounded-xl hover:bg-lime-500 transition-all shadow-lg shadow-slate-900/10 active:scale-95">
                         Оставить заявку
                     </button>
                 </div>

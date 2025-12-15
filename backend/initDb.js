@@ -29,7 +29,7 @@ const initDb = async () => {
         id SERIAL PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
         address TEXT,
-        surface VARCHAR(50),
+        surface JSONB,
         price_per_hour INTEGER,
         rating NUMERIC(3, 1),
         image TEXT,
@@ -225,7 +225,7 @@ const initDb = async () => {
             {
                 name: 'Мультиспорт (Лужники)',
                 address: 'ул. Лужники, 24, стр. 10, Москва',
-                surface: 'hard',
+                surface: ['hard', 'clay'],
                 price: 4500,
                 rating: 5.0,
                 image: 'https://images.unsplash.com/photo-1575217985390-3375c3dbb908?q=80&w=1200&auto=format&fit=crop',
@@ -234,7 +234,7 @@ const initDb = async () => {
             {
                 name: 'Теннис Парк',
                 address: 'Рязанский просп., 4, Москва',
-                surface: 'clay',
+                surface: ['clay'],
                 price: 2800,
                 rating: 4.8,
                 image: 'https://images.unsplash.com/photo-1620202755294-8531732e7071?q=80&w=1200&auto=format&fit=crop',
@@ -243,7 +243,7 @@ const initDb = async () => {
             {
                 name: 'Национальный Теннисный Центр',
                 address: 'Ленинградское ш., 45-47, Москва',
-                surface: 'hard',
+                surface: ['hard'],
                 price: 3500,
                 rating: 4.9,
                 image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop',
@@ -252,7 +252,7 @@ const initDb = async () => {
             {
                 name: 'Спартак (Ширяевка)',
                 address: 'Майский просек, 7, Москва',
-                surface: 'clay',
+                surface: ['clay', 'grass'],
                 price: 2200,
                 rating: 4.7,
                 image: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1200&auto=format&fit=crop',
@@ -261,7 +261,7 @@ const initDb = async () => {
             {
                 name: 'Теннисный клуб "Чайка"',
                 address: 'Коробейников пер., 1/2, Москва',
-                surface: 'carpet',
+                surface: ['carpet'],
                 price: 3200,
                 rating: 4.6,
                 image: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1200&auto=format&fit=crop',
@@ -270,110 +270,11 @@ const initDb = async () => {
             {
                 name: 'Теннисный клуб ЦСКА',
                 address: 'Ленинградский пр-т, 39, Москва',
-                surface: 'hard',
+                surface: ['hard', 'clay'],
                 price: 3000,
                 rating: 4.8,
                 image: 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=1200&auto=format&fit=crop',
                 website: 'http://cska-tennis.ru/'
-            },
-            {
-                name: 'Теннисный центр "Динамо"',
-                address: 'Ленинградский пр-т, 36, Москва',
-                surface: 'hard',
-                price: 3500,
-                rating: 4.7,
-                image: 'https://images.unsplash.com/photo-1588611910629-68897b69c693?q=80&w=1200&auto=format&fit=crop',
-                website: 'https://dynamo-tennis.ru/'
-            },
-            {
-                name: 'ТК "Коломенский"',
-                address: 'Коломенская наб., 20, Москва',
-                surface: 'hard',
-                price: 2200,
-                rating: 4.5,
-                image: 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=1200&auto=format&fit=crop',
-                website: 'https://tennis-kolomenskoe.ru/'
-            },
-            {
-                name: 'Теннис.ру',
-                address: 'Ленинский проспект, 101, Москва',
-                surface: 'carpet',
-                price: 2500,
-                rating: 4.6,
-                image: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1200&auto=format&fit=crop',
-                website: 'https://xn--e1aahgrctrbc.xn--p1ai/'
-            },
-            {
-                name: 'Академия Островского',
-                address: 'Химки, ул. Юннатов, 1А',
-                surface: 'hard',
-                price: 3800,
-                rating: 5.0,
-                image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop',
-                website: 'https://school-tennis.ru/'
-            },
-            {
-                name: 'Корты Парка Горького',
-                address: 'Крымский Вал, 9, Москва',
-                surface: 'hard',
-                price: 1500,
-                rating: 4.4,
-                image: 'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?q=80&w=1200&auto=format&fit=crop',
-                website: 'https://www.park-gorkogo.com/places/192'
-            },
-            {
-                name: 'Теннис-Арт',
-                address: 'ул. Мосфильмовская, 41, Москва',
-                surface: 'clay',
-                price: 2800,
-                rating: 4.7,
-                image: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1200&auto=format&fit=crop',
-                website: 'https://tennis-art.ru/'
-            },
-            {
-                name: 'Sport Station',
-                address: 'Новоостаповская ул., 5, стр. 2, Москва',
-                surface: 'hard',
-                price: 3200,
-                rating: 4.8,
-                image: 'https://images.unsplash.com/photo-1575217985390-3375c3dbb908?q=80&w=1200&auto=format&fit=crop',
-                website: 'https://sportstation.club/'
-            },
-            {
-                name: 'ТК "Магия Спорта"',
-                address: 'Крылатская ул., 2, Москва',
-                surface: 'hard', 
-                price: 2900, 
-                rating: 4.6, 
-                image: 'https://images.unsplash.com/photo-1588611910629-68897b69c693?q=80&w=1200&auto=format&fit=crop' ,
-                website: 'http://www.magic-sport.ru/'
-            },
-            { 
-                name: 'Теннисный центр "Жуковка"', 
-                address: 'Рублево-Успенское ш., Жуковка', 
-                surface: 'hard', 
-                price: 5000, 
-                rating: 4.9, 
-                image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop',
-                website: 'https://tennis-zhukovka.ru/'
-            },
-            { 
-                name: 'ТК "Пироговский"', 
-                address: 'Мытищи, ул. Совхозная, 2', 
-                surface: 'clay', 
-                price: 2400, 
-                rating: 4.5, 
-                image: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1200&auto=format&fit=crop',
-                website: 'https://pirogovski.ru/'
-            },
-            { 
-                name: 'PRO CLUB', 
-                address: 'ул. Лобачевского, 114, Москва', 
-                surface: 'clay', 
-                price: 3100, 
-                rating: 4.7, 
-                image: 'https://images.unsplash.com/photo-1620202755294-8531732e7071?q=80&w=1200&auto=format&fit=crop',
-                website: 'https://proclub.moscow/'
             }
         ];
 

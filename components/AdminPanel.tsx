@@ -57,7 +57,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
     const [isCourtModalOpen, setIsCourtModalOpen] = useState(false);
-    const [editingCourt, setEditingCourt] = useState<Partial<Court> | null>(null);
+    const [editingCourt, setEditingCourt] = useState<Partial<Court> & { surface: string[] } | null>(null);
     
     // User Edit State
     // We extend User to include 'password' for creation logic, though it's not in the base User type
@@ -141,6 +141,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             } catch (e: any) {
                 alert('Ошибка удаления: ' + e.message);
             }
+        }
+    };
+    
+    const handleSurfaceChange = (surface: string) => {
+        if (editingCourt) {
+            const newSurfaces = editingCourt.surface.includes(surface)
+                ? editingCourt.surface.filter(s => s !== surface)
+                : [...editingCourt.surface, surface];
+            setEditingCourt({ ...editingCourt, surface: newSurfaces });
         }
     };
 
@@ -458,7 +467,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                          <div className="animate-fade-in-up">
                              <div className="flex justify-end mb-6">
                                  <Button className="gap-2" onClick={() => {
-                                     setEditingCourt({ name: '', address: '', surface: 'hard', pricePerHour: 2000, rating: 5.0, image: '' });
+                                     setEditingCourt({ name: '', address: '', surface: [], pricePerHour: 2000, rating: 5.0, image: '' });
                                      setIsCourtModalOpen(true);
                                  }}>
                                      <Plus size={18}/> Добавить корт
@@ -492,13 +501,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                                          c.surface === 'grass' ? 'bg-green-100 text-green-800' :
                                                          'bg-indigo-100 text-indigo-800'
                                                      }`}>
-                                                         {c.surface}
+                                                         {Array.isArray(c.surface) ? c.surface.join(', ') : c.surface}
                                                      </span>
                                                  </td>
                                                  <td className="px-6 py-4 font-bold">{c.pricePerHour} ₽/ч</td>
                                                  <td className="px-6 py-4 text-right">
                                                      <div className="flex justify-end gap-2">
-                                                         <button onClick={() => { setEditingCourt(c); setIsCourtModalOpen(true); }} className="p-2 hover:bg-slate-200 rounded-lg text-slate-600"><Edit size={16}/></button>
+                                                         <button onClick={() => { setEditingCourt({ ...c, surface: Array.isArray(c.surface) ? c.surface : [c.surface] }); setIsCourtModalOpen(true); }} className="p-2 hover:bg-slate-200 rounded-lg text-slate-600"><Edit size={16}/></button>
                                                          <button onClick={() => handleDeleteCourt(c.id)} className="p-2 hover:bg-red-50 rounded-lg text-red-500"><Trash2 size={16}/></button>
                                                      </div>
                                                  </td>
@@ -600,12 +609,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         </div>
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Покрытие</label>
-                            <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingCourt.surface} onChange={e => setEditingCourt({...editingCourt, surface: e.target.value as any})}>
-                                <option value="hard">Хард</option>
-                                <option value="clay">Грунт</option>
-                                <option value="grass">Трава</option>
-                                <option value="carpet">Ковер (Carpet)</option>
-                            </select>
+                            <div className="flex flex-wrap gap-x-4 gap-y-2">
+                                {['hard', 'clay', 'grass', 'carpet'].map(s => (
+                                    <label key={s} className="flex items-center gap-2 text-sm font-medium">
+                                        <input
+                                            type="checkbox"
+                                            className="h-4 w-4 rounded border-gray-300 text-lime-600 focus:ring-lime-500"
+                                            checked={editingCourt.surface.includes(s)}
+                                            onChange={() => handleSurfaceChange(s)}
+                                        />
+                                        {s.charAt(0).toUpperCase() + s.slice(1)}
+                                    </label>
+                                ))}
+                            </div>
                         </div>
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Фото</label>
