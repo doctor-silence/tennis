@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ViewState, User } from './types';
 import Dashboard from './components/Dashboard';
 import Button from './components/Button';
@@ -32,9 +31,33 @@ const App = () => {
   const [view, setView] = useState<ViewState>('landing');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
+  const [loading, setLoading] = useState(true); // Add loading state
+
+  // New useEffect to load user from localStorage on initial render
+  useEffect(() => {
+    try {
+      const storedUser = localStorage.getItem('currentUser');
+      if (storedUser) {
+        const user: User = JSON.parse(storedUser);
+        setCurrentUser(user);
+        if (user.role === 'admin') {
+          setView('admin');
+        } else {
+          setView('dashboard');
+        }
+      }
+    } catch (error) {
+      console.error("Failed to parse user from localStorage", error);
+      // Clear localStorage if parsing fails to prevent infinite loop
+      localStorage.removeItem('currentUser');
+    } finally {
+      setLoading(false); // Set loading to false after check
+    }
+  }, []); // Empty dependency array means this runs once on mount
 
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
+    localStorage.setItem('currentUser', JSON.stringify(user)); // Store user in localStorage
     if (user.role === 'admin') {
         setView('admin');
     } else {
@@ -44,12 +67,15 @@ const App = () => {
 
   const handleUserUpdate = (updatedData: Partial<User>) => {
     if (currentUser) {
-        setCurrentUser({ ...currentUser, ...updatedData });
+        const updatedUser = { ...currentUser, ...updatedData };
+        setCurrentUser(updatedUser);
+        localStorage.setItem('currentUser', JSON.stringify(updatedUser)); // Update user in localStorage
     }
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
+    localStorage.removeItem('currentUser'); // Remove user from localStorage
     setView('landing');
   };
 
@@ -64,40 +90,49 @@ const App = () => {
     window.scrollTo(0, 0);
   };
 
+  if (loading) { // Render loading indicator if loading
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
+        <Loader2 className="animate-spin h-10 w-10 text-lime-400" />
+        <span className="ml-3 text-lg">Загрузка...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen font-sans bg-slate-50">
       {view === 'landing' && (
-        <LandingPage 
-          onLoginClick={() => handleAuthNavigate('login')} 
+        <LandingPage
+          onLoginClick={() => handleAuthNavigate('login')}
           onRegisterClick={() => handleAuthNavigate('register')}
           onNavigate={handleNavigate}
         />
       )}
-      
+
       {view === 'pro' && (
         <ProPage onBack={() => handleNavigate('landing')} onSubscribe={() => handleAuthNavigate('register')} />
       )}
-      
+
       {view === 'shop' && (
         <Shop onBack={() => handleNavigate('landing')} />
       )}
-      
+
       {view === 'auth' && (
-        <AuthPage 
-            onBack={() => handleNavigate('landing')} 
-            onComplete={handleLoginSuccess} 
+        <AuthPage
+            onBack={() => handleNavigate('landing')}
+            onComplete={handleLoginSuccess}
             initialMode={authInitialMode}
         />
       )}
 
       {view === 'dashboard' && currentUser && (
-        <Dashboard 
-            user={currentUser} 
-            onLogout={handleLogout} 
+        <Dashboard
+            user={currentUser}
+            onLogout={handleLogout}
             onUserUpdate={handleUserUpdate}
         />
       )}
-      
+
       {view === 'admin' && currentUser && (
           <AdminPanel user={currentUser} onLogout={handleLogout} />
       )}
