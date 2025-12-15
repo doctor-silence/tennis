@@ -305,7 +305,8 @@ app.get('/api/courts', async (req, res) => {
             surface: row.surface,
             pricePerHour: row.price_per_hour,
             image: row.image,
-            rating: parseFloat(row.rating)
+            rating: parseFloat(row.rating),
+            website: row.website
         }));
         res.json(courts);
     } catch (err) {
@@ -314,11 +315,11 @@ app.get('/api/courts', async (req, res) => {
 });
 
 app.post('/api/courts', async (req, res) => {
-    const { name, address, surface, pricePerHour, image, rating } = req.body;
+    const { name, address, surface, pricePerHour, image, rating, website } = req.body;
     try {
         const result = await pool.query(
-            'INSERT INTO courts (name, address, surface, price_per_hour, image, rating) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [name, address, surface, pricePerHour, image, rating]
+            'INSERT INTO courts (name, address, surface, price_per_hour, image, rating, website) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+            [name, address, surface, pricePerHour, image, rating, website]
         );
         await logSystemEvent('info', `New court added: ${name}`, 'Admin');
         const row = result.rows[0];
@@ -329,7 +330,8 @@ app.post('/api/courts', async (req, res) => {
             surface: row.surface,
             pricePerHour: row.price_per_hour,
             image: row.image,
-            rating: parseFloat(row.rating)
+            rating: parseFloat(row.rating),
+            website: row.website
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -338,11 +340,11 @@ app.post('/api/courts', async (req, res) => {
 
 app.put('/api/courts/:id', async (req, res) => {
     const { id } = req.params;
-    const { name, address, surface, pricePerHour, image, rating } = req.body;
+    const { name, address, surface, pricePerHour, image, rating, website } = req.body;
     try {
         await pool.query(
-            'UPDATE courts SET name=$1, address=$2, surface=$3, price_per_hour=$4, image=$5, rating=$6 WHERE id=$7',
-            [name, address, surface, pricePerHour, image, rating, id]
+            'UPDATE courts SET name=$1, address=$2, surface=$3, price_per_hour=$4, image=$5, rating=$6, website=$7 WHERE id=$8',
+            [name, address, surface, pricePerHour, image, rating, website, id]
         );
         res.json({ success: true });
     } catch (err) {

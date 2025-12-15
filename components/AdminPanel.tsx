@@ -584,6 +584,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                             <label className="text-xs font-bold text-slate-500 uppercase">Адрес</label>
                             <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingCourt.address || ''} onChange={e => setEditingCourt({...editingCourt, address: e.target.value})} />
                         </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Сайт</label>
+                            <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" placeholder="https://example.com" value={editingCourt.website || ''} onChange={e => setEditingCourt({...editingCourt, website: e.target.value})} />
+                        </div>
                         <div className="grid grid-cols-2 gap-4">
                              <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Цена (₽/час)</label>
@@ -604,16 +608,32 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                             </select>
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase">Ссылка на фото</label>
-                            <div className="flex gap-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Фото</label>
+                            <div className="flex items-center gap-4">
+                                <div className="w-20 h-20 bg-slate-100 rounded-lg overflow-hidden shrink-0 border border-slate-200 flex items-center justify-center">
+                                    {editingCourt.image ? (
+                                        <img src={editingCourt.image} className="w-full h-full object-cover" alt="preview"/>
+                                    ) : (
+                                        <ImageIcon size={32} className="text-slate-400"/>
+                                    )}
+                                </div>
                                 <input 
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none placeholder:text-slate-400" 
-                                    placeholder="Оставьте пустым для авто-подбора"
-                                    value={editingCourt.image || ''} 
-                                    onChange={e => setEditingCourt({...editingCourt, image: e.target.value})} 
+                                    type="file"
+                                    accept="image/*"
+                                    className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-slate-50 file:text-slate-700 hover:file:bg-slate-100"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            const reader = new FileReader();
+                                            reader.onloadend = () => {
+                                                setEditingCourt({...editingCourt, image: reader.result as string});
+                                            };
+                                            reader.readAsDataURL(file);
+                                        }
+                                    }}
                                 />
-                                {editingCourt.image && <img src={editingCourt.image} className="w-10 h-10 rounded-lg object-cover border border-slate-200" alt=""/>}
                             </div>
+                             <p className="text-[11px] text-slate-400 mt-1">Оставьте пустым для авто-подбора случайного фото.</p>
                         </div>
                         <Button type="submit" className="w-full mt-4">Сохранить</Button>
                     </form>

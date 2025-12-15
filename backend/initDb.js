@@ -32,9 +32,11 @@ const initDb = async () => {
         surface VARCHAR(50),
         price_per_hour INTEGER,
         rating NUMERIC(3, 1),
-        image TEXT
+        image TEXT,
+        website TEXT
       );
     `);
+    await client.query(`ALTER TABLE courts ADD COLUMN IF NOT EXISTS website TEXT;`);
     console.log('✅ Table "courts" checked.');
 
     // 3. Create Users Table
@@ -226,7 +228,8 @@ const initDb = async () => {
                 surface: 'hard',
                 price: 4500,
                 rating: 5.0,
-                image: 'https://images.unsplash.com/photo-1575217985390-3375c3dbb908?q=80&w=1200&auto=format&fit=crop'
+                image: 'https://images.unsplash.com/photo-1575217985390-3375c3dbb908?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://multisport.ru'
             },
             {
                 name: 'Теннис Парк',
@@ -234,7 +237,8 @@ const initDb = async () => {
                 surface: 'clay',
                 price: 2800,
                 rating: 4.8,
-                image: 'https://images.unsplash.com/photo-1620202755294-8531732e7071?q=80&w=1200&auto=format&fit=crop'
+                image: 'https://images.unsplash.com/photo-1620202755294-8531732e7071?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://tennis-park.ru'
             },
             {
                 name: 'Национальный Теннисный Центр',
@@ -242,7 +246,8 @@ const initDb = async () => {
                 surface: 'hard',
                 price: 3500,
                 rating: 4.9,
-                image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop'
+                image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://lovetennis.ru'
             },
             {
                 name: 'Спартак (Ширяевка)',
@@ -250,7 +255,8 @@ const initDb = async () => {
                 surface: 'clay',
                 price: 2200,
                 rating: 4.7,
-                image: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1200&auto=format&fit=crop'
+                image: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://tennis-spartak.ru'
             },
             {
                 name: 'Теннисный клуб "Чайка"',
@@ -258,7 +264,8 @@ const initDb = async () => {
                 surface: 'carpet',
                 price: 3200,
                 rating: 4.6,
-                image: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1200&auto=format&fit=crop'
+                image: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://www.chayka-sport.ru/tennis'
             },
             {
                 name: 'Теннисный клуб ЦСКА',
@@ -266,7 +273,8 @@ const initDb = async () => {
                 surface: 'hard',
                 price: 3000,
                 rating: 4.8,
-                image: 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=1200&auto=format&fit=crop'
+                image: 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=1200&auto=format&fit=crop',
+                website: 'http://cska-tennis.ru/'
             },
             {
                 name: 'Теннисный центр "Динамо"',
@@ -274,7 +282,8 @@ const initDb = async () => {
                 surface: 'hard',
                 price: 3500,
                 rating: 4.7,
-                image: 'https://images.unsplash.com/photo-1588611910629-68897b69c693?q=80&w=1200&auto=format&fit=crop'
+                image: 'https://images.unsplash.com/photo-1588611910629-68897b69c693?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://dynamo-tennis.ru/'
             },
             {
                 name: 'ТК "Коломенский"',
@@ -282,7 +291,8 @@ const initDb = async () => {
                 surface: 'hard',
                 price: 2200,
                 rating: 4.5,
-                image: 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=1200&auto=format&fit=crop'
+                image: 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://tennis-kolomenskoe.ru/'
             },
             {
                 name: 'Теннис.ру',
@@ -290,7 +300,8 @@ const initDb = async () => {
                 surface: 'carpet',
                 price: 2500,
                 rating: 4.6,
-                image: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1200&auto=format&fit=crop'
+                image: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://xn--e1aahgrctrbc.xn--p1ai/'
             },
             {
                 name: 'Академия Островского',
@@ -298,7 +309,8 @@ const initDb = async () => {
                 surface: 'hard',
                 price: 3800,
                 rating: 5.0,
-                image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop'
+                image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://school-tennis.ru/'
             },
             {
                 name: 'Корты Парка Горького',
@@ -306,7 +318,8 @@ const initDb = async () => {
                 surface: 'hard',
                 price: 1500,
                 rating: 4.4,
-                image: 'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?q=80&w=1200&auto=format&fit=crop'
+                image: 'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://www.park-gorkogo.com/places/192'
             },
             {
                 name: 'Теннис-Арт',
@@ -314,7 +327,8 @@ const initDb = async () => {
                 surface: 'clay',
                 price: 2800,
                 rating: 4.7,
-                image: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1200&auto=format&fit=crop'
+                image: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://tennis-art.ru/'
             },
             {
                 name: 'Sport Station',
@@ -322,7 +336,8 @@ const initDb = async () => {
                 surface: 'hard',
                 price: 3200,
                 rating: 4.8,
-                image: 'https://images.unsplash.com/photo-1575217985390-3375c3dbb908?q=80&w=1200&auto=format&fit=crop'
+                image: 'https://images.unsplash.com/photo-1575217985390-3375c3dbb908?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://sportstation.club/'
             },
             {
                 name: 'ТК "Магия Спорта"',
@@ -330,7 +345,8 @@ const initDb = async () => {
                 surface: 'hard', 
                 price: 2900, 
                 rating: 4.6, 
-                image: 'https://images.unsplash.com/photo-1588611910629-68897b69c693?q=80&w=1200&auto=format&fit=crop' 
+                image: 'https://images.unsplash.com/photo-1588611910629-68897b69c693?q=80&w=1200&auto=format&fit=crop' ,
+                website: 'http://www.magic-sport.ru/'
             },
             { 
                 name: 'Теннисный центр "Жуковка"', 
@@ -338,7 +354,8 @@ const initDb = async () => {
                 surface: 'hard', 
                 price: 5000, 
                 rating: 4.9, 
-                image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop' 
+                image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://tennis-zhukovka.ru/'
             },
             { 
                 name: 'ТК "Пироговский"', 
@@ -346,7 +363,8 @@ const initDb = async () => {
                 surface: 'clay', 
                 price: 2400, 
                 rating: 4.5, 
-                image: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1200&auto=format&fit=crop' 
+                image: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://pirogovski.ru/'
             },
             { 
                 name: 'PRO CLUB', 
@@ -354,14 +372,15 @@ const initDb = async () => {
                 surface: 'clay', 
                 price: 3100, 
                 rating: 4.7, 
-                image: 'https://images.unsplash.com/photo-1620202755294-8531732e7071?q=80&w=1200&auto=format&fit=crop' 
+                image: 'https://images.unsplash.com/photo-1620202755294-8531732e7071?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://proclub.moscow/'
             }
         ];
 
         for (const c of courts) {
             await pool.query(
-                'INSERT INTO courts (name, address, surface, price_per_hour, rating, image) VALUES ($1, $2, $3, $4, $5, $6)',
-                [c.name, c.address, c.surface, c.price, c.rating, c.image]
+                'INSERT INTO courts (name, address, surface, price_per_hour, rating, image, website) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                [c.name, c.address, c.surface, c.price, c.rating, c.image, c.website]
             );
         }
     }

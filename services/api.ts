@@ -602,13 +602,13 @@ export const api = {
                 let res;
                 // Check if ID is present and valid (not temp '0.' or 'mock-')
                 if (court.id && !court.id.startsWith('0.')) { 
-                     await fetch(`${API_URL}/courts/${court.id}`, {
+                    res = await fetch(`${API_URL}/courts/${court.id}`, {
                          method: 'PUT',
                          headers: { 'Content-Type': 'application/json' },
                          body: JSON.stringify(court)
                      });
                  } else {
-                     await fetch(`${API_URL}/courts`, {
+                    res = await fetch(`${API_URL}/courts`, {
                          method: 'POST',
                          headers: { 'Content-Type': 'application/json' },
                          body: JSON.stringify(court)
