@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
     LayoutDashboard, 
@@ -20,7 +19,8 @@ import {
     CheckCircle2,
     Info,
     Image as ImageIcon,
-    Map
+    Map,
+    ChevronDown
 } from 'lucide-react';
 import Button from './Button';
 import { User, Product, SystemLog, Court } from '../types';
@@ -40,6 +40,25 @@ const COURT_IMAGES = [
     'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1200&auto=format&fit=crop', // Red Clay
     'https://images.unsplash.com/photo-1620202755294-8531732e7071?q=80&w=1200&auto=format&fit=crop', // Outdoor Clay
     'https://images.unsplash.com/photo-1588611910629-68897b69c693?q=80&w=1200&auto=format&fit=crop'  // Hard Green
+];
+
+const CITIES = [
+    'Москва', 
+    'Санкт-Петербург', 
+    'Сочи', 
+    'Казань', 
+    'Екатеринбург',
+    'Краснодар',
+    'Новосибирск',
+    'Нижний Новгород',
+    'Ростов-на-Дону',
+    'Самара',
+    'Уфа',
+    'Челябинск',
+    'Омск',
+    'Тюмень',
+    'Владивосток',
+    'Калининград'
 ];
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
@@ -63,10 +82,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     // We extend User to include 'password' for creation logic, though it's not in the base User type
     const [editingUser, setEditingUser] = useState<(Partial<User> & { password?: string }) | null>(null);
 
+    // Court Search Filters
+    const [courtSearchName, setCourtSearchName] = useState<string>('');
+    const [courtSearchCity, setCourtSearchCity] = useState<string>('Все города');
+
     // Initial Data Load
     useEffect(() => {
         loadData();
-    }, [activeTab]); // Refresh when tab changes
+    }, [activeTab, courtSearchName, courtSearchCity]); // Refresh when tab changes or search filters change
 
     const loadData = async () => {
         if (activeTab === 'overview') {
@@ -86,7 +109,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             if (Array.isArray(p)) setProducts(p);
         }
         if (activeTab === 'courts') {
-            const c = await api.getCourts();
+            const c = await api.getCourts(courtSearchName, courtSearchCity === 'Все города' ? '' : courtSearchCity);
             if (Array.isArray(c)) setCourts(c);
         }
     };
@@ -465,13 +488,35 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
 
                     {activeTab === 'courts' && (
                          <div className="animate-fade-in-up">
-                             <div className="flex justify-end mb-6">
-                                 <Button className="gap-2" onClick={() => {
-                                     setEditingCourt({ name: '', address: '', surface: [], pricePerHour: 2000, rating: 5.0, image: '' });
-                                     setIsCourtModalOpen(true);
-                                 }}>
-                                     <Plus size={18}/> Добавить корт
-                                 </Button>
+                             <div className="flex justify-between items-center mb-6">
+                                 <div className="relative w-64">
+                                     <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
+                                     <input 
+                                         className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg w-full text-sm outline-none focus:ring-2 focus:ring-lime-400/50 transition-all placeholder:text-slate-400 text-slate-900 font-medium" 
+                                         placeholder="Поиск по названию..."
+                                         value={courtSearchName}
+                                         onChange={e => setCourtSearchName(e.target.value)}
+                                     />
+                                 </div>
+                                 <div className="flex gap-2">
+                                     <div className="relative">
+                                         <select
+                                             className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm font-medium pr-8 appearance-none"
+                                             value={courtSearchCity}
+                                             onChange={e => setCourtSearchCity(e.target.value)}
+                                         >
+                                             <option value="Все города">Все города</option>
+                                             {CITIES.map(city => <option key={city} value={city}>{city}</option>)}
+                                         </select>
+                                         <ChevronDown className="absolute right-3 top-2.5 text-slate-400 pointer-events-none" size={16}/>
+                                     </div>
+                                     <Button className="gap-2" onClick={() => {
+                                         setEditingCourt({ name: '', address: '', surface: [], pricePerHour: 2000, rating: 5.0, image: '' });
+                                         setIsCourtModalOpen(true);
+                                     }}>
+                                         <Plus size={18}/> Добавить корт
+                                     </Button>
+                                 </div>
                              </div>
                              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                                  <table className="w-full text-sm text-left">

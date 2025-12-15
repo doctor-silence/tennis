@@ -296,8 +296,27 @@ app.delete('/api/admin/users/:id', async (req, res) => {
 // --- COURTS ROUTES (Public & Admin) ---
 
 app.get('/api/courts', async (req, res) => {
+    const { name, city } = req.query;
     try {
-        const result = await pool.query('SELECT * FROM courts ORDER BY id ASC');
+        let query = 'SELECT * FROM courts';
+        const queryParams = [];
+        let paramIndex = 1;
+
+        if (name || city) {
+            query += ' WHERE';
+            if (name) {
+                queryParams.push(`%${name}%`);
+                query += ` name ILIKE $${paramIndex++}`;
+            }
+            if (city) {
+                if (name) query += ' AND';
+                queryParams.push(`%${city}%`);
+                query += ` address ILIKE $${paramIndex++}`;
+            }
+        }
+        query += ' ORDER BY id ASC';
+
+        const result = await pool.query(query, queryParams);
         const courts = result.rows.map(row => ({
             id: row.id.toString(),
             name: row.name,
