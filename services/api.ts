@@ -735,40 +735,72 @@ export const api = {
 
     ladder: {
         getRankings: async (): Promise<LadderPlayer[]> => {
-            return new Promise(resolve => setTimeout(() => resolve(MOCK_LADDER), 400));
+            try {
+                const res = await fetch(`${API_URL}/ladder/rankings`);
+                if (!res.ok) throw new Error('Failed to fetch ladder rankings');
+                return await res.json();
+            } catch (e) {
+                console.warn("Backend offline or failed to fetch rankings. Returning mock data.");
+                return MOCK_LADDER;
+            }
         },
         getChallenges: async (): Promise<Challenge[]> => {
-             return new Promise(resolve => setTimeout(() => resolve(MOCK_CHALLENGES), 400));
+            try {
+                const res = await fetch(`${API_URL}/ladder/challenges`);
+                if (!res.ok) throw new Error('Failed to fetch ladder challenges');
+                return await res.json();
+            } catch (e) {
+                console.warn("Backend offline or failed to fetch challenges. Returning mock data.");
+                return MOCK_CHALLENGES;
+            }
         },
         getPlayerProfile: async (userId: string): Promise<PlayerProfile | null> => {
             console.log(`Fetching profile for ${userId}`);
-            const profile = MOCK_PLAYER_PROFILES[userId];
-            // If no specific profile, create a generic one from the ladder list
-            if (!profile) {
-                const ladderInfo = MOCK_LADDER.find(p => p.userId === userId);
-                if (!ladderInfo) return null;
-                return new Promise(resolve => setTimeout(() => resolve({
-                    ...ladderInfo,
-                    joinDate: '2023-05-12',
-                    bio: 'Нет дополнительной информации об этом игроке.',
-                    stats: { wins: Math.round(ladderInfo.matches * (ladderInfo.winRate/100)), losses: Math.round(ladderInfo.matches * (1-(ladderInfo.winRate/100))), bestRank: ladderInfo.rank, currentStreak: 1 },
-                    rankHistory: [{ month: 'Окт', rank: ladderInfo.rank }],
-                    recentMatches: []
-                }), 400));
+            try {
+                const res = await fetch(`${API_URL}/ladder/player/${userId}`);
+                if (!res.ok) throw new Error('Failed to fetch player profile');
+                return await res.json();
+            } catch (e) {
+                console.warn("Backend offline or failed to fetch player profile. Returning mock data.");
+                const profile = MOCK_PLAYER_PROFILES[userId];
+                // If no specific profile, create a generic one from the ladder list
+                if (!profile) {
+                    const ladderInfo = MOCK_LADDER.find(p => p.userId === userId);
+                    if (!ladderInfo) return null;
+                    return {
+                        ...ladderInfo,
+                        joinDate: '2023-05-12',
+                        bio: 'Нет дополнительной информации об этом игроке.',
+                        stats: { wins: Math.round(ladderInfo.matches * (ladderInfo.winRate/100)), losses: Math.round(ladderInfo.matches * (1-(ladderInfo.winRate/100))), bestRank: ladderInfo.rank, currentStreak: 1 },
+                        rankHistory: [{ month: 'Окт', rank: ladderInfo.rank }],
+                        recentMatches: []
+                    };
+                }
+                return profile;
             }
-            return new Promise(resolve => setTimeout(() => resolve(profile), 400));
         },
         createChallenge: async (challenger: LadderPlayer, defender: LadderPlayer): Promise<Challenge> => {
-            return {
-                id: Math.random().toString(),
-                challengerId: challenger.userId,
-                defenderId: defender.userId,
-                challengerName: challenger.name,
-                defenderName: defender.name,
-                rankGap: challenger.rank - defender.rank,
-                status: 'pending',
-                deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-            };
+            try {
+                const res = await fetch(`${API_URL}/ladder/challenges`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ challengerId: challenger.userId, defenderId: defender.userId })
+                });
+                if (!res.ok) throw new Error('Failed to create challenge');
+                return await res.json();
+            } catch (e) {
+                console.warn("Backend offline or failed to create challenge. Returning mock data.");
+                return {
+                    id: Math.random().toString(),
+                    challengerId: challenger.userId,
+                    defenderId: defender.userId,
+                    challengerName: challenger.name,
+                    defenderName: defender.name,
+                    rankGap: challenger.rank - defender.rank,
+                    status: 'pending',
+                    deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+                };
+            }
         }
     },
 

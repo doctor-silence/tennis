@@ -169,6 +169,20 @@ const initDb = async () => {
     `);
     console.log('✅ Table "messages" checked.');
 
+    // 11. Create Challenges Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS challenges (
+        id SERIAL PRIMARY KEY,
+        challenger_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        defender_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        status VARCHAR(20) DEFAULT 'pending',
+        deadline DATE,
+        match_date DATE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Table "challenges" checked.');
+
     await client.query('COMMIT');
 
     // --- SEED DATA ---
@@ -207,14 +221,14 @@ const initDb = async () => {
             `, [hashedAdminPassword, adminEmail]);
         }
     } else {
-        console.warn('⚠️  ADMIN_EMAIL or ADMIN_PASSWORD not set in .env. Admin user check skipped.');
+        console.warn('⚠️  ADMIN_EMAIL или ADMIN_PASSWORD не установлены в .env. Проверка пользователя Admin пропущена.');
     }
 
     // Seed Courts (Real Moscow Data - Extended List)
     // We check if we have less than 6 courts, if so, we seed the full list to update old dbs
     const courtCount = await pool.query('SELECT count(*) FROM courts');
     if (parseInt(courtCount.rows[0].count) < 6) {
-        console.log('🌱 Seeding extended list of Moscow courts...');
+        console.log('🌱 Заполнение расширенного списка московских кортов...');
         
         // Clear old small list to avoid duplicates if re-seeding
         if (parseInt(courtCount.rows[0].count) > 0) {
@@ -289,7 +303,7 @@ const initDb = async () => {
     // Seed Products
     const prodCount = await pool.query('SELECT count(*) FROM products');
     if (parseInt(prodCount.rows[0].count) === 0) {
-       console.log('🌱 Seeding products...');
+       console.log('🌱 Заполнение товаров...');
        const products = [
           ['Wilson Blade 98 v8', 'rackets', 24990, 'https://images.unsplash.com/photo-1617083934555-52951271b273?q=80&w=800&auto=format&fit=crop', true],
           ['Babolat Pure Aero 2023', 'rackets', 26500, 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=800&auto=format&fit=crop', false],
@@ -303,10 +317,10 @@ const initDb = async () => {
        }
     }
 
-    console.log('🚀 Database initialization complete.');
+    console.log('🚀 Инициализация базы данных завершена.');
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('❌ Error initializing database:', error);
+    console.error('❌ Ошибка инициализации базы данных:', error);
   } finally {
     client.release();
   }

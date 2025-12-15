@@ -488,6 +488,178 @@ app.get('/api/partners', async (req, res) => {
     }
 });
 
+// --- LADDER ROUTES ---
+
+app.get('/api/ladder/rankings', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT 
+                id, 
+                name, 
+                avatar, 
+                xp as points, 
+                role, 
+                level,
+                rating,
+                rtt_rank,
+                rtt_category
+            FROM users 
+            WHERE role != 'admin'
+            ORDER BY xp DESC, rating DESC, name ASC
+        `);
+
+        // Map to LadderPlayer structure and calculate rank and winRate (mock for now)
+        const ladderPlayers = result.rows.map((row, index) => ({
+            id: row.id.toString(),
+            rank: index + 1, // Simple sequential ranking
+            userId: row.id.toString(),
+            name: row.name,
+            avatar: row.avatar,
+            points: row.points,
+            matches: Math.floor(Math.random() * 50) + 10, // Mock matches played
+            winRate: Math.floor(Math.random() * 40) + 60,  // Mock win rate between 60-99%
+            status: index < 3 ? 'defending' : 'idle' // Top 3 are defending
+        }));
+        
+        res.json(ladderPlayers);
+    } catch (err) {
+        console.error("Fetch Ladder Rankings Error:", err);
+        res.status(500).json({ error: 'Failed to fetch ladder rankings' });
+    }
+});
+
+app.get('/api/ladder/challenges', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT 
+                c.id, 
+                c.challenger_id, 
+                c.defender_id, 
+                c.status, 
+                c.deadline, 
+                c.match_date,
+                uc.name as challenger_name,
+                uc.avatar as challenger_avatar,
+                ud.name as defender_name,
+                ud.avatar as defender_avatar,
+                (uc.xp - ud.xp) as rank_gap_xp
+            FROM challenges c
+            JOIN users uc ON c.challenger_id = uc.id
+            JOIN users ud ON c.defender_id = ud.id
+            ORDER BY c.deadline ASC
+        `);
+
+        const challenges = result.rows.map(row => ({
+            id: row.id.toString(),
+            challengerId: row.challenger_id.toString(),
+            defenderId: row.defender_id.toString(),
+            challengerName: row.challenger_name,
+            defenderName: row.defender_name,
+            rankGap: row.rank_gap_xp, // Using XP difference as rank gap
+            status: row.status,
+            deadline: row.deadline,
+            matchDate: row.match_date
+        }));
+        res.json(challenges);
+    } catch (err) {
+        console.error("Fetch Ladder Challenges Error:", err);
+        res.status(500).json({ error: 'Failed to fetch ladder challenges' });
+    }
+});
+
+app.post('/api/ladder/challenges', async (req, res) => {
+    const { challengerId, defenderId } = req.body;
+    if (!challengerId || !defenderId) {
+        return res.status(400).json({ error: 'Challenger and defender IDs are required' });
+    }
+
+    try {
+        const deadline = new Date();
+        deadline.setDate(deadline.getDate() + 7); // 7 days from now
+
+        const result = await pool.query(
+            `INSERT INTO challenges (challenger_id, defender_id, status, deadline)
+             VALUES ($1, $2, 'pending', $3)
+             RETURNING *`,
+            [challengerId, defenderId, deadline.toISOString().split('T')[0]]
+        );
+        const newChallenge = result.rows[0];
+
+        // Fetch challenger and defender names for the response
+        const challenger = await pool.query('SELECT name FROM users WHERE id = $1', [newChallenge.challenger_id]);
+        const defender = await pool.query('SELECT name FROM users WHERE id = $1', [newChallenge.defender_id]);
+
+        res.status(201).json({
+            id: newChallenge.id.toString(),
+            challengerId: newChallenge.challenger_id.toString(),
+            defenderId: newChallenge.defender_id.toString(),
+            challengerName: challenger.rows[0].name,
+            defenderName: defender.rows[0].name,
+            rankGap: 0, // Will be calculated on frontend based on rankings
+            status: newChallenge.status,
+            deadline: newChallenge.deadline,
+            matchDate: newChallenge.match_date
+        });
+    } catch (err) {
+        console.error("Create Ladder Challenge Error:", err);
+        res.status(500).json({ error: 'Failed to create ladder challenge' });
+    }
+});
+
+app.get('/api/ladder/player/:userId', async (req, res) => {
+    const { userId } = req.params;
+    try {
+        const userResult = await pool.query(
+            `SELECT 
+                id, name, avatar, xp as points, role, level, rating, rtt_rank, rtt_category, created_at as join_date
+             FROM users 
+             WHERE id = $1`, 
+            [userId]
+        );
+
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Player not found' });
+        }
+
+        const userRow = userResult.rows[0];
+
+        // Fetch user's matches to calculate win/loss stats
+        const matchesResult = await pool.query(
+            `SELECT result FROM matches WHERE user_id = $1`,
+            [userId]
+        );
+
+        let wins = 0;
+        let losses = 0;
+        matchesResult.rows.forEach(match => {
+            if (match.result === 'win') wins++;
+            else losses++;
+        });
+
+        const playerProfile = {
+            id: userRow.id.toString(),
+            userId: userRow.id.toString(),
+            name: userRow.name,
+            avatar: userRow.avatar,
+            points: userRow.points,
+            rank: 0, // This will be dynamically set by the frontend based on overall ladder ranking
+            matches: wins + losses,
+            winRate: (wins + losses) > 0 ? Math.round((wins / (wins + losses)) * 100) : 0,
+            status: 'idle', // This will be dynamically set by the frontend
+            joinDate: userRow.join_date,
+            bio: 'Нет дополнительной информации об этом игроке.', // Placeholder
+            stats: { wins, losses, bestRank: userRow.rtt_rank || 0, currentStreak: 0 }, // Simplified
+            rankHistory: [], // Placeholder
+            recentMatches: [] // Placeholder
+        };
+
+        res.json(playerProfile);
+    } catch (err) {
+        console.error("Fetch Player Profile Error:", err);
+        res.status(500).json({ error: 'Failed to fetch player profile' });
+    }
+});
+
 // --- STUDENTS CRM ROUTES ---
 
 app.get('/api/students', async (req, res) => {
