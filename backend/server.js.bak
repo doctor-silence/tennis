@@ -727,7 +727,7 @@ app.get('/api/conversations', async (req, res) => {
             ORDER BY c.updated_at DESC
         `, [userId]);
         
-        res.json(result.rows.map(r => ({ ...r, id: r.id.toString(), partnerId: r.partnerId.toString(), unread: parseInt(r.unread) })));
+        res.json(result.rows.map(r => ({ ...r, id: r.id.toString(), partnerId: r.partnerId.toString() })));
     } catch (err) {
         console.error("Fetch Conversations Error:", err);
         res.status(500).json({ error: 'Failed to fetch conversations' });
@@ -820,62 +820,6 @@ app.post('/api/messages', async (req, res) => {
         await client.query('ROLLBACK');
         console.error("Send Message Error:", err);
         res.status(500).json({ error: 'Failed to send message' });
-    } finally {
-        client.release();
-    }
-});
-
-app.post('/api/conversations', async (req, res) => {
-    const { userId, partnerId } = req.body;
-    if (!userId || !partnerId) {
-        return res.status(400).json({ error: 'userId and partnerId are required' });
-    }
-
-    const client = await pool.connect();
-    try {
-        // Find or create conversation
-        let conversationResult = await client.query(
-            `SELECT c.id, 
-                c.updated_at,
-                p.id as "partnerId",
-                p.name as "partnerName",
-                p.avatar as "partnerAvatar",
-                (SELECT text FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as "lastMessage",
-                (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND is_read = FALSE AND sender_id != $1) as "unread"
-             FROM conversations c
-             JOIN users p ON (p.id = CASE WHEN c.user1_id = $1 THEN c.user2_id ELSE c.user1_id END)
-             WHERE (c.user1_id = $1 AND c.user2_id = $2) OR (c.user1_id = $2 AND c.user2_id = $1)`,
-            [userId, partnerId]
-        );
-
-        let conversation;
-        if (conversationResult.rows.length > 0) {
-            conversation = conversationResult.rows[0];
-        } else {
-            const newConversationResult = await client.query(
-                'INSERT INTO conversations (user1_id, user2_id) VALUES ($1, $2) RETURNING id, updated_at',
-                [userId, partnerId]
-            );
-            const newConversationId = newConversationResult.rows[0].id;
-            
-            const partnerInfo = await client.query('SELECT id, name, avatar FROM users WHERE id = $1', [partnerId]);
-
-            conversation = {
-                id: newConversationId,
-                updated_at: newConversationResult.rows[0].updated_at,
-                partnerId: partnerInfo.rows[0].id,
-                partnerName: partnerInfo.rows[0].name,
-                partnerAvatar: partnerInfo.rows[0].avatar,
-                lastMessage: null,
-                unread: 0
-            };
-        }
-        
-        res.status(200).json({ ...conversation, id: conversation.id.toString(), partnerId: conversation.partnerId.toString() });
-
-    } catch (err) {
-        console.error("Find/Create Conversation Error:", err);
-        res.status(500).json({ error: 'Failed to find or create conversation' });
     } finally {
         client.release();
     }

@@ -1,12 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   MessageSquare, LogOut, Settings, Bell, 
   User as UserIcon, Swords, Globe, Bot
 } from 'lucide-react';
-import { User, DashboardTab } from '../types';
+import { User, DashboardTab, Conversation } from '../types';
 import Sidebar from './dashboard/Sidebar';
 import { NavButton } from './Shared';
+import { api } from '../services/api';
 
 // Import Views
 import ProfileView from './dashboard/ProfileView';
@@ -24,8 +25,40 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) => {
   const [activeTab, setActiveTab] = useState<DashboardTab>('profile');
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loadingConversations, setLoadingConversations] = useState(true);
+
+  useEffect(() => {
+    api.messages.getConversations(user.id).then(data => {
+      setConversations(data);
+      setLoadingConversations(false);
+    });
+  }, [user.id]);
+
+  const totalUnread = conversations.reduce((sum, convo) => sum + (convo.unread || 0), 0);
 
   const handleNavigate = (tab: DashboardTab) => setActiveTab(tab);
+  
+  const handleStartConversation = async (partnerId: string) => {
+    try {
+      const conversation = await api.messages.getOrCreateConversation(user.id, partnerId);
+      if (conversation) {
+        // Check if conversation already exists to avoid duplicates
+        if (!conversations.find(c => c.id === conversation.id)) {
+            setConversations(prev => [conversation, ...prev]);
+        }
+        setActiveConversationId(conversation.id);
+        setActiveTab('messages');
+      }
+    } catch (error) {
+      console.error("Failed to start conversation:", error);
+    }
+  };
+  
+  const handleConversationsUpdate = (updatedConversations: Conversation[]) => {
+    setConversations(updatedConversations);
+  };
 
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden font-sans text-slate-900">
@@ -34,7 +67,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
         user={user} 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
-        onLogout={onLogout} 
+        onLogout={onLogout}
+        unreadCount={totalUnread}
       />
 
       {/* Mobile Header */}
@@ -84,10 +118,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
 
           <div className="animate-fade-in-up">
             {activeTab === 'profile' && <ProfileView user={user} onUserUpdate={onUserUpdate} />}
-            {activeTab === 'search' && <PartnerSearchView onNavigate={handleNavigate} />}
+            {activeTab === 'search' && <PartnerSearchView onNavigate={handleNavigate} onStartConversation={handleStartConversation} />}
             {activeTab === 'courts' && <CourtBookingView />}
             {activeTab === 'ai_coach' && <AiCoachView user={user} />}
-            {activeTab === 'messages' && <MessagesView />}
+            {activeTab === 'messages' && <MessagesView 
+                user={user} 
+                activeConversationId={activeConversationId} 
+                onConversationSelect={setActiveConversationId}
+                conversations={conversations}
+                loadingConversations={loadingConversations}
+                onConversationsUpdate={handleConversationsUpdate}
+            />}
             {activeTab === 'settings' && <SettingsView user={user} />}
             {activeTab === 'notifications' && <NotificationsView />}
             {activeTab === 'tactics' && <TacticsView user={user} />}

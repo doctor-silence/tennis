@@ -141,6 +141,32 @@ const initDb = async () => {
     `);
     console.log('✅ Table "tactics" checked.');
 
+    // 9. Create Conversations Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS conversations (
+        id SERIAL PRIMARY KEY,
+        user1_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        user2_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user1_id, user2_id)
+      );
+    `);
+    console.log('✅ Table "conversations" checked.');
+
+    // 10. Create Messages Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id SERIAL PRIMARY KEY,
+        conversation_id INTEGER REFERENCES conversations(id) ON DELETE CASCADE,
+        sender_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        text TEXT NOT NULL,
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Table "messages" checked.');
+
     await client.query('COMMIT');
 
     // --- SEED DATA ---

@@ -1,37 +1,147 @@
 
-import React, { useState, useEffect } from 'react';
-import { MessageSquare, Bell, Heart, MessageCircle, Share2, Swords, Clock, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-import { User, LadderPlayer, Challenge, PlayerProfile } from '../../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { MessageSquare, Bell, Heart, MessageCircle, Share2, Swords, Clock, CheckCircle2, AlertCircle, Loader2, Send } from 'lucide-react';
+import { User, LadderPlayer, Challenge, PlayerProfile, Conversation, ChatMessage } from '../../types';
 import Button from '../Button';
 import { api } from '../../services/api';
 import { Modal } from '../Shared';
 import PlayerProfileFlyout from './PlayerProfileFlyout';
 
-export const MessagesView = () => (
-    <div className="flex h-[600px] bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="w-80 border-r border-slate-100 flex flex-col">
-            <div className="p-4 border-b border-slate-100 font-bold text-lg">Сообщения</div>
-            <div className="flex-1 overflow-y-auto">
-                 {/* Mock conversations */}
-                 {[1,2,3].map(i => (
-                     <div key={i} className="p-4 hover:bg-slate-50 cursor-pointer border-b border-slate-50">
-                         <div className="flex gap-3">
-                             <div className="w-10 h-10 bg-slate-200 rounded-full shrink-0"></div>
-                             <div>
-                                 <div className="font-bold text-sm">Александр К.</div>
-                                 <div className="text-xs text-slate-500 truncate">Привет, сыграем в субботу?</div>
-                             </div>
-                         </div>
-                     </div>
-                 ))}
+interface MessagesViewProps {
+    user: User;
+    activeConversationId: string | null;
+    onConversationSelect: (id: string | null) => void;
+    conversations: Conversation[];
+    loadingConversations: boolean;
+    onConversationsUpdate: (conversations: Conversation[]) => void;
+}
+
+export const MessagesView: React.FC<MessagesViewProps> = ({ 
+    user, 
+    activeConversationId, 
+    onConversationSelect,
+    conversations,
+    loadingConversations,
+    onConversationsUpdate
+}) => {
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [newMessage, setNewMessage] = useState('');
+    const [loadingMessages, setLoadingMessages] = useState(false);
+    const messagesEndRef = useRef<null | HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (activeConversationId) {
+            setLoadingMessages(true);
+            api.messages.getMessages(activeConversationId, user.id).then(data => {
+                setMessages(data);
+                setLoadingMessages(false);
+                // Mark conversation as read in the parent component
+                const updatedConversations = conversations.map(c => 
+                    c.id === activeConversationId ? { ...c, unread: 0 } : c
+                );
+                onConversationsUpdate(updatedConversations);
+            });
+        }
+    }, [activeConversationId, user.id]);
+
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages]);
+
+    const handleSendMessage = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newMessage.trim() || !activeConversationId) return;
+        
+        const activeConvo = conversations.find(c => c.id === activeConversationId);
+        if (!activeConvo) return;
+
+        const sentMessage = await api.messages.sendMessage(user.id, activeConvo.partnerId, newMessage);
+        setMessages(currentMessages => [...currentMessages, sentMessage]);
+        setNewMessage('');
+    };
+    
+    const activeConversation = conversations.find(c => c.id === activeConversationId);
+
+    return (
+        <div className="flex h-[calc(100vh-10rem)] bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="w-1/3 border-r border-slate-100 flex flex-col">
+                <div className="p-4 border-b border-slate-100 font-bold text-lg">Сообщения</div>
+                <div className="flex-1 overflow-y-auto">
+                    {loadingConversations ? (
+                        <div className="p-4 text-center text-slate-400">Загрузка...</div>
+                    ) : (
+                        conversations.map(convo => (
+                            <div 
+                                key={convo.id} 
+                                className={`p-4 cursor-pointer border-b border-slate-50 flex gap-3 transition-colors ${activeConversationId === convo.id ? 'bg-lime-50' : 'hover:bg-slate-50'}`}
+                                onClick={() => onConversationSelect(convo.id)}
+                            >
+                                <div className="relative shrink-0">
+                                    <img src={convo.partnerAvatar} className="w-10 h-10 rounded-full" alt={convo.partnerName}/>
+                                    {convo.isPro && <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-slate-900 border-2 border-white rounded-full" title="Pro"></div>}
+                                </div>
+                                <div className="flex-1 overflow-hidden">
+                                    <div className="flex justify-between items-start">
+                                        <div className="font-bold text-sm">{convo.partnerName}</div>
+                                        <div className="text-[10px] text-slate-400 font-medium">{convo.timestamp}</div>
+                                    </div>
+                                    <div className="flex justify-between items-start">
+                                        <p className="text-xs text-slate-500 truncate">{convo.lastMessage}</p>
+                                        {convo.unread > 0 && <span className="bg-lime-500 text-slate-900 text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full ml-2">{convo.unread}</span>}
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+            <div className="flex-1 flex flex-col">
+                {activeConversation ? (
+                    <>
+                        <div className="p-4 border-b border-slate-100 flex items-center gap-3">
+                            <img src={activeConversation.partnerAvatar} className="w-8 h-8 rounded-full" alt=""/>
+                            <h3 className="font-bold">{activeConversation.partnerName}</h3>
+                        </div>
+                        <div className="flex-1 p-6 overflow-y-auto bg-slate-50/50">
+                            <div className="space-y-4">
+                                {loadingMessages ? (
+                                    <div className="flex justify-center items-center h-full"><Loader2 className="animate-spin text-slate-400"/></div>
+                                ) : (
+                                    messages.map((msg, i) => (
+                                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                            <div className={`max-w-xs md:max-w-md p-3 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-lime-500 text-white rounded-br-lg' : 'bg-white border border-slate-100 text-slate-700 rounded-bl-lg'}`}>
+                                                {msg.text}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                                <div ref={messagesEndRef} />
+                            </div>
+                        </div>
+                        <div className="p-4 border-t border-slate-100 bg-white">
+                            <form onSubmit={handleSendMessage} className="flex gap-2">
+                                <input 
+                                    className="flex-1 bg-slate-100 border-transparent rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-lime-400"
+                                    placeholder="Напишите сообщение..."
+                                    value={newMessage}
+                                    onChange={e => setNewMessage(e.target.value)}
+                                />
+                                <Button type="submit" className="w-12 h-12 px-0" disabled={!newMessage.trim()}>
+                                    <Send size={20}/>
+                                </Button>
+                            </form>
+                        </div>
+                    </>
+                ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+                        <MessageSquare size={48} className="mb-4 opacity-20"/>
+                        <p>Выберите диалог</p>
+                    </div>
+                )}
             </div>
         </div>
-        <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
-            <MessageSquare size={48} className="mb-4 opacity-20"/>
-            <p>Выберите диалог</p>
-        </div>
-    </div>
-);
+    );
+};
 
 export const NotificationsView = () => (
     <div className="max-w-2xl mx-auto space-y-4">
@@ -44,6 +154,38 @@ export const NotificationsView = () => (
                     <div className="text-xs text-slate-400 mt-2">2 часа назад</div>
                 </div>
             </div>
+        ))}
+    </div>
+);
+
+export const CommunityView = () => (
+    <div className="max-w-2xl mx-auto">
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6 flex gap-4">
+            <div className="w-10 h-10 bg-slate-200 rounded-full shrink-0"></div>
+            <input className="w-full bg-slate-50 rounded-xl px-4 outline-none" placeholder="Поделитесь результатами или мыслями..." />
+        </div>
+        
+        {[1,2].map(i => (
+             <div key={i} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-6">
+                 <div className="flex items-center gap-3 mb-4">
+                     <div className="w-10 h-10 bg-slate-200 rounded-full"></div>
+                     <div>
+                         <div className="font-bold text-sm">Мария Шарапова</div>
+                         <div className="text-xs text-slate-400">2 часа назад</div>
+                     </div>
+                 </div>
+                 <p className="text-slate-800 mb-4 text-sm leading-relaxed">
+                     Отличная тренировка сегодня! Отрабатывали бэкхенд по линии. Спасибо тренеру за терпение 💪🎾
+                 </p>
+                 <div className="h-64 bg-slate-100 rounded-xl mb-4 overflow-hidden">
+                     <img src={`https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=800&auto=format&fit=crop`} className="w-full h-full object-cover" alt="post"/>
+                 </div>
+                 <div className="flex gap-6 text-slate-500 text-sm font-bold">
+                     <button className="flex items-center gap-2 hover:text-red-500"><Heart size={18}/> 245</button>
+                     <button className="flex items-center gap-2 hover:text-blue-500"><MessageCircle size={18}/> 12</button>
+                     <button className="flex items-center gap-2 hover:text-green-500"><Share2 size={18}/></button>
+                 </div>
+             </div>
         ))}
     </div>
 );
@@ -278,35 +420,3 @@ export const LadderView = ({ user }: { user: User }) => {
         </div>
     );
 };
-
-export const CommunityView = () => (
-    <div className="max-w-2xl mx-auto">
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6 flex gap-4">
-            <div className="w-10 h-10 bg-slate-200 rounded-full shrink-0"></div>
-            <input className="w-full bg-slate-50 rounded-xl px-4 outline-none" placeholder="Поделитесь результатами или мыслями..." />
-        </div>
-        
-        {[1,2].map(i => (
-             <div key={i} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-6">
-                 <div className="flex items-center gap-3 mb-4">
-                     <div className="w-10 h-10 bg-slate-200 rounded-full"></div>
-                     <div>
-                         <div className="font-bold text-sm">Мария Шарапова</div>
-                         <div className="text-xs text-slate-400">2 часа назад</div>
-                     </div>
-                 </div>
-                 <p className="text-slate-800 mb-4 text-sm leading-relaxed">
-                     Отличная тренировка сегодня! Отрабатывали бэкхенд по линии. Спасибо тренеру за терпение 💪🎾
-                 </p>
-                 <div className="h-64 bg-slate-100 rounded-xl mb-4 overflow-hidden">
-                     <img src={`https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=800&auto=format&fit=crop`} className="w-full h-full object-cover" alt="post"/>
-                 </div>
-                 <div className="flex gap-6 text-slate-500 text-sm font-bold">
-                     <button className="flex items-center gap-2 hover:text-red-500"><Heart size={18}/> 245</button>
-                     <button className="flex items-center gap-2 hover:text-blue-500"><MessageCircle size={18}/> 12</button>
-                     <button className="flex items-center gap-2 hover:text-green-500"><Share2 size={18}/></button>
-                 </div>
-             </div>
-        ))}
-    </div>
-);

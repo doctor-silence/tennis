@@ -11,6 +11,7 @@ interface SidebarProps {
   activeTab: DashboardTab;
   setActiveTab: (tab: DashboardTab) => void;
   onLogout: () => void;
+  unreadCount: number;
 }
 
 const SidebarItem = ({ icon, label, active, onClick, isSpecial = false, badge }: any) => (
@@ -35,7 +36,7 @@ const SidebarItem = ({ icon, label, active, onClick, isSpecial = false, badge }:
   </button>
 );
 
-const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogout }) => {
+const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogout, unreadCount }) => {
   return (
     <aside className="w-72 bg-slate-900 text-white flex-shrink-0 hidden md:flex flex-col relative z-20 shadow-2xl">
       <div className="p-8">
@@ -54,7 +55,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogo
           <SidebarItem icon={<Globe size={20} />} label="Сообщество" active={activeTab === 'community'} onClick={() => setActiveTab('community')} />
           <SidebarItem icon={<BookOpen size={20} />} label="Тактика" active={activeTab === 'tactics'} onClick={() => setActiveTab('tactics')} />
           <SidebarItem icon={<Video size={20} />} label="Видео-анализ" active={activeTab === 'video_analysis'} onClick={() => setActiveTab('video_analysis')} isSpecial />
-          <SidebarItem icon={<MessageSquare size={20} />} label="Сообщения" active={activeTab === 'messages'} onClick={() => setActiveTab('messages')} badge={2} />
+          <SidebarItem icon={<MessageSquare size={20} />} label="Сообщения" active={activeTab === 'messages'} onClick={() => setActiveTab('messages')} badge={unreadCount > 0 && unreadCount} />
           <SidebarItem icon={<Bot size={20} />} label="AI Тренер" active={activeTab === 'ai_coach'} onClick={() => setActiveTab('ai_coach')} />
           {user.role === 'coach' && (
             <SidebarItem icon={<Users size={20} />} label="Ученики (CRM)" active={activeTab === 'students'} onClick={() => setActiveTab('students')} />

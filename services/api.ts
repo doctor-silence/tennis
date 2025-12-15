@@ -1,5 +1,4 @@
-
-import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Match, Product, PlayerProfile, Trajectory } from '../types';
+import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Match, Product, PlayerProfile, Trajectory, Conversation, ChatMessage } from '../types';
 import * as THREE from 'three'; // Import THREE for Vector3 deserialization
 
 // Frontend API Service
@@ -272,6 +271,22 @@ const MOCK_TACTICS: Trajectory[] = [
     }
 ];
 
+const MOCK_CONVERSATIONS: Conversation[] = [
+    { id: '1', partnerId: '1', partnerName: 'Алексей Иванов', partnerAvatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80', lastMessage: 'Привет! Готов к матчу в субботу?', timestamp: '10:45 AM', unread: 2, isPro: true },
+    { id: '2', partnerId: '2', partnerName: 'Мария Петрова', partnerAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80', lastMessage: 'Да, давай в 16:00 на кортах "Чайка"', timestamp: 'Вчера', unread: 0, isPro: false },
+];
+
+const MOCK_MESSAGES: { [key: string]: ChatMessage[] } = {
+    '1': [
+        { role: 'partner', text: 'Привет! Готов к матчу в субботу?' },
+        { role: 'user', text: 'Привет! Да, конечно. Во сколько?' },
+        { role: 'partner', text: 'Думаю, в 12:00 будет отлично.' },
+    ],
+    '2': [
+        { role: 'partner', text: 'Да, давай в 16:00 на кортах "Чайка"' },
+    ],
+};
+
 export const api = {
     auth: {
         register: async (userData: any): Promise<User> => {
@@ -313,6 +328,79 @@ export const api = {
             if (!res.ok) throw new Error(data.error || 'Ошибка входа');
             
             return data;
+        }
+    },
+
+    messages: {
+        getConversations: async (userId: string): Promise<Conversation[]> => {
+            try {
+                const res = await fetch(`${API_URL}/conversations?userId=${userId}`);
+                if (!res.ok) throw new Error('Failed to fetch conversations');
+                return await res.json();
+            } catch (e) {
+                console.warn("Backend offline or failed to fetch conversations. Returning mock data.");
+                return MOCK_CONVERSATIONS;
+            }
+        },
+        getMessages: async (conversationId: string, userId: string): Promise<ChatMessage[]> => {
+            try {
+                const res = await fetch(`${API_URL}/messages?conversationId=${conversationId}&userId=${userId}`);
+                if (!res.ok) throw new Error('Failed to fetch messages');
+                return await res.json();
+            } catch (e) {
+                console.warn("Backend offline or failed to fetch messages. Returning mock data.");
+                return MOCK_MESSAGES[conversationId] || [];
+            }
+        },
+        getOrCreateConversation: async (userId: string, partnerId: string): Promise<Conversation> => {
+            try {
+                const res = await fetch(`${API_URL}/conversations`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, partnerId })
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Failed to get or create conversation');
+                }
+                return await res.json();
+            } catch (e) {
+                console.error("Get/Create Conversation Error:", e);
+                // Fallback for demo mode
+                const existing = MOCK_CONVERSATIONS.find(c => c.partnerId === partnerId);
+                if (existing) return existing;
+                const newConvo: Conversation = {
+                    id: Math.random().toString(),
+                    partnerId: partnerId,
+                    partnerName: 'Новый собеседник',
+                    partnerAvatar: 'https://ui-avatars.com/api/?name=?',
+                    lastMessage: '',
+                    timestamp: new Date().toISOString(),
+                    unread: 0,
+                    isPro: false,
+                };
+                MOCK_CONVERSATIONS.push(newConvo);
+                return newConvo;
+            }
+        },
+        sendMessage: async (senderId: string, partnerId: string, text: string): Promise<ChatMessage> => {
+            try {
+                const res = await fetch(`${API_URL}/messages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ senderId, partnerId, text })
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Failed to send message');
+                }
+                return await res.json();
+            } catch (e) {
+                console.error("Send Message Error:", e);
+                // Fallback for demo mode
+                const newMessage: ChatMessage = { role: 'user', text };
+                return new Promise(resolve => setTimeout(() => resolve(newMessage), 300));
+            }
         }
     },
 

@@ -5,7 +5,12 @@ import { Partner, DashboardTab } from '../../types';
 import Button from '../Button';
 import { api } from '../../services/api';
 
-const PartnerSearchView = ({ onNavigate }: { onNavigate: (tab: DashboardTab) => void }) => {
+interface PartnerSearchViewProps {
+    onNavigate: (tab: DashboardTab) => void;
+    onStartConversation: (partnerId: string) => void;
+}
+
+const PartnerSearchView = ({ onNavigate, onStartConversation }: PartnerSearchViewProps) => {
     const [partners, setPartners] = useState<Partner[]>([]);
     const [filter, setFilter] = useState({ city: '', level: 'all', search: '' });
     const [cities, setCities] = useState<string[]>([]); // New state for cities
@@ -77,7 +82,7 @@ const PartnerSearchView = ({ onNavigate }: { onNavigate: (tab: DashboardTab) => 
                         <h3 className="font-bold text-lg">{partner.name}</h3>
                         <p className="text-slate-500 text-sm mb-4 flex items-center justify-center gap-1"><MapPin size={12}/> {partner.city} • {partner.level}</p>
                         <div className="grid grid-cols-2 gap-2 w-full mt-auto">
-                            <Button variant="outline" size="sm" onClick={() => onNavigate('messages')}>Написать</Button>
+                            <Button variant="outline" size="sm" onClick={() => onStartConversation(partner.id)}>Написать</Button>
                             <Button size="sm">Играть</Button>
                         </div>
                     </div>
