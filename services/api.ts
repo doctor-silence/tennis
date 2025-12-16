@@ -228,7 +228,7 @@ let MOCK_COURTS: Court[] = [
     }
 ];
 
-const MOCK_LADDER: LadderPlayer[] = [
+let MOCK_LADDER: LadderPlayer[] = [
     { id: 'l1', rank: 1, userId: 'u10', name: 'Даниил М.', avatar: 'https://i.pravatar.cc/150?u=10', points: 2450, matches: 45, winRate: 88, status: 'idle' },
     { id: 'l2', rank: 2, userId: 'u12', name: 'Андрей Р.', avatar: 'https://i.pravatar.cc/150?u=12', points: 2100, matches: 38, winRate: 82, status: 'defending' },
     { id: 'l3', rank: 3, userId: 'u15', name: 'Карен Х.', avatar: 'https://i.pravatar.cc/150?u=15', points: 1950, matches: 40, winRate: 75, status: 'idle' },
@@ -236,7 +236,7 @@ const MOCK_LADDER: LadderPlayer[] = [
     { id: 'l5', rank: 5, userId: 'mock-user-1', name: 'Вы (Демо)', avatar: MOCK_USER.avatar, points: 1650, matches: 28, winRate: 65, status: 'idle' },
 ];
 
-const MOCK_CHALLENGES: Challenge[] = [
+let MOCK_CHALLENGES: Challenge[] = [
     { id: 'c1', challengerId: 'u22', defenderId: 'u20', challengerName: 'Дмитрий В.', defenderName: 'Сергей К.', rankGap: 1, status: 'scheduled', deadline: '2024-11-01', matchDate: '2024-10-30' },
     { id: 'c2', challengerId: 'u12', defenderId: 'u10', challengerName: 'Андрей Р.', defenderName: 'Даниил М.', rankGap: 1, status: 'pending', deadline: '2024-11-05' },
 ];
@@ -801,7 +801,52 @@ export const api = {
                     deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
                 };
             }
-        }
+        },
+        acceptChallenge: async (challengeId: string, userId: string): Promise<Challenge> => {
+            try {
+                const res = await fetch(`${API_URL}/ladder/challenges/${challengeId}/accept`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId })
+                });
+                if (!res.ok) throw new Error('Failed to accept challenge');
+                return await res.json();
+            } catch (e) {
+                console.warn("Backend offline or failed to accept challenge.", e);
+                // Mock behavior
+                const challenge = MOCK_CHALLENGES.find(c => c.id === challengeId);
+                if (challenge) {
+                    challenge.status = 'scheduled';
+                    return challenge;
+                }
+                throw e;
+            }
+        },
+        cancelChallenge: async (challengeId: string): Promise<void> => {
+            try {
+                const res = await fetch(`${API_URL}/ladder/challenges/${challengeId}`, {
+                    method: 'DELETE',
+                });
+                if (!res.ok) throw new Error('Failed to cancel challenge');
+            } catch (e) {
+                console.warn("Backend offline or failed to cancel challenge.", e);
+                // Mock behavior
+                MOCK_CHALLENGES = MOCK_CHALLENGES.filter(c => c.id !== challengeId);
+            }
+        },
+        enterScore: async (challengeId: string, score: string, winnerId: string): Promise<void> => {
+            try {
+                const res = await fetch(`${API_URL}/ladder/challenges/${challengeId}/result`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ score, winnerId })
+                });
+                if (!res.ok) throw new Error('Failed to enter score');
+            } catch (e) {
+                console.error("Enter score error:", e);
+                throw e;
+            }
+        },
     },
 
     tactics: {
@@ -863,6 +908,39 @@ export const api = {
             if (!res.ok) {
                 const err = await res.json();
                 throw new Error(err.error || 'Failed to delete tactic');
+            }
+        }
+    },
+
+    notifications: {
+        getUnreadCount: async (userId: string): Promise<{ count: number }> => {
+            try {
+                const res = await fetch(`${API_URL}/notifications/unread-count/${userId}`);
+                if (!res.ok) throw new Error('Failed to fetch unread notification count');
+                return await res.json();
+            } catch (e) {
+                console.error("Get unread notifications error:", e);
+                return { count: 0 };
+            }
+        },
+        getAll: async (userId: string): Promise<Notification[]> => {
+            try {
+                const res = await fetch(`${API_URL}/notifications/${userId}`);
+                if (!res.ok) throw new Error('Failed to fetch notifications');
+                return await res.json();
+            } catch (e) {
+                 console.error("Get all notifications error:", e);
+                return [];
+            }
+        },
+        markAsRead: async (notificationId: string): Promise<void> => {
+            try {
+                const res = await fetch(`${API_URL}/notifications/mark-read/${notificationId}`, {
+                    method: 'POST'
+                });
+                if (!res.ok) throw new Error('Failed to mark notification as read');
+            } catch (e) {
+                console.error("Mark notification as read error:", e);
             }
         }
     }

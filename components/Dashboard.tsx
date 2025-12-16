@@ -28,12 +28,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loadingConversations, setLoadingConversations] = useState(true);
+  const [unreadLadderNotifications, setUnreadLadderNotifications] = useState(0);
+
+  const fetchUnreadCount = () => {
+    api.notifications.getUnreadCount(user.id).then(data => {
+        setUnreadLadderNotifications(data.count);
+    });
+  }
 
   useEffect(() => {
     api.messages.getConversations(user.id).then(data => {
       setConversations(data);
       setLoadingConversations(false);
     });
+    fetchUnreadCount();
   }, [user.id]);
 
   const totalUnread = conversations.reduce((sum, convo) => sum + (convo.unread || 0), 0);
@@ -59,6 +67,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
   const handleConversationsUpdate = (updatedConversations: Conversation[]) => {
     setConversations(updatedConversations);
   };
+  
+  const handleNotificationsRead = () => {
+      setUnreadLadderNotifications(0);
+  };
 
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden font-sans text-slate-900">
@@ -69,6 +81,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
         setActiveTab={setActiveTab} 
         onLogout={onLogout}
         unreadCount={totalUnread}
+        ladderNotifications={unreadLadderNotifications}
       />
 
       {/* Mobile Header */}
@@ -101,6 +114,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
                    activeTab === 'courts' ? 'Бронирование' :
                    activeTab === 'tactics' ? 'Тактическая доска' :
                    activeTab === 'messages' ? 'Сообщения' :
+                   activeTab === 'notifications' ? 'Уведомления' :
                    activeTab}
                 </h1>
                 <p className="text-slate-500 text-sm mt-1">Добро пожаловать, {user.name}</p>
@@ -108,7 +122,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
               <div className="hidden md:flex items-center gap-4">
                  <button onClick={() => setActiveTab('notifications')} className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors shadow-sm relative ${activeTab === 'notifications' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
                    <Bell size={20} />
-                   <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                   {unreadLadderNotifications > 0 &&
+                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                   }
                  </button>
                  <button onClick={() => setActiveTab('settings')} className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors shadow-sm ${activeTab === 'settings' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
                    <Settings size={20} />
@@ -130,7 +146,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
                 onConversationsUpdate={handleConversationsUpdate}
             />}
             {activeTab === 'settings' && <SettingsView user={user} />}
-            {activeTab === 'notifications' && <NotificationsView />}
+            {activeTab === 'notifications' && <NotificationsView user={user} onNotificationsRead={handleNotificationsRead} />}
             {activeTab === 'tactics' && <TacticsView user={user} />}
             {activeTab === 'students' && <StudentsView user={user} />}
             {activeTab === 'video_analysis' && <VideoAnalysisView />}

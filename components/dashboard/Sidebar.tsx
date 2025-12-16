@@ -12,6 +12,7 @@ interface SidebarProps {
   setActiveTab: (tab: DashboardTab) => void;
   onLogout: () => void;
   unreadCount: number;
+  ladderNotifications: number;
 }
 
 const SidebarItem = ({ icon, label, active, onClick, isSpecial = false, badge }: any) => (
@@ -36,7 +37,7 @@ const SidebarItem = ({ icon, label, active, onClick, isSpecial = false, badge }:
   </button>
 );
 
-const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogout, unreadCount }) => {
+const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogout, unreadCount, ladderNotifications }) => {
   return (
     <aside className="w-72 bg-slate-900 text-white flex-shrink-0 hidden md:flex flex-col relative z-20 shadow-2xl">
       <div className="p-8">
@@ -51,7 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogo
           <SidebarItem icon={<UserIcon size={20} />} label="Мой Профиль" active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
           <SidebarItem icon={<Search size={20} />} label="Поиск Партнера" active={activeTab === 'search'} onClick={() => setActiveTab('search')} />
           <SidebarItem icon={<MapPin size={20} />} label="Бронирование" active={activeTab === 'courts'} onClick={() => setActiveTab('courts')} />
-          <SidebarItem icon={<Swords size={20} />} label="Турнирная лестница" active={activeTab === 'ladder'} onClick={() => setActiveTab('ladder')} />
+          <SidebarItem icon={<Swords size={20} />} label="Турнирная лестница" active={activeTab === 'ladder'} onClick={() => setActiveTab('ladder')} badge={ladderNotifications > 0 && ladderNotifications} />
           <SidebarItem icon={<Globe size={20} />} label="Сообщество" active={activeTab === 'community'} onClick={() => setActiveTab('community')} />
           <SidebarItem icon={<BookOpen size={20} />} label="Тактика" active={activeTab === 'tactics'} onClick={() => setActiveTab('tactics')} />
           <SidebarItem icon={<Video size={20} />} label="Видео-анализ" active={activeTab === 'video_analysis'} onClick={() => setActiveTab('video_analysis')} isSpecial />

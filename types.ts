@@ -1,4 +1,3 @@
-
 export type ViewState = 'landing' | 'auth' | 'dashboard' | 'pro' | 'shop' | 'admin';
 export type DashboardTab = 'profile' | 'search' | 'courts' | 'ai_coach' | 'messages' | 'settings' | 'notifications' | 'tactics' | 'students' | 'video_analysis' | 'ladder' | 'community';
 
@@ -75,15 +74,6 @@ export interface Conversation {
   timestamp: string;
   unread: number;
   isPro: boolean;
-}
-
-export interface Notification {
-  id: string;
-  type: 'invite' | 'match' | 'system';
-  title: string;
-  message: string;
-  time: string;
-  isRead: boolean;
 }
 
 export interface Student {
@@ -178,4 +168,14 @@ export interface Trajectory {
     arcHeight: number;
     points: any[]; 
     tactics_data?: any[];
+}
+
+export interface Notification {
+  id: string;
+  user_id: number;
+  type: string;
+  message: string;
+  reference_id: string;
+  is_read: boolean;
+  created_at: string;
 }

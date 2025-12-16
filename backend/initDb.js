@@ -1,4 +1,3 @@
-
 const pool = require('./db');
 const bcrypt = require('bcryptjs');
 
@@ -178,10 +177,29 @@ const initDb = async () => {
         status VARCHAR(20) DEFAULT 'pending',
         deadline DATE,
         match_date DATE,
+        winner_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        score VARCHAR(50),
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    await client.query(`ALTER TABLE challenges ADD COLUMN IF NOT EXISTS winner_id INTEGER REFERENCES users(id) ON DELETE SET NULL;`);
+    await client.query(`ALTER TABLE challenges ADD COLUMN IF NOT EXISTS score VARCHAR(50);`);
     console.log('✅ Table "challenges" checked.');
+    
+    // 12. Create Notifications Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        message TEXT NOT NULL,
+        reference_id VARCHAR(255),
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Table "notifications" checked.');
+
 
     await client.query('COMMIT');
 

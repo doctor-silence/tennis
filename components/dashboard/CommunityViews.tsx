@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Bell, Heart, MessageCircle, Share2, Swords, Clock, CheckCircle2, AlertCircle, Loader2, Send } from 'lucide-react';
-import { User, LadderPlayer, Challenge, PlayerProfile, Conversation, ChatMessage } from '../../types';
+import { User, LadderPlayer, Challenge, PlayerProfile, Conversation, ChatMessage, Notification } from '../../types';
 import Button from '../Button';
 import { api } from '../../services/api';
 import { Modal } from '../Shared';
@@ -42,7 +41,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                 onConversationsUpdate(updatedConversations);
             });
         }
-    }, [activeConversationId, user.id]);
+    }, [activeConversationId, user.id, onConversationsUpdate]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -143,20 +142,81 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
     );
 };
 
-export const NotificationsView = () => (
-    <div className="max-w-2xl mx-auto space-y-4">
-        {[1,2].map(i => (
-            <div key={i} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex gap-4">
-                <div className="w-10 h-10 bg-lime-100 text-lime-600 rounded-full flex items-center justify-center shrink-0"><Bell size={20}/></div>
-                <div>
-                    <div className="font-bold text-sm">Напоминание о матче</div>
-                    <p className="text-sm text-slate-600">Завтра в 18:00 игра с Иваном П. в ТК "Спартак".</p>
-                    <div className="text-xs text-slate-400 mt-2">2 часа назад</div>
-                </div>
+interface NotificationsViewProps {
+    user: User;
+    onNotificationsRead: () => void;
+}
+
+export const NotificationsView: React.FC<NotificationsViewProps> = ({ user, onNotificationsRead }) => {
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchAndReadNotifications = async () => {
+            setLoading(true);
+            const fetchedNotifications = await api.notifications.getAll(user.id);
+            setNotifications(fetchedNotifications);
+            setLoading(false);
+
+            const unreadIds = fetchedNotifications.filter(n => !n.is_read).map(n => n.id);
+            if (unreadIds.length > 0) {
+                await Promise.all(unreadIds.map(id => api.notifications.markAsRead(id)));
+                onNotificationsRead();
+            }
+        };
+
+        fetchAndReadNotifications();
+    }, [user.id, onNotificationsRead]);
+
+    const getIconForType = (type: string) => {
+        switch (type) {
+            case 'new_challenge':
+                return <Swords className="text-red-500" size={20} />;
+            case 'challenge_accepted':
+                return <CheckCircle2 className="text-green-500" size={20} />;
+            default:
+                return <Bell className="text-blue-500" size={20} />;
+        }
+    };
+    
+    if (loading) {
+        return (
+            <div className="max-w-2xl mx-auto text-center">
+                <Loader2 className="animate-spin text-slate-400 mx-auto" />
             </div>
-        ))}
-    </div>
-);
+        );
+    }
+
+    if (notifications.length === 0) {
+        return (
+            <div className="max-w-2xl mx-auto text-center py-12 bg-white rounded-3xl border border-dashed border-slate-200 text-slate-400">
+                <Bell size={48} className="mx-auto mb-4 opacity-20"/>
+                <p>Новых уведомлений нет</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="max-w-2xl mx-auto space-y-4">
+            {notifications.map(n => (
+                <div key={n.id} className={`bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex gap-4 ${n.is_read ? 'opacity-60' : ''}`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                        n.type === 'new_challenge' ? 'bg-red-100' :
+                        n.type === 'challenge_accepted' ? 'bg-green-100' : 'bg-blue-100'
+                    }`}>
+                        {getIconForType(n.type)}
+                    </div>
+                    <div>
+                        <p className="text-sm text-slate-800">{n.message}</p>
+                        <div className="text-xs text-slate-400 mt-2">
+                            {new Date(n.created_at).toLocaleString()}
+                        </div>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
 
 export const CommunityView = () => (
     <div className="max-w-2xl mx-auto">
@@ -198,6 +258,10 @@ export const LadderView = ({ user }: { user: User }) => {
     const [showChallengeModal, setShowChallengeModal] = useState(false);
     const [selectedProfile, setSelectedProfile] = useState<PlayerProfile | null>(null);
     const [isProfileLoading, setIsProfileLoading] = useState(false);
+    const [showEnterScoreModal, setShowEnterScoreModal] = useState(false);
+    const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
+    const [score, setScore] = useState("");
+    const [winnerId, setWinnerId] = useState<string | null>(null);
     
     useEffect(() => {
         const loadData = async () => {
@@ -225,20 +289,66 @@ export const LadderView = ({ user }: { user: User }) => {
 
     const confirmChallenge = async () => {
         if (!selectedOpponent) return;
-        // Mock API call
-        const newChallenge: Challenge = {
-            id: Math.random().toString(),
-            challengerId: user.id,
-            defenderId: selectedOpponent.userId,
-            challengerName: user.name,
-            defenderName: selectedOpponent.name,
-            rankGap: Math.abs(selectedOpponent.rank - (ranking.find(r => r.userId === user.id)?.rank || 0)),
-            status: 'pending',
-            deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-        };
-        setChallenges([newChallenge, ...challenges]);
-        setShowChallengeModal(false);
-        setViewMode('challenges');
+
+        const challenger = ranking.find(p => p.userId === user.id);
+        if (!challenger) {
+            console.error("Could not find challenger in ranking list");
+            // Optionally, show an error to the user
+            return;
+        }
+
+        try {
+            const newChallenge = await api.ladder.createChallenge(challenger, selectedOpponent);
+            setChallenges([newChallenge, ...challenges]);
+            setShowChallengeModal(false);
+            setViewMode('challenges');
+        } catch (error) {
+            console.error("Failed to create challenge:", error);
+            // Optionally, show an error message to the user
+        }
+    };
+
+    const handleCancelChallenge = async (challengeId: string) => {
+        try {
+            await api.ladder.cancelChallenge(challengeId);
+            setChallenges(challenges.filter(c => c.id !== challengeId));
+        } catch (error) {
+            console.error("Failed to cancel challenge:", error);
+            // Optionally, show an error message to the user
+        }
+    };
+
+    const handleAcceptChallenge = async (challengeId: string) => {
+        try {
+            const updatedChallenge = await api.ladder.acceptChallenge(challengeId, user.id);
+            setChallenges(challenges.map(c => c.id === challengeId ? updatedChallenge : c));
+        } catch (error) {
+            console.error("Failed to accept challenge:", error);
+            // Optionally, show an error message to the user
+        }
+    };
+
+    const handleEnterScore = async () => {
+        if (!selectedChallenge || !score || !winnerId) {
+            // TODO: show error to user
+            return;
+        }
+        try {
+            await api.ladder.enterScore(selectedChallenge.id, score, winnerId);
+    
+            // refresh data
+            const rankData = await api.ladder.getRankings();
+            setRanking(rankData);
+            const challengeData = await api.ladder.getChallenges();
+            setChallenges(challengeData);
+    
+            setShowEnterScoreModal(false);
+            setScore("");
+            setWinnerId(null);
+        } catch (error) {
+            console.error("Failed to enter score:", error);
+            // Optionally, show an error message to the user
+        }
     };
 
     return (
@@ -258,7 +368,11 @@ export const LadderView = ({ user }: { user: User }) => {
                     className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${viewMode === 'challenges' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'}`}
                 >
                     Вызовы
-                    {challenges.length > 0 && <span className="bg-lime-500 text-slate-900 text-[10px] px-1.5 rounded-full">{challenges.length}</span>}
+                    {challenges.filter(c => c.status === 'pending' || c.status === 'scheduled').length > 0 && 
+                        <span className="bg-lime-500 text-slate-900 text-[10px] px-1.5 rounded-full">
+                            {challenges.filter(c => c.status === 'pending' || c.status === 'scheduled').length}
+                        </span>
+                    }
                 </button>
             </div>
 
@@ -376,10 +490,13 @@ export const LadderView = ({ user }: { user: User }) => {
                                         <div className="font-bold text-slate-900">{new Date(c.deadline).toLocaleDateString()}</div>
                                     </div>
                                     {c.status === 'pending' && c.defenderId === user.id && (
-                                        <Button size="sm">Принять</Button>
+                                        <Button size="sm" onClick={() => handleAcceptChallenge(c.id)}>Принять</Button>
+                                    )}
+                                     {c.status === 'pending' && c.challengerId === user.id && (
+                                        <Button size="sm" variant="danger_outline" onClick={() => handleCancelChallenge(c.id)}>Отменить</Button>
                                     )}
                                     {c.status === 'scheduled' && (
-                                        <Button size="sm" variant="outline">Внести счет</Button>
+                                        <Button size="sm" variant="outline" onClick={() => { setSelectedChallenge(c); setShowEnterScoreModal(true); }}>Внести счет</Button>
                                     )}
                                 </div>
                             </div>
@@ -416,6 +533,38 @@ export const LadderView = ({ user }: { user: User }) => {
                         <Button className="flex-1" onClick={confirmChallenge}>Отправить вызов</Button>
                     </div>
                 </div>
+            </Modal>
+            <Modal isOpen={showEnterScoreModal} onClose={() => setShowEnterScoreModal(false)} title="Внести результат матча">
+                {selectedChallenge && (
+                    <div className="space-y-4">
+                        <p>Матч: {selectedChallenge.challengerName} vs {selectedChallenge.defenderName}</p>
+                        <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Счет (например, 6:4, 6:3)</label>
+                            <input
+                                type="text"
+                                value={score}
+                                onChange={(e) => setScore(e.target.value)}
+                                className="w-full mt-1 p-2 border rounded-xl bg-slate-50 focus:ring-2 focus:ring-lime-400 outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Победитель</label>
+                            <select
+                                value={winnerId || ''}
+                                onChange={(e) => setWinnerId(e.target.value)}
+                                className="w-full mt-1 p-2 border rounded-xl bg-slate-50 focus:ring-2 focus:ring-lime-400 outline-none"
+                            >
+                                <option value="" disabled>Выберите победителя</option>
+                                <option value={selectedChallenge.challengerId}>{selectedChallenge.challengerName}</option>
+                                <option value={selectedChallenge.defenderId}>{selectedChallenge.defenderName}</option>
+                            </select>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-4">
+                            <Button variant="outline" onClick={() => setShowEnterScoreModal(false)}>Отмена</Button>
+                            <Button onClick={handleEnterScore}>Подтвердить</Button>
+                        </div>
+                    </div>
+                )}
             </Modal>
         </div>
     );

@@ -1,5 +1,4 @@
 
-
 require('dotenv').config({ path: __dirname + '/.env' });
 const express = require('express');
 const cors = require('cors');
@@ -492,33 +491,48 @@ app.get('/api/partners', async (req, res) => {
 
 app.get('/api/ladder/rankings', async (req, res) => {
     try {
-        const result = await pool.query(`
+        // Get all users ordered by rank
+        const usersResult = await pool.query(`
             SELECT 
-                id, 
-                name, 
-                avatar, 
-                xp as points, 
-                role, 
-                level,
-                rating,
-                rtt_rank,
-                rtt_category
+                id, name, avatar, xp as points, role, level, rating, rtt_rank, rtt_category
             FROM users 
             WHERE role != 'admin'
             ORDER BY xp DESC, rating DESC, name ASC
         `);
 
-        // Map to LadderPlayer structure and calculate rank and winRate (mock for now)
-        const ladderPlayers = result.rows.map((row, index) => ({
-            id: row.id.toString(),
-            rank: index + 1, // Simple sequential ranking
-            userId: row.id.toString(),
-            name: row.name,
-            avatar: row.avatar,
-            points: row.points,
-            matches: Math.floor(Math.random() * 50) + 10, // Mock matches played
-            winRate: Math.floor(Math.random() * 40) + 60,  // Mock win rate between 60-99%
-            status: index < 3 ? 'defending' : 'idle' // Top 3 are defending
+        // Get all active defenders' IDs
+        const activeChallengesResult = await pool.query(
+            "SELECT defender_id FROM challenges WHERE status = 'pending' OR status = 'scheduled'"
+        );
+        const defendingPlayerIds = new Set(activeChallengesResult.rows.map(r => r.defender_id));
+
+        // Map to LadderPlayer structure
+        const ladderPlayers = await Promise.all(usersResult.rows.map(async (row, index) => {
+            // Fetch match stats for each user
+            const matchStatsResult = await pool.query(
+                `SELECT
+                    COUNT(*) AS total_matches,
+                    COUNT(*) FILTER (WHERE result = 'win') AS wins
+                FROM matches
+                WHERE user_id = $1`,
+                [row.id]
+            );
+
+            const { total_matches, wins } = matchStatsResult.rows[0];
+            const totalMatches = parseInt(total_matches, 10) || 0;
+            const winRate = totalMatches > 0 ? Math.round((parseInt(wins, 10) / totalMatches) * 100) : 0;
+
+            return {
+                id: row.id.toString(),
+                rank: index + 1,
+                userId: row.id.toString(),
+                name: row.name,
+                avatar: row.avatar,
+                points: row.points,
+                matches: totalMatches,
+                winRate: winRate,
+                status: defendingPlayerIds.has(row.id) ? 'defending' : 'idle'
+            };
         }));
         
         res.json(ladderPlayers);
@@ -573,6 +587,14 @@ app.post('/api/ladder/challenges', async (req, res) => {
         return res.status(400).json({ error: 'Challenger and defender IDs are required' });
     }
 
+    const parsedChallengerId = parseInt(challengerId, 10);
+    const parsedDefenderId = parseInt(defenderId, 10);
+
+    if (isNaN(parsedChallengerId) || isNaN(parsedDefenderId)) {
+        console.error(`Invalid challenge IDs: challengerId=${challengerId}, defenderId=${defenderId}`);
+        return res.status(400).json({ error: 'Invalid ID format' });
+    }
+
     try {
         const deadline = new Date();
         deadline.setDate(deadline.getDate() + 7); // 7 days from now
@@ -581,13 +603,20 @@ app.post('/api/ladder/challenges', async (req, res) => {
             `INSERT INTO challenges (challenger_id, defender_id, status, deadline)
              VALUES ($1, $2, 'pending', $3)
              RETURNING *`,
-            [challengerId, defenderId, deadline.toISOString().split('T')[0]]
+            [parsedChallengerId, parsedDefenderId, deadline.toISOString().split('T')[0]]
         );
         const newChallenge = result.rows[0];
 
         // Fetch challenger and defender names for the response
         const challenger = await pool.query('SELECT name FROM users WHERE id = $1', [newChallenge.challenger_id]);
         const defender = await pool.query('SELECT name FROM users WHERE id = $1', [newChallenge.defender_id]);
+
+        // Create notification for the defender
+        await pool.query(
+            `INSERT INTO notifications (user_id, type, message, reference_id)
+             VALUES ($1, 'new_challenge', $2, $3)`,
+            [parsedDefenderId, `${challenger.rows[0].name} бросил(а) вам вызов!`, newChallenge.id]
+        );
 
         res.status(201).json({
             id: newChallenge.id.toString(),
@@ -603,6 +632,258 @@ app.post('/api/ladder/challenges', async (req, res) => {
     } catch (err) {
         console.error("Create Ladder Challenge Error:", err);
         res.status(500).json({ error: 'Failed to create ladder challenge' });
+    }
+});
+
+app.put('/api/ladder/challenges/:challengeId/accept', async (req, res) => {
+    const { challengeId } = req.params;
+    // The user ID is sent in the body to confirm who is accepting.
+    const { userId } = req.body;
+    const parsedChallengeId = parseInt(challengeId, 10);
+
+    if (isNaN(parsedChallengeId) || !userId) {
+        return res.status(400).json({ error: 'Invalid challenge ID or missing user ID' });
+    }
+
+    try {
+        const challengeRes = await pool.query('SELECT * FROM challenges WHERE id = $1', [parsedChallengeId]);
+        if (challengeRes.rows.length === 0) {
+            return res.status(404).json({ error: 'Challenge not found' });
+        }
+        const challenge = challengeRes.rows[0];
+
+        // Ensure the person accepting is the defender.
+        if (challenge.defender_id.toString() !== userId.toString()) {
+            return res.status(403).json({ error: 'Only the defender can accept the challenge' });
+        }
+
+        // Update status to 'scheduled'
+        const result = await pool.query(
+            "UPDATE challenges SET status = 'scheduled' WHERE id = $1 RETURNING *",
+            [parsedChallengeId]
+        );
+        const updatedChallenge = result.rows[0];
+
+        // Create a notification for the challenger.
+        const defender = await pool.query('SELECT name FROM users WHERE id = $1', [challenge.defender_id]);
+        await pool.query(
+            `INSERT INTO notifications (user_id, type, message, reference_id)
+             VALUES ($1, 'challenge_accepted', $2, $3)`,
+            [challenge.challenger_id, `${defender.rows[0].name} принял(а) ваш вызов!`, updatedChallenge.id]
+        );
+
+        await logSystemEvent('info', `Challenge ${challengeId} was accepted by user ${userId}.`, 'Ladder');
+
+        res.status(200).json(updatedChallenge);
+    } catch (err) {
+        console.error("Accept Ladder Challenge Error:", err);
+        res.status(500).json({ error: 'Failed to accept ladder challenge' });
+    }
+});
+
+app.post('/api/ladder/challenges/:challengeId/result', async (req, res) => {
+    const { challengeId } = req.params;
+    const { score, winnerId } = req.body;
+    const parsedChallengeId = parseInt(challengeId, 10);
+
+    if (isNaN(parsedChallengeId) || !score || !winnerId) {
+        return res.status(400).json({ error: 'Invalid data' });
+    }
+
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        const challengeRes = await client.query('SELECT * FROM challenges WHERE id = $1', [parsedChallengeId]);
+        if (challengeRes.rows.length === 0) {
+            throw new Error('Challenge not found');
+        }
+        const challenge = challengeRes.rows[0];
+
+        const challengerId = challenge.challenger_id;
+        const defenderId = challenge.defender_id;
+        const parsedWinnerId = parseInt(winnerId, 10);
+        const loserId = parsedWinnerId === challengerId ? defenderId : challengerId;
+
+        // Logic for XP change
+        if (parsedWinnerId === challengerId) { // Challenger won
+            const challengerRes = await client.query('SELECT xp FROM users WHERE id = $1', [challengerId]);
+            const defenderRes = await client.query('SELECT xp FROM users WHERE id = $1', [defenderId]);
+            const challengerXp = challengerRes.rows[0].xp;
+            const defenderXp = defenderRes.rows[0].xp;
+
+            // Challenger takes defender's XP, defender takes challenger's.
+            // Add a bonus to ensure the swap is effective if XPs were equal or challenger was already higher.
+            await client.query('UPDATE users SET xp = $1 WHERE id = $2', [defenderXp + 5, challengerId]);
+            await client.query('UPDATE users SET xp = $1 WHERE id = $2', [challengerXp, defenderId]);
+
+        } else if (parsedWinnerId === defenderId) { // Defender won
+            // Defender gets a bonus for a successful defense.
+            await client.query('UPDATE users SET xp = xp + 5 WHERE id = $1', [defenderId]);
+        }
+
+        // Update challenge status
+        await client.query("UPDATE challenges SET status = 'completed', winner_id = $1, score = $2 WHERE id = $3", [parsedWinnerId, score, parsedChallengeId]);
+
+        // Add match record for both players
+        const winner = await client.query('SELECT name FROM users WHERE id = $1', [parsedWinnerId]);
+        const loser = await client.query('SELECT name FROM users WHERE id = $1', [loserId]);
+
+        await client.query(
+            `INSERT INTO matches (user_id, opponent_name, score, result, surface)
+             VALUES ($1, $2, $3, 'win', 'hard')`, // Assuming hard court for now
+            [parsedWinnerId, loser.rows[0].name, score]
+        );
+         await client.query(
+            `INSERT INTO matches (user_id, opponent_name, score, result, surface)
+             VALUES ($1, $2, $3, 'loss', 'hard')`,
+            [loserId, winner.rows[0].name, score]
+        );
+
+        await logSystemEvent('info', `Score entered for challenge ${challengeId}. Winner: ${winnerId}`, 'Ladder');
+        
+        await client.query('COMMIT');
+        res.status(200).json({ success: true });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error("Enter Score Error:", err);
+        res.status(500).json({ error: 'Failed to enter score' });
+    } finally {
+        client.release();
+    }
+});
+
+app.delete('/api/ladder/challenges/:challengeId', async (req, res) => {
+    const { challengeId } = req.params;
+    const parsedChallengeId = parseInt(challengeId, 10);
+
+    if (isNaN(parsedChallengeId)) {
+        return res.status(400).json({ error: 'Invalid challenge ID' });
+    }
+
+    try {
+        const result = await pool.query(
+            'DELETE FROM challenges WHERE id = $1 RETURNING *',
+            [parsedChallengeId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Challenge not found' });
+        }
+
+        // We should also delete the notification sent to the defender
+        await pool.query(
+            "DELETE FROM notifications WHERE type = 'new_challenge' AND reference_id = $1",
+            [parsedChallengeId]
+        );
+        
+        await logSystemEvent('info', `Challenge ${challengeId} was cancelled.`, 'Ladder');
+
+        res.status(200).json({ success: true });
+    } catch (err) {
+        console.error("Cancel Ladder Challenge Error:", err);
+        res.status(500).json({ error: 'Failed to cancel ladder challenge' });
+    }
+});
+
+app.put('/api/ladder/challenges/:challengeId/accept', async (req, res) => {
+    const { challengeId } = req.params;
+    // The user ID is sent in the body to confirm who is accepting.
+    const { userId } = req.body;
+    const parsedChallengeId = parseInt(challengeId, 10);
+
+    if (isNaN(parsedChallengeId) || !userId) {
+        return res.status(400).json({ error: 'Invalid challenge ID or missing user ID' });
+    }
+
+    try {
+        const challengeRes = await pool.query('SELECT * FROM challenges WHERE id = $1', [parsedChallengeId]);
+        if (challengeRes.rows.length === 0) {
+            return res.status(404).json({ error: 'Challenge not found' });
+        }
+        const challenge = challengeRes.rows[0];
+
+        // Ensure the person accepting is the defender.
+        if (challenge.defender_id.toString() !== userId.toString()) {
+            return res.status(403).json({ error: 'Only the defender can accept the challenge' });
+        }
+
+        // Update status to 'scheduled'
+        const result = await pool.query(
+            "UPDATE challenges SET status = 'scheduled' WHERE id = $1 RETURNING *",
+            [parsedChallengeId]
+        );
+        const updatedChallenge = result.rows[0];
+
+        // Create a notification for the challenger.
+        const defender = await pool.query('SELECT name FROM users WHERE id = $1', [challenge.defender_id]);
+        await pool.query(
+            `INSERT INTO notifications (user_id, type, message, reference_id)
+             VALUES ($1, 'challenge_accepted', $2, $3)`,
+            [challenge.challenger_id, `${defender.rows[0].name} принял(а) ваш вызов!`, updatedChallenge.id]
+        );
+
+        await logSystemEvent('info', `Challenge ${challengeId} was accepted by user ${userId}.`, 'Ladder');
+
+        res.status(200).json(updatedChallenge);
+    } catch (err) {
+        console.error("Accept Ladder Challenge Error:", err);
+        res.status(500).json({ error: 'Failed to accept ladder challenge' });
+    }
+});
+
+app.get('/api/notifications/unread-count/:userId', async (req, res) => {
+    const { userId } = req.params;
+    const parsedUserId = parseInt(userId, 10);
+    if (isNaN(parsedUserId)) {
+        return res.status(400).json({ error: 'Invalid user ID' });
+    }
+    try {
+        const result = await pool.query(
+            'SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND is_read = FALSE',
+            [parsedUserId]
+        );
+        res.json({ count: parseInt(result.rows[0].count, 10) });
+    } catch (err) {
+        console.error("Fetch Unread Count Error:", err);
+        res.status(500).json({ error: 'Failed to fetch unread notification count' });
+    }
+});
+
+app.get('/api/notifications/:userId', async (req, res) => {
+    const { userId } = req.params;
+    const parsedUserId = parseInt(userId, 10);
+    if (isNaN(parsedUserId)) {
+        return res.status(400).json({ error: 'Invalid user ID' });
+    }
+    try {
+        const result = await pool.query(
+            'SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC',
+            [parsedUserId]
+        );
+        res.json(result.rows.map(n => ({...n, id: n.id.toString()})));
+    } catch (err) {
+        console.error("Fetch Notifications Error:", err);
+        res.status(500).json({ error: 'Failed to fetch notifications' });
+    }
+});
+
+app.post('/api/notifications/mark-read/:notificationId', async (req, res) => {
+    const { notificationId } = req.params;
+    const parsedNotificationId = parseInt(notificationId, 10);
+    if (isNaN(parsedNotificationId)) {
+        return res.status(400).json({ error: 'Invalid notification ID' });
+    }
+    try {
+        await pool.query(
+            'UPDATE notifications SET is_read = TRUE WHERE id = $1',
+            [parsedNotificationId]
+        );
+        res.status(200).json({ success: true });
+    } catch (err) {
+        console.error("Mark Notification Read Error:", err);
+        res.status(500).json({ error: 'Failed to mark notification as read' });
     }
 });
 
@@ -625,7 +906,7 @@ app.get('/api/ladder/player/:userId', async (req, res) => {
 
         // Fetch user's matches to calculate win/loss stats
         const matchesResult = await pool.query(
-            `SELECT result FROM matches WHERE user_id = $1`,
+            `SELECT result, opponent_name, score, date, id FROM matches WHERE user_id = $1 ORDER BY date DESC`,
             [userId]
         );
 
@@ -635,6 +916,16 @@ app.get('/api/ladder/player/:userId', async (req, res) => {
             if (match.result === 'win') wins++;
             else losses++;
         });
+
+        const recentMatches = matchesResult.rows.slice(0, 5).map(m => ({
+            id: m.id.toString(),
+            userId: userId,
+            opponentName: m.opponent_name,
+            score: m.score,
+            date: m.date,
+            result: m.result,
+            surface: 'hard' // placeholder
+        }));
 
         const playerProfile = {
             id: userRow.id.toString(),
@@ -650,7 +941,7 @@ app.get('/api/ladder/player/:userId', async (req, res) => {
             bio: 'Нет дополнительной информации об этом игроке.', // Placeholder
             stats: { wins, losses, bestRank: userRow.rtt_rank || 0, currentStreak: 0 }, // Simplified
             rankHistory: [], // Placeholder
-            recentMatches: [] // Placeholder
+            recentMatches: recentMatches
         };
 
         res.json(playerProfile);
