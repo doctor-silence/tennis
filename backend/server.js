@@ -494,10 +494,14 @@ app.get('/api/ladder/rankings', async (req, res) => {
         // Get all users ordered by rank
         const usersResult = await pool.query(`
             SELECT 
-                id, name, avatar, xp as points, role, level, rating, rtt_rank, rtt_category
-            FROM users 
-            WHERE role != 'admin'
-            ORDER BY xp DESC, rating DESC, name ASC
+                u.id, u.name, u.avatar, u.xp as points, u.role, u.level, u.rating, u.rtt_rank, u.rtt_category,
+                COUNT(m.id) AS total_matches,
+                COUNT(m.id) FILTER (WHERE m.result = 'win') AS wins
+            FROM users u
+            LEFT JOIN matches m ON u.id = m.user_id
+            WHERE u.role != 'admin'
+            GROUP BY u.id
+            ORDER BY u.xp DESC, u.rating DESC, u.name ASC
         `);
 
         // Get all active defenders' IDs
@@ -507,20 +511,10 @@ app.get('/api/ladder/rankings', async (req, res) => {
         const defendingPlayerIds = new Set(activeChallengesResult.rows.map(r => r.defender_id));
 
         // Map to LadderPlayer structure
-        const ladderPlayers = await Promise.all(usersResult.rows.map(async (row, index) => {
-            // Fetch match stats for each user
-            const matchStatsResult = await pool.query(
-                `SELECT
-                    COUNT(*) AS total_matches,
-                    COUNT(*) FILTER (WHERE result = 'win') AS wins
-                FROM matches
-                WHERE user_id = $1`,
-                [row.id]
-            );
-
-            const { total_matches, wins } = matchStatsResult.rows[0];
-            const totalMatches = parseInt(total_matches, 10) || 0;
-            const winRate = totalMatches > 0 ? Math.round((parseInt(wins, 10) / totalMatches) * 100) : 0;
+        const ladderPlayers = usersResult.rows.map((row, index) => {
+            const totalMatches = parseInt(row.total_matches, 10) || 0;
+            const wins = parseInt(row.wins, 10) || 0;
+            const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
 
             return {
                 id: row.id.toString(),
@@ -533,7 +527,7 @@ app.get('/api/ladder/rankings', async (req, res) => {
                 winRate: winRate,
                 status: defendingPlayerIds.has(row.id) ? 'defending' : 'idle'
             };
-        }));
+        });
         
         res.json(ladderPlayers);
     } catch (err) {
@@ -710,12 +704,15 @@ app.post('/api/ladder/challenges/:challengeId/result', async (req, res) => {
         if (parsedWinnerId === challengerId) { // Challenger won
             const challengerRes = await client.query('SELECT xp FROM users WHERE id = $1', [challengerId]);
             const defenderRes = await client.query('SELECT xp FROM users WHERE id = $1', [defenderId]);
-            const challengerXp = challengerRes.rows[0].xp;
-            const defenderXp = defenderRes.rows[0].xp;
+            let challengerXp = challengerRes.rows[0].xp;
+            let defenderXp = defenderRes.rows[0].xp;
+
+            if (defenderXp <= challengerXp) {
+                defenderXp = challengerXp + 1;
+            }
 
             // Challenger takes defender's XP, defender takes challenger's.
-            // Add a bonus to ensure the swap is effective if XPs were equal or challenger was already higher.
-            await client.query('UPDATE users SET xp = $1 WHERE id = $2', [defenderXp + 5, challengerId]);
+            await client.query('UPDATE users SET xp = $1 WHERE id = $2', [defenderXp, challengerId]);
             await client.query('UPDATE users SET xp = $1 WHERE id = $2', [challengerXp, defenderId]);
 
         } else if (parsedWinnerId === defenderId) { // Defender won
@@ -725,6 +722,16 @@ app.post('/api/ladder/challenges/:challengeId/result', async (req, res) => {
 
         // Update challenge status
         await client.query("UPDATE challenges SET status = 'completed', winner_id = $1, score = $2 WHERE id = $3", [parsedWinnerId, score, parsedChallengeId]);
+
+        // Mark related notifications as read
+        await client.query(
+            `UPDATE notifications SET is_read = TRUE WHERE type = 'new_challenge' AND reference_id = $1`,
+            [parsedChallengeId]
+        );
+        await client.query(
+            `UPDATE notifications SET is_read = TRUE WHERE type = 'challenge_accepted' AND reference_id = $1`,
+            [parsedChallengeId]
+        );
 
         // Add match record for both players
         const winner = await client.query('SELECT name FROM users WHERE id = $1', [parsedWinnerId]);
@@ -917,6 +924,20 @@ app.get('/api/ladder/player/:userId', async (req, res) => {
             else losses++;
         });
 
+        let currentStreak = 0;
+        if (matchesResult.rows.length > 0) {
+            const lastResult = matchesResult.rows[0].result;
+            let streak = 0;
+            for (const match of matchesResult.rows) {
+                if (match.result === lastResult) {
+                    streak++;
+                } else {
+                    break;
+                }
+            }
+            currentStreak = lastResult === 'win' ? streak : -streak;
+        }
+
         const recentMatches = matchesResult.rows.slice(0, 5).map(m => ({
             id: m.id.toString(),
             userId: userId,
@@ -939,7 +960,7 @@ app.get('/api/ladder/player/:userId', async (req, res) => {
             status: 'idle', // This will be dynamically set by the frontend
             joinDate: userRow.join_date,
             bio: 'Нет дополнительной информации об этом игроке.', // Placeholder
-            stats: { wins, losses, bestRank: userRow.rtt_rank || 0, currentStreak: 0 }, // Simplified
+            stats: { wins, losses, bestRank: userRow.rtt_rank || 0, currentStreak: currentStreak },
             rankHistory: [], // Placeholder
             recentMatches: recentMatches
         };

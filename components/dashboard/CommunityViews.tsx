@@ -282,7 +282,7 @@ export const LadderView = ({ user }: { user: User }) => {
         setIsProfileLoading(true);
         const profile = await api.ladder.getPlayerProfile(player.userId);
         if (profile) {
-            setSelectedProfile(profile);
+            setSelectedProfile({ ...profile, rank: player.rank, status: player.status });
         }
         setIsProfileLoading(false);
     };

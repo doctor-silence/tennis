@@ -39,9 +39,9 @@ export const ProgressChart = ({ matches, type }: { matches: Match[], type: 'serv
 export const Modal = ({ isOpen, onClose, title, children, maxWidth = "max-w-lg" }: { isOpen: boolean; onClose: () => void; title: string; children?: React.ReactNode; maxWidth?: string }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
-      <div className={`relative bg-white rounded-3xl w-full ${maxWidth} max-h-[90vh] overflow-y-auto shadow-2xl animate-fade-in-up`}>
+      <div className={`relative bg-white rounded-3xl w-full ${maxWidth} max-h-[90vh] shadow-2xl animate-fade-in-up`}>
         <div className="flex justify-between items-center p-6 border-b border-slate-100 bg-white sticky top-0 z-10">
           <h3 className="text-xl font-bold text-slate-900">{title}</h3>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 hover:text-slate-900 transition-colors">

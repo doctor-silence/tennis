@@ -9,6 +9,45 @@ import Button from '../Button';
 import { StatCard, ProgressChart, Modal } from '../Shared';
 import { api } from '../../services/api';
 
+const trainings = [
+    {
+        title: "Стабильность подачи падает",
+        description: "В последних 3 матчах процент первой подачи снизился на 12%. Рекомендую тренировку 'Точность подачи'.",
+        modalTitle: "Тренировка: Точность подачи",
+        goal: "Увеличить процент попадания первой подачи в квадрат.",
+        inventory: "Корзина мячей (30-50 шт), конусы или мишени.",
+        steps: [
+            { title: "Разминка (5 мин)", description: "Имитация движения подачи без мяча. Плавность ритма." },
+            { title: "Подача по зонам (15 мин)", description: "Поставьте мишени по углам квадрата подачи. Выполните 10 подач в каждую зону (T и широкая)." },
+            { title: "Игра на счет (10 мин)", description: "Подавайте вторую подачу с вращением (кик или слайс). Задача: не сделать ни одной двойной ошибки за серию из 20 мячей." }
+        ]
+    },
+    {
+        title: "Улучшение игры у сетки",
+        description: "Ваш процент выигранных очков у сетки ниже среднего. Пора поработать над этим!",
+        modalTitle: "Тренировка: Игра у сетки",
+        goal: "Уверенно завершать розыгрыши у сетки.",
+        inventory: "Корзина мячей, партнер или стенка.",
+        steps: [
+            { title: "Разминка (5 мин)", description: "Короткие удары с лета с партнером." },
+            { title: "Реакция и техника (15 мин)", description: "Партнер накидывает мячи в разные стороны, вы должны успеть среагировать и сыграть с лета." },
+            { title: "Смэш (10 мин)", description: "Отработка удара над головой. Партнер накидывает 'свечки'." }
+        ]
+    },
+    {
+        title: "Выносливость и передвижение",
+        description: "В затяжных розыгрышах вы часто ошибаетесь. Давайте повысим выносливость.",
+        modalTitle: "Тренировка: Выносливость",
+        goal: "Поддерживать высокий темп игры в течение всего матча.",
+        inventory: "Конусы, скакалка.",
+        steps: [
+            { title: "Разминка (5 мин)", description: "Прыжки на скакалке, легкий бег." },
+            { title: "Челночный бег (15 мин)", description: "Расставьте конусы по корту и выполняйте челночный бег между ними." },
+            { title: "Имитация розыгрышей (10 мин)", description: "Имитируйте передвижение по корту во время длинных розыгрышей." }
+        ]
+    }
+];
+
 interface ProfileViewProps {
   user: User;
   onUserUpdate: (data: Partial<User>) => void;
@@ -20,10 +59,12 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
   const [showTournamentsModal, setShowTournamentsModal] = useState(false);
   const [showTrainingModal, setShowTrainingModal] = useState(false);
   const [isTrainingCompleted, setIsTrainingCompleted] = useState(false);
+  const [currentTrainingIndex, setCurrentTrainingIndex] = useState(0);
   
   const [matches, setMatches] = useState<Match[]>([]);
   const [loadingMatches, setLoadingMatches] = useState(true);
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
+
 
   const [editFormData, setEditFormData] = useState({
       name: user.name,
@@ -107,6 +148,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
       onUserUpdate({ xp: newXp });
       
       setIsTrainingCompleted(true);
+      setCurrentTrainingIndex((prevIndex) => (prevIndex + 1) % trainings.length);
 
       try {
           await api.admin.updateUser(user.id, { xp: newXp });
@@ -119,6 +161,8 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
       setShowTrainingModal(false);
       setTimeout(() => setIsTrainingCompleted(false), 500);
   };
+
+  const currentTraining = trainings[currentTrainingIndex];
 
   return (
     <>
@@ -213,7 +257,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
           {loadingMatches ? (
               <div className="flex justify-center py-4"><Loader2 className="animate-spin text-slate-400"/></div>
           ) : matches.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
                 {matches.map((m) => (
                   <div 
                     key={m.id} 
@@ -280,9 +324,9 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
                <div className="flex items-center gap-2 mb-2 font-bold uppercase text-xs tracking-wider opacity-70">
                    <Zap size={14}/> AI Coach Insight
                </div>
-               <h3 className="font-bold text-xl mb-2">Стабильность подачи падает</h3>
+               <h3 className="font-bold text-xl mb-2">{currentTraining.title}</h3>
                <p className="text-sm font-medium opacity-80 mb-4">
-                   В последних 3 матчах процент первой подачи снизился на 12%. Рекомендую тренировку "Точность подачи".
+                   {currentTraining.description}
                </p>
                <Button 
                    variant="glass" 
@@ -502,36 +546,24 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
         </div>
     </Modal>
 
-    <Modal isOpen={showTrainingModal} onClose={resetTrainingModal} title={!isTrainingCompleted ? "Тренировка: Точность подачи" : ""}>
+    <Modal isOpen={showTrainingModal} onClose={resetTrainingModal} title={!isTrainingCompleted ? currentTraining.modalTitle : ""}>
         {!isTrainingCompleted ? (
             <div className="space-y-6">
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm text-slate-700 leading-relaxed">
-                    <p className="mb-2"><span className="font-bold">Цель:</span> Увеличить процент попадания первой подачи в квадрат.</p>
-                    <p><span className="font-bold">Инвентарь:</span> Корзина мячей (30-50 шт), конусы или мишени.</p>
+                    <p className="mb-2"><span className="font-bold">Цель:</span> {currentTraining.goal}</p>
+                    <p><span className="font-bold">Инвентарь:</span> {currentTraining.inventory}</p>
                 </div>
 
-                <div className="space-y-4">
-                    <div className="flex gap-3">
-                        <div className="w-6 h-6 bg-lime-400 rounded-full flex items-center justify-center text-xs font-bold shrink-0">1</div>
-                        <div>
-                            <h4 className="font-bold text-sm">Разминка (5 мин)</h4>
-                            <p className="text-xs text-slate-500">Имитация движения подачи без мяча. Плавность ритма.</p>
+                <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                    {currentTraining.steps.map((step, index) => (
+                        <div key={index} className="flex gap-3">
+                            <div className="w-6 h-6 bg-lime-400 rounded-full flex items-center justify-center text-xs font-bold shrink-0">{index + 1}</div>
+                            <div>
+                                <h4 className="font-bold text-sm">{step.title}</h4>
+                                <p className="text-xs text-slate-500">{step.description}</p>
+                            </div>
                         </div>
-                    </div>
-                    <div className="flex gap-3">
-                        <div className="w-6 h-6 bg-lime-400 rounded-full flex items-center justify-center text-xs font-bold shrink-0">2</div>
-                        <div>
-                            <h4 className="font-bold text-sm">Подача по зонам (15 мин)</h4>
-                            <p className="text-xs text-slate-500">Поставьте мишени по углам квадрата подачи. Выполните 10 подач в каждую зону (T и широкая).</p>
-                        </div>
-                    </div>
-                    <div className="flex gap-3">
-                        <div className="w-6 h-6 bg-lime-400 rounded-full flex items-center justify-center text-xs font-bold shrink-0">3</div>
-                        <div>
-                            <h4 className="font-bold text-sm">Игра на счет (10 мин)</h4>
-                            <p className="text-xs text-slate-500">Подавайте вторую подачу с вращением (кик или слайс). Задача: не сделать ни одной двойной ошибки за серию из 20 мячей.</p>
-                        </div>
-                    </div>
+                    ))}
                 </div>
 
                 <Button className="w-full" onClick={handleCompleteTraining}>Я выполнил тренировку</Button>

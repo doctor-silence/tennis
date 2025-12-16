@@ -51,7 +51,7 @@ const PlayerProfileFlyout = ({ profile, onClose }: { profile: PlayerProfile, onC
 
                     {/* Key Stats */}
                     <div className="grid grid-cols-2 gap-4 mb-6">
-                        <StatCard icon={Award} label="Лучший ранг" value={`#${profile.stats.bestRank}`} colorClass="bg-amber-100 text-amber-600" />
+                        <StatCard icon={Award} label="Лучший ранг" value={`#${profile.rank}`} colorClass="bg-amber-100 text-amber-600" />
                         <StatCard 
                             icon={profile.stats.currentStreak > 0 ? TrendingUp : TrendingDown} 
                             label="Текущая серия" 
