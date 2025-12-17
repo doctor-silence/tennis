@@ -6,6 +6,7 @@ import Button from '../Button';
 import { api } from '../../services/api';
 import { Modal } from '../Shared';
 import PlayerProfileFlyout from './PlayerProfileFlyout';
+import CommunityFeatures from './CommunityFeatures';
 
 interface MessagesViewProps {
     user: User;
@@ -223,35 +224,11 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({ user, onNo
     );
 };
 
+import CommunityView2 from './CommunityView2';
+
 export const CommunityView = () => (
-    <div className="max-w-2xl mx-auto">
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6 flex gap-4">
-            <div className="w-10 h-10 bg-slate-200 rounded-full shrink-0"></div>
-            <input className="w-full bg-slate-50 rounded-xl px-4 outline-none" placeholder="Поделитесь результатами или мыслями..." />
-        </div>
-        
-        {[1,2].map(i => (
-             <div key={i} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-6">
-                 <div className="flex items-center gap-3 mb-4">
-                     <div className="w-10 h-10 bg-slate-200 rounded-full"></div>
-                     <div>
-                         <div className="font-bold text-sm">Мария Шарапова</div>
-                         <div className="text-xs text-slate-400">2 часа назад</div>
-                     </div>
-                 </div>
-                 <p className="text-slate-800 mb-4 text-sm leading-relaxed">
-                     Отличная тренировка сегодня! Отрабатывали бэкхенд по линии. Спасибо тренеру за терпение 💪🎾
-                 </p>
-                 <div className="h-64 bg-slate-100 rounded-xl mb-4 overflow-hidden">
-                     <img src={`https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=800&auto=format&fit=crop`} className="w-full h-full object-cover" alt="post"/>
-                 </div>
-                 <div className="flex gap-6 text-slate-500 text-sm font-bold">
-                     <button className="flex items-center gap-2 hover:text-red-500"><Heart size={18}/> 245</button>
-                     <button className="flex items-center gap-2 hover:text-blue-500"><MessageCircle size={18}/> 12</button>
-                     <button className="flex items-center gap-2 hover:text-green-500"><Share2 size={18}/></button>
-                 </div>
-             </div>
-        ))}
+    <div className="max-w-7xl mx-auto">
+        <CommunityView2 />
     </div>
 );
 

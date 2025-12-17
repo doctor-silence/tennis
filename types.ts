@@ -184,3 +184,14 @@ export interface Notification {
   is_read: boolean;
   created_at: string;
 }
+
+export interface MarketplaceItem {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  image: string;
+  sellerName: string;
+  sellerAvatar: string;
+  city: string;
+}

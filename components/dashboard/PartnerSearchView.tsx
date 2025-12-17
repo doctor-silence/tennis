@@ -62,10 +62,12 @@ const PartnerSearchView = ({ onNavigate, onStartConversation }: PartnerSearchVie
                         onChange={e => setFilter({...filter, level: e.target.value})}
                      >
                          <option value="all">Любой уровень</option>
-                         <option value="NTRP 3.0">NTRP 3.0</option>
-                         <option value="NTRP 3.5">NTRP 3.5</option>
-                         <option value="NTRP 4.0">NTRP 4.0</option>
-                         <option value="NTRP 4.5">NTRP 4.5</option>
+                         <option value="NTRP 2.0 (Новичок)">NTRP 2.0 (Новичок)</option>
+                         <option value="NTRP 3.0 (Начальный)">NTRP 3.0 (Начальный)</option>
+                         <option value="NTRP 3.5 (Средний)">NTRP 3.5 (Средний)</option>
+                         <option value="NTRP 4.0 (Продвинутый)">NTRP 4.0 (Продвинутый)</option>
+                         <option value="NTRP 4.5 (Полупрофи)">NTRP 4.5 (Полупрофи)</option>
+                         <option value="NTRP 5.0+ (Профи)">NTRP 5.0+ (Профи)</option>
                      </select>
                      <Button variant="secondary" className="w-12 px-0"><Filter size={20}/></Button>
                  </div>

@@ -1,4 +1,4 @@
-import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Match, Product, PlayerProfile, Trajectory, Conversation, ChatMessage } from '../types';
+import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Match, Product, PlayerProfile, Trajectory, Conversation, ChatMessage, MarketplaceItem } from '../types';
 import * as THREE from 'three'; // Import THREE for Vector3 deserialization
 
 // Frontend API Service
@@ -67,6 +67,29 @@ let MOCK_PRODUCTS: Product[] = [
         isHit: false, 
         rating: 4.5, 
         reviews: 150 
+    }
+];
+
+const MOCK_MARKETPLACE_ITEMS: MarketplaceItem[] = [
+    {
+        id: 'mkt-1',
+        title: 'Ракетка Babolat Pure Aero (б/у)',
+        description: 'Состояние хорошее, есть небольшие потертости. Струны новые. Ручка 3.',
+        price: 8000,
+        image: 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=800&auto=format&fit=crop',
+        sellerName: 'Алексей Иванов',
+        sellerAvatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80',
+        city: 'Москва'
+    },
+    {
+        id: 'mkt-2',
+        title: 'Кроссовки Asics Gel-Resolution 8',
+        description: 'Размер 43. Почти новые, играл 2 раза. Не подошел размер.',
+        price: 6500,
+        image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=800&auto=format&fit=crop',
+        sellerName: 'Мария Петрова',
+        sellerAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80',
+        city: 'Санкт-Петербург'
     }
 ];
 
@@ -541,6 +564,19 @@ export const api = {
             console.warn("Backend offline or failed to fetch cities. Returning mock data.");
             // Fallback to a mock list of cities if backend is offline or request fails
             return ['Москва', 'Санкт-Петербург', 'Казань', 'Сочи'];
+        }
+    },
+
+    getMarketplaceItems: async (): Promise<MarketplaceItem[]> => {
+        try {
+            // In the future, this will fetch from a real backend endpoint
+            // const res = await fetch(`${API_URL}/marketplace`);
+            // if (!res.ok) throw new Error('Failed to fetch marketplace items');
+            // return await res.json();
+            return new Promise(resolve => setTimeout(() => resolve(MOCK_MARKETPLACE_ITEMS), 500));
+        } catch (e) {
+            console.warn("Backend offline. Serving in-memory marketplace items.");
+            return MOCK_MARKETPLACE_ITEMS;
         }
     },
 
