@@ -1,5 +1,5 @@
 export type ViewState = 'landing' | 'auth' | 'dashboard' | 'pro' | 'shop' | 'admin';
-export type DashboardTab = 'profile' | 'search' | 'courts' | 'ai_coach' | 'messages' | 'settings' | 'notifications' | 'tactics' | 'students' | 'video_analysis' | 'ladder' | 'community';
+export type DashboardTab = 'profile' | 'search' | 'courts' | 'ai_coach' | 'messages' | 'notifications' | 'tactics' | 'students' | 'video_analysis' | 'ladder' | 'community';
 
 export interface User {
   id: string;
@@ -14,6 +14,8 @@ export interface User {
   age?: number;
   city: string;
   avatar: string;
+  is_private?: boolean;
+  notifications_enabled?: boolean;
 }
 
 export interface MatchStats {
@@ -45,6 +47,9 @@ export interface Partner {
   city: string;
   image: string;
   isPro: boolean;
+  rttRank?: number;
+  rating?: number;
+  role: 'amateur' | 'rtt_pro' | 'coach' | 'admin';
 }
 
 export interface Court {

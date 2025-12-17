@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Bell, Heart, MessageCircle, Share2, Swords, Clock, CheckCircle2, AlertCircle, Loader2, Send } from 'lucide-react';
 import { User, LadderPlayer, Challenge, PlayerProfile, Conversation, ChatMessage, Notification } from '../../types';
@@ -30,18 +31,22 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
 
     useEffect(() => {
         if (activeConversationId) {
+            const currentConvo = conversations.find(c => c.id === activeConversationId);
+            
             setLoadingMessages(true);
             api.messages.getMessages(activeConversationId, user.id).then(data => {
                 setMessages(data);
                 setLoadingMessages(false);
-                // Mark conversation as read in the parent component
-                const updatedConversations = conversations.map(c => 
-                    c.id === activeConversationId ? { ...c, unread: 0 } : c
-                );
-                onConversationsUpdate(updatedConversations);
+    
+                if (currentConvo && currentConvo.unread > 0) {
+                    const updatedConversations = conversations.map(c => 
+                        c.id === activeConversationId ? { ...c, unread: 0 } : c
+                    );
+                    onConversationsUpdate(updatedConversations);
+                }
             });
         }
-    }, [activeConversationId, user.id, onConversationsUpdate]);
+    }, [activeConversationId, user.id, conversations, onConversationsUpdate]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

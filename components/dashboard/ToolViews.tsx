@@ -4,33 +4,11 @@ import { BookOpen, Video, Upload, Users, Plus, Loader2 } from 'lucide-react';
 import { User, Student } from '../../types';
 import Button from '../Button';
 import { api } from '../../services/api';
+import { Modal } from '../Shared';
 
 // Lazy load the 3D component
 const TennisCourt3D = lazy(() => import('./TennisCourt3D'));
 
-
-export const SettingsView = ({ user }: { user: User }) => (
-    <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200 max-w-2xl mx-auto">
-        <h3 className="font-bold text-xl mb-6">Настройки аккаунта</h3>
-        <div className="space-y-6">
-            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
-                <div>
-                    <div className="font-bold">Уведомления</div>
-                    <div className="text-xs text-slate-500">О матчах и сообщениях</div>
-                </div>
-                <div className="w-12 h-6 bg-lime-400 rounded-full relative cursor-pointer"><div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div></div>
-            </div>
-            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
-                 <div>
-                    <div className="font-bold">Приватность</div>
-                    <div className="text-xs text-slate-500">Показывать профиль в поиске</div>
-                </div>
-                <div className="w-12 h-6 bg-lime-400 rounded-full relative cursor-pointer"><div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div></div>
-            </div>
-            <Button variant="outline" className="w-full text-red-500 border-red-200 hover:bg-red-50 hover:border-red-300">Удалить аккаунт</Button>
-        </div>
-    </div>
-);
 
 export const TacticsView = ({ user }: { user: User }) => {
     return (

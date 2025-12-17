@@ -255,31 +255,40 @@ app.post('/api/admin/users', async (req, res) => {
     }
 });
 
+
 app.put('/api/admin/users/:id', async (req, res) => {
     const { id } = req.params;
-    const { name, role, city, rating, level, rttRank, rttCategory, age, xp, avatar } = req.body;
+    const { name, role, city, rating, level, rttRank, rttCategory, age, xp, avatar, is_private, notifications_enabled } = req.body;
+
+    const client = await pool.connect();
     try {
-        await pool.query(
-            `UPDATE users SET 
-                name = COALESCE($1, name), 
-                role = COALESCE($2, role),
-                city = COALESCE($3, city),
-                rating = COALESCE($4, rating),
-                level = COALESCE($5, level),
-                rtt_rank = COALESCE($6, rtt_rank),
-                rtt_category = COALESCE($7, rtt_category),
-                age = COALESCE($8, age),
-                xp = COALESCE($9, xp),
-                avatar = COALESCE($10, avatar)
-            WHERE id = $11`, 
-            [name, role, city, rating, level, rttRank, rttCategory, age, xp, avatar, id]
-        );
+        await client.query('BEGIN');
+
+        if (name !== undefined) await client.query('UPDATE users SET name = $1 WHERE id = $2', [name, id]);
+        if (role !== undefined) await client.query('UPDATE users SET role = $1 WHERE id = $2', [role, id]);
+        if (city !== undefined) await client.query('UPDATE users SET city = $1 WHERE id = $2', [city, id]);
+        if (rating !== undefined) await client.query('UPDATE users SET rating = $1 WHERE id = $2', [rating, id]);
+        if (level !== undefined) await client.query('UPDATE users SET level = $1 WHERE id = $2', [level, id]);
+        if (rttRank !== undefined) await client.query('UPDATE users SET rtt_rank = $1 WHERE id = $2', [rttRank, id]);
+        if (rttCategory !== undefined) await client.query('UPDATE users SET rtt_category = $1 WHERE id = $2', [rttCategory, id]);
+        if (age !== undefined) await client.query('UPDATE users SET age = $1 WHERE id = $2', [age, id]);
+        if (xp !== undefined) await client.query('UPDATE users SET xp = $1 WHERE id = $2', [xp, id]);
+        if (avatar !== undefined) await client.query('UPDATE users SET avatar = $1 WHERE id = $2', [avatar, id]);
+        if (is_private !== undefined) await client.query('UPDATE users SET is_private = $1 WHERE id = $2', [is_private, id]);
+        if (notifications_enabled !== undefined) await client.query('UPDATE users SET notifications_enabled = $1 WHERE id = $2', [notifications_enabled, id]);
+
+        await client.query('COMMIT');
         await logSystemEvent('warning', `Admin updated user ${id}`, 'Admin');
         res.json({ success: true });
     } catch (err) {
+        await client.query('ROLLBACK');
+        console.error("Update user error:", err);
         res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
     }
 });
+
 
 app.delete('/api/admin/users/:id', async (req, res) => {
     const { id } = req.params;
@@ -457,7 +466,7 @@ app.get('/api/partners', async (req, res) => {
     const { city, level, search } = req.query;
 
     try {
-        let query = "SELECT id, name, age, level, city, avatar as image, (role = 'rtt_pro' or role = 'coach') as isPro FROM users WHERE role != 'admin'";
+        let query = "SELECT id, name, age, level, city, avatar as image, (role = 'rtt_pro' or role = 'coach') as isPro, rtt_rank, rating, role FROM users WHERE role != 'admin' AND (is_private IS NULL OR is_private = FALSE)";
         const queryParams = [];
 
         if (city) {

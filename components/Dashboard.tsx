@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  MessageSquare, LogOut, Settings, Bell, 
+  MessageSquare, LogOut, Bell, 
   User as UserIcon, Swords, Globe, Bot
 } from 'lucide-react';
 import { User, DashboardTab, Conversation } from '../types';
@@ -15,7 +15,7 @@ import CourtBookingView from './dashboard/CourtBookingView';
 import PartnerSearchView from './dashboard/PartnerSearchView';
 import AiCoachView from './dashboard/AiCoachView';
 import { MessagesView, NotificationsView, LadderView, CommunityView } from './dashboard/CommunityViews';
-import { SettingsView, TacticsView, VideoAnalysisView, StudentsView } from './dashboard/ToolViews';
+import { TacticsView, VideoAnalysisView, StudentsView } from './dashboard/ToolViews';
 
 interface DashboardProps {
   user: User;
@@ -126,9 +126,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
                     <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
                    }
                  </button>
-                 <button onClick={() => setActiveTab('settings')} className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors shadow-sm ${activeTab === 'settings' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
-                   <Settings size={20} />
-                 </button>
               </div>
            </header>
 
@@ -145,7 +142,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
                 loadingConversations={loadingConversations}
                 onConversationsUpdate={handleConversationsUpdate}
             />}
-            {activeTab === 'settings' && <SettingsView user={user} />}
             {activeTab === 'notifications' && <NotificationsView user={user} onNotificationsRead={handleNotificationsRead} />}
             {activeTab === 'tactics' && <TacticsView user={user} />}
             {activeTab === 'students' && <StudentsView user={user} />}

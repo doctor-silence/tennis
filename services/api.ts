@@ -32,6 +32,8 @@ const MOCK_ADMIN: User = {
   level: 'GOD MODE'
 };
 
+let MOCK_PARTNERS: Partner[] = [];
+
 let MOCK_PRODUCTS: Product[] = [
     { 
         id: '1', 
@@ -593,15 +595,6 @@ export const api = {
                 console.error(e);
                 return null;
             }
-        },
-        updateUser: async (id: string, data: Partial<User>) => {
-            try {
-                await fetch(`${API_URL}/admin/users/${id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-            } catch (e) { console.error(e); }
         },
         deleteUser: async (id: string) => {
             try {

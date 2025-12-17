@@ -80,7 +80,7 @@ const PartnerSearchView = ({ onNavigate, onStartConversation }: PartnerSearchVie
                             {partner.isPro && <div className="absolute bottom-0 right-0 bg-slate-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-white">PRO</div>}
                         </div>
                         <h3 className="font-bold text-lg">{partner.name}</h3>
-                        <p className="text-slate-500 text-sm mb-4 flex items-center justify-center gap-1"><MapPin size={12}/> {partner.city} • {partner.level}</p>
+                        <p className="text-slate-500 text-sm mb-4 flex items-center justify-center gap-1"><MapPin size={12}/> {partner.city} • {partner.role === 'rtt_pro' ? `${partner.rating} очков РТТ` : partner.level}</p>
                         <div className="grid grid-cols-2 gap-2 w-full mt-auto">
                             <Button variant="outline" size="sm" onClick={() => onStartConversation(partner.id)}>Написать</Button>
                             <Button size="sm">Играть</Button>
