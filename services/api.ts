@@ -878,6 +878,55 @@ export const api = {
         },
     },
 
+    posts: {
+        getAll: async (userId: string): Promise<any[]> => {
+            try {
+                const res = await fetch(`${API_URL}/posts?userId=${userId}`);
+                if (!res.ok) throw new Error('Failed to fetch posts');
+                return await res.json();
+            } catch (e) {
+                console.warn("Backend offline or failed to fetch posts. Returning empty array.");
+                return [];
+            }
+        },
+        create: async (postData: { userId: string, type: string, content: any }): Promise<{ success: boolean, postId: number }> => {
+            const res = await fetch(`${API_URL}/posts`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(postData)
+            });
+            if (!res.ok) {
+                 const err = await res.json();
+                 throw new Error(err.error || 'Failed to create post');
+            }
+            return await res.json();
+        },
+        toggleLike: async (postId: string, userId: string): Promise<{ success: boolean, action: 'liked' | 'unliked' }> => {
+            const res = await fetch(`${API_URL}/posts/${postId}/like`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId })
+            });
+            if (!res.ok) {
+                 const err = await res.json();
+                 throw new Error(err.error || 'Failed to toggle like');
+            }
+            return await res.json();
+        },
+        addComment: async (postId: string, userId: string, text: string): Promise<any> => {
+            const res = await fetch(`${API_URL}/posts/${postId}/comments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, text })
+            });
+            if (!res.ok) {
+                 const err = await res.json();
+                 throw new Error(err.error || 'Failed to add comment');
+            }
+            return await res.json();
+        }
+    },
+
     tactics: {
         getAll: async (userId: string): Promise<Trajectory[]> => {
             try {

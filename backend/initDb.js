@@ -204,6 +204,38 @@ const initDb = async () => {
     `);
     console.log('✅ Table "notifications" checked.');
 
+    // 13. Create Post-related Tables
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS posts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        type VARCHAR(50) NOT NULL,
+        content JSONB NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    console.log('✅ "posts" table created or already exists.');
+    
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS post_likes (
+        post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        PRIMARY KEY (post_id, user_id)
+      );
+    `);
+    console.log('✅ "post_likes" table created or already exists.');
+    
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS post_comments (
+        id SERIAL PRIMARY KEY,
+        post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        text TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    console.log('✅ "post_comments" table created or already exists.');
+
 
     await client.query('COMMIT');
 

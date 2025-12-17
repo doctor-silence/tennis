@@ -1,235 +1,315 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Tag, ShoppingCart, Plus, Lock, Globe, Rss, Swords, Search, Award, MessageCircle, Trophy, Calendar } from 'lucide-react';
-import { MarketplaceItem, User, LadderPlayer } from '../../types';
+import { Heart, MessageCircle, Calendar, Globe, Swords, Trophy, Users, ShoppingCart, Share2, Loader2, X } from 'lucide-react';
 import { api } from '../../services/api';
 import Button from '../Button';
-
-const MOCK_LADDER: LadderPlayer[] = [
-    { id: 'l1', rank: 1, userId: 'u10', name: 'Даниил М.', avatar: 'https://i.pravatar.cc/150?u=10', points: 2450, matches: 45, winRate: 88, status: 'idle' },
-    { id: 'l2', rank: 2, userId: 'u12', name: 'Андрей Р.', avatar: 'https://i.pravatar.cc/150?u=12', points: 2100, matches: 38, winRate: 82, status: 'defending' },
-    { id: 'l3', rank: 3, userId: 'u15', name: 'Карен Х.', avatar: 'https://i.pravatar.cc/150?u=15', points: 1950, matches: 40, winRate: 75, status: 'idle' },
-    { id: 'l4', rank: 4, userId: 'u1', name: 'Алексей Иванов', avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80', points: 1800, matches: 32, winRate: 70, status: 'idle' },
-    { id: 'l5', rank: 5, userId: 'mock-user-1', name: 'Вы (Демо)', avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80', points: 1650, matches: 28, winRate: 65, status: 'idle' },
-];
-
-const MOCK_USER: User = {
-  id: 'mock-user-1',
-  name: 'Гость (Демо Режим)',
-  email: 'demo@tennis.pro',
-  role: 'amateur',
-  city: 'Москва',
-  avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80',
-  rating: 1200,
-  xp: 150,
-  age: 25,
-  level: 'NTRP 3.5'
-};
-
-const mockFeed = [
-    { 
-        type: 'match', 
-        id: 'f1',
-        user1: { name: 'Иван П.', avatar: 'https://i.pravatar.cc/150?u=a' },
-        user2: { name: 'Алексей С.', avatar: 'https://i.pravatar.cc/150?u=b' },
-        score: '6:4, 6:2',
-        timestamp: '2 часа назад'
-    },
-    {
-        type: 'achievement',
-        id: 'f2',
-        user: { name: 'Елена В.', avatar: 'https://i.pravatar.cc/150?u=c' },
-        achievement: 'Выиграла 3 матча подряд!',
-        timestamp: '5 часов назад'
-    },
-    {
-        type: 'search',
-        id: 'f3',
-        user: { name: 'Сергей Н.', avatar: 'https://i.pravatar.cc/150?u=d' },
-        message: 'Нужен партнер сегодня в 20:00, корты "Спартак", уровень 3.5-4.0. Оплата корта пополам.',
-        timestamp: '8 часов назад'
-    }
-];
+import { MarketplaceItem, LadderPlayer, User } from '../../types';
 
 const mockGroups = [
-    { id: 1, name: 'Теннис Хамовники', members: 1240, type: 'public', avatar: 'T' },
-    { id: 2, name: 'Игроки Севера', members: 856, type: 'private', avatar: 'И' },
-    { id: 3, name: 'Спарринг Москва', members: 3400, type: 'public', avatar: 'С' },
+    { id: 1, avatar: 'Т', name: 'Теннис Хамовники', members: 1240 },
+    { id: 2, avatar: 'И', name: 'Игроки Севера', members: 856 },
+    { id: 3, avatar: 'С', name: 'Спарринг Москва', members: 3400 },
 ];
 
-const CommunityView2 = () => {
-    const [activeTab, setActiveTab] = useState('Все события');
+// --- Modal Component ---
+const ImageModal = ({ src, onClose }: { src: string, onClose: () => void }) => {
+    if (!src) return null;
 
     return (
-        <div>
-            <div className="flex items-center gap-2 mb-6">
-                <Button 
-                    onClick={() => setActiveTab('Все события')}
-                    variant={activeTab === 'Все события' ? 'primary' : 'light'}
-                >
-                    Все события
-                </Button>
-                <Button 
-                    onClick={() => setActiveTab('Результаты матчей')}
-                    variant={activeTab === 'Результаты матчей' ? 'primary' : 'light'}
-                >
-                    Результаты матчей
-                </Button>
-                <Button 
-                    onClick={() => setActiveTab('Поиск игры')}
-                    variant={activeTab === 'Поиск игры' ? 'primary' : 'light'}
-                >
-                    Поиск игры
-                </Button>
-                <Button 
-                    onClick={() => setActiveTab('Барахолка')}
-                    variant={activeTab === 'Барахолка' ? 'primary' : 'light'}
-                >
-                    Барахолка
-                </Button>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                <div className="lg:col-span-2 space-y-6">
-                    <PostStatus />
-                    <Feed />
-                </div>
-                <div className="space-y-6">
-                    <TournamentsWidget />
-                    <TopPlayersWidget />
-                    <GroupsWidget />
-                    <MarketplaceWidget />
-                </div>
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={onClose}>
+            <div className="max-w-4xl max-h-4xl relative" onClick={e => e.stopPropagation()}>
+                <img src={src} alt="Full-size view" className="max-w-full max-h-screen rounded-lg" />
+                <button onClick={onClose} className="absolute top-2 right-2 text-white bg-black/50 rounded-full p-1">&times;</button>
             </div>
         </div>
     );
 };
 
-const PostStatus = () => (
-    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-        <div className="flex gap-4 items-center">
-            <img src={'https://i.pravatar.cc/150?u=us'} alt="user avatar" className="w-10 h-10 rounded-full" />
-            <input className="w-full bg-transparent p-3 text-sm outline-none border-none" placeholder="Что нового, чемпион?" />
-        </div>
-        <div className="flex justify-between items-center mt-3">
-            <div className="flex gap-4 text-slate-400">
-                <button className="hover:text-lime-500"><Tag size={20} /></button>
-                <button className="hover:text-lime-500"><Swords size={20} /></button>
-                <button className="hover:text-lime-500"><Trophy size={20} /></button>
-                <button className="hover:text-lime-500"><ShoppingCart size={20} /></button>
+
+// --- Feed Item Components ---
+
+const TextPost = ({ post, user, onUpdate }: { post: any, user: User, onUpdate: () => void }) => {
+    const [isLiked, setIsLiked] = useState(post.liked_by_user);
+    const [currentLikes, setCurrentLikes] = useState(parseInt(post.likes_count) || 0);
+    const [showCommentInput, setShowCommentInput] = useState(false);
+    const [newCommentText, setNewCommentText] = useState('');
+    const [comments, setComments] = useState(post.comments || []);
+
+    const handleLikeClick = async () => {
+        const originalIsLiked = isLiked;
+        const originalLikes = currentLikes;
+        
+        setIsLiked(!originalIsLiked);
+        setCurrentLikes(originalIsLiked ? originalLikes - 1 : originalLikes + 1);
+
+        try {
+            await api.posts.toggleLike(post.id, user.id);
+        } catch (error) {
+            console.error("Failed to toggle like", error);
+            // Revert on error
+            setIsLiked(originalIsLiked);
+            setCurrentLikes(originalLikes);
+        }
+    };
+
+    const handleCommentClick = () => {
+        setShowCommentInput(!showCommentInput);
+    };
+
+    const handleAddComment = async () => {
+        if (newCommentText.trim()) {
+            try {
+                await api.posts.addComment(post.id, user.id, newCommentText);
+                setNewCommentText('');
+                onUpdate(); // Re-fetch all posts to get the new comment
+            } catch (error) {
+                console.error("Failed to add comment", error);
+            }
+        }
+    };
+
+    return (
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+            <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-3">
+                    <img src={post.author.avatar} alt={post.author.name} className="w-10 h-10 rounded-full" />
+                    <div>
+                        <p className="font-bold">{post.author.name}</p>
+                        <p className="text-xs text-slate-400">{new Date(post.created_at).toLocaleString()}</p>
+                    </div>
+                </div>
+                <button className="text-slate-400">...</button>
             </div>
-            <Button>Опубликовать</Button>
+            <p className="text-slate-700 mb-4 whitespace-pre-wrap">{post.content.text}</p>
+            <div className="flex items-center gap-4 text-slate-500 text-sm">
+                <button onClick={handleLikeClick} className="flex items-center gap-1">
+                    <Heart size={16} className={`transition-colors ${isLiked ? "text-red-500 fill-current" : "hover:text-red-500"}`}/> {currentLikes}
+                </button>
+                <button onClick={handleCommentClick} className="flex items-center gap-1">
+                    <MessageCircle size={16} /> {comments.length}
+                </button>
+                <Share2 size={16} className="ml-auto"/>
+            </div>
+
+            {showCommentInput && (
+                <div className="mt-4">
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="text"
+                            placeholder="Написать комментарий..."
+                            value={newCommentText}
+                            onChange={(e) => setNewCommentText(e.target.value)}
+                            className="flex-1 bg-slate-100 p-2 rounded-lg outline-none border border-slate-200"
+                        />
+                        <Button onClick={handleAddComment} disabled={!newCommentText.trim()}>Отправить</Button>
+                    </div>
+                     {comments.length > 0 && (
+                        <div className="mt-4 space-y-3 pt-3 border-t border-slate-100">
+                            {comments.map((comment: any) => (
+                                <div key={comment.id} className="flex gap-2 text-xs text-slate-600">
+                                    <img src={comment.author.avatar} alt={comment.author.name} className="w-5 h-5 rounded-full" />
+                                    <div>
+                                        <span className="font-bold">{comment.author.name}</span>
+                                        <p className="text-slate-500">{comment.text}</p>
+                                    </div>
+                                    <span className="text-slate-400 ml-auto text-[10px]">{new Date(comment.created_at).toLocaleString()}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const PartnerSearchPost = ({ post }: { post: any }) => (
+    <div className="bg-white p-6 rounded-2xl shadow-sm border border-lime-200">
+        <div className="flex justify-between items-start">
+            <div className="flex gap-3">
+                <img src={post.author.avatar} alt={post.author.name} className="w-10 h-10 rounded-full" />
+                <div>
+                    <p className="font-bold">{post.author.name}</p>
+                    <p className="text-xs text-slate-400">{new Date(post.created_at).toLocaleString()}・NTRP {post.content.details.ntrp}</p>
+                </div>
+            </div>
+            <div className="text-xs font-bold bg-lime-100 text-lime-700 px-2 py-1 rounded">ПОИСК ПАРТНЕРА</div>
+        </div>
+        <div className="bg-slate-50 rounded-xl p-4 my-4">
+            <div className="flex justify-around">
+                <div>
+                    <p className="text-xs text-slate-400">КОГДА</p>
+                    <p className="font-bold flex items-center gap-2"><Calendar size={16}/> {post.content.details.when}</p>
+                </div>
+                <div>
+                    <p className="font-bold flex items-center gap-2"><Globe size={16}/> {post.content.details.where}</p>
+                </div>
+            </div>
+             <p className="text-center text-sm mt-3 text-slate-600">"{post.content.details.text}"</p>
+        </div>
+        <div className="flex justify-between items-center">
+            <p className="text-sm"><span className="text-slate-500">Требование:</span> <span className="font-bold">{post.content.details.requirement}</span></p>
+            <Button><Swords size={16}/>Сыграть</Button>
         </div>
     </div>
 );
 
-const Feed = () => {
-    // In a real app, you'd fetch a combined feed.
-    // Here we'll just alternate between mock feed and market items.
-    const [feedItems, setFeedItems] = useState(mockFeed);
-    const [marketItems, setMarketItems] = useState<MarketplaceItem[]>([]);
-
-    useEffect(() => {
-        api.getMarketplaceItems().then(data => {
-            setMarketItems(data.slice(0, 1)); // Take one for the feed
-        });
-    }, []);
-
+const MatchResultPost = ({ post }: { post: any }) => {
+    const { author, content } = post;
+    const { opponent, score, isWinner } = content;
+    const winner = isWinner ? author : opponent;
+    const loser = isWinner ? opponent : author;
+    
     return (
-        <div className="space-y-4">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-lime-200">
-                <div className="flex justify-between items-start">
-                    <div className="flex gap-3">
-                        <img src="https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80" alt="user" className="w-10 h-10 rounded-full" />
-                        <div>
-                            <p className="font-bold">Дмитрий Смирнов</p>
-                            <p className="text-xs text-slate-400">15 мин назад・NTRP 4.0</p>
-                        </div>
-                    </div>
-                    <div className="text-xs font-bold bg-lime-100 text-lime-700 px-2 py-1 rounded">ПОИСК ПАРТНЕРА</div>
-                </div>
-                <div className="bg-slate-50 rounded-xl p-4 my-4">
-                    <div className="flex justify-around">
-                        <div>
-                            <p className="text-xs text-slate-400">КОГДА</p>
-                            <p className="font-bold flex items-center gap-2"><Calendar size={16}/> Завтра, 20:00</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-slate-400">ГДЕ</p>
-                            <p className="font-bold flex items-center gap-2"><Globe size={16}/> ТК "Спартак"</p>
-                        </div>
-                    </div>
-                     <p className="text-center text-sm mt-3 text-slate-600">"Ищу партнера на 2 часа. Корт забронирован. Оплата пополам."</p>
-                </div>
-                <div className="flex justify-between items-center">
-                    <p className="text-sm"><span className="text-slate-500">Требование:</span> <span className="font-bold">3.5 - 4.0</span></p>
-                    <Button><Swords size={16}/>Сыграть</Button>
-                </div>
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+            <div className="flex justify-between items-center text-xs text-slate-400 mb-2">
+                <span>РЕЗУЛЬТАТ МАТЧА</span>
+                <span>{new Date(post.created_at).toLocaleString()}</span>
             </div>
-
-            <div className="bg-slate-900 p-6 rounded-2xl shadow-sm text-white relative overflow-hidden">
-                <div className="flex gap-4 items-center">
-                     <img src="https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80" alt="user" className="w-10 h-10 rounded-full" />
-                     <div>
-                         <p className="font-bold">Андрей Рублев</p>
-                         <p className="text-xs text-slate-400">4 часа назад</p>
-                     </div>
-                </div>
-                <div className="flex items-center gap-4 my-4">
-                    <div className="w-16 h-16 bg-lime-400/20 rounded-xl flex items-center justify-center">
-                        <Trophy size={32} className="text-lime-400"/>
-                    </div>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <img src={winner.avatar} alt={winner.name} className="w-10 h-10 rounded-full border-2 border-lime-400 p-0.5" />
                     <div>
-                        <p className="font-bold text-lime-400 text-lg">Серия побед</p>
-                        <p className="text-sm text-slate-300">Выиграл 5 матчей подряд в лиге "Взрослые PRO"</p>
+                        <p className="font-bold text-sm">{winner.name}</p>
+                        <p className="text-xs text-slate-500">Победитель</p>
                     </div>
                 </div>
-                <div className="border-t border-slate-700 pt-3">
-                    <button className="text-sm text-amber-400 font-bold">Поздравить (890)</button>
+                <div className="text-center">
+                    <p className="font-bold text-lg">{score}</p>
+                    <p className="text-xs text-slate-400">ХАРД</p>
                 </div>
-                <Trophy size={128} className="absolute -right-8 -bottom-8 text-white/5" />
+                <div className="flex items-center gap-2">
+                     <div>
+                        <p className="font-bold text-sm text-right">{loser.name}</p>
+                        <p className="text-xs text-slate-500 text-right">Оппонент</p>
+                    </div>
+                    <img src={loser.avatar} alt={loser.name} className="w-10 h-10 rounded-full" />
+                </div>
             </div>
-
-            {/* Placeholder for merged feed */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-                <div className="flex justify-between items-center text-xs text-slate-400 mb-2">
-                    <span>РЕЗУЛЬТАТ МАТЧА</span>
-                    <span>Сегодня, 10:30</span>
-                </div>
-                 <p>результат матча</p>
-            </div>
-            
-            {marketItems.map(item => (
-                <div  key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-                    <div className="flex justify-between items-center text-xs text-slate-400 mb-2">
-                        <span>БАРАХОЛКА - МОСКВА</span>
-                        <span>30 мин назад</span>
-                    </div>
-                    <div className="bg-white rounded-2xl overflow-hidden">
-                        <img src={'https://images.unsplash.com/photo-1617083934555-52951271b273?q=80&w=800&auto=format&fit=crop'} alt={item.title} className="h-80 w-full object-cover rounded-xl" />
-                        <div className="py-4">
-                            <div className="flex justify-between items-start mb-4">
-                                <div>
-                                    <div className="inline-block bg-slate-100 text-slate-600 text-xs font-bold px-2 py-1 rounded">Б/У, отличное</div>
-                                    <h4 className="font-bold text-xl mt-2">Ракетка Wilson Blade 98 v8</h4>
-                                </div>
-                                <div className="text-2xl font-bold text-slate-800">14 000 ₽</div>
-                            </div>
-                            <div className="flex items-center justify-between mt-4">
-                                <div className="flex items-center gap-2">
-                                    <img src={'https://i.pravatar.cc/150?u=e'} alt={item.sellerName} className="w-8 h-8 rounded-full" />
-                                    <div>
-                                        <div className="text-sm font-bold text-slate-700">Елена В.</div>
-                                    </div>
-                                </div>
-                                <Button>Написать продавцу</Button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            ))}
         </div>
     );
 };
 
+const MarketplacePost = ({ post }: { post: any }) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedImage, setSelectedImage] = useState('');
+
+    const openModal = (imageUrl: string) => {
+        setSelectedImage(imageUrl);
+        setIsModalOpen(true);
+    };
+
+    const closeModal = () => {
+        setIsModalOpen(false);
+        setSelectedImage('');
+    };
+
+    return (
+        <>
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <div className="flex justify-between items-center text-xs text-slate-400 mb-2">
+                    <span>БАРАХОЛКА - {post.author.city || 'Город не указан'}</span>
+                    <span>{new Date(post.created_at).toLocaleString()}</span>
+                </div>
+                <div className="bg-white rounded-2xl overflow-hidden">
+                     {post.content.images && post.content.images.length > 0 && (
+                        <img 
+                            src={post.content.images[0]} 
+                            alt={post.content.title} 
+                            className="h-80 w-full object-cover rounded-xl cursor-pointer"
+                            onClick={() => openModal(post.content.images[0])}
+                        />
+                    )}
+                    <div className="py-4">
+                        <div className="flex justify-between items-start mb-4">
+                            <div>
+                                <h4 className="font-bold text-xl mt-2">{post.content.title}</h4>
+                            </div>
+                            <div className="text-2xl font-bold text-slate-800">{post.content.price} ₽</div>
+                        </div>
+                        <p className="text-sm text-slate-600 mb-4">{post.content.description}</p>
+                        <div className="flex items-center justify-between mt-4">
+                            <div className="flex items-center gap-2">
+                                <img src={post.author.avatar} alt={post.author.name} className="w-8 h-8 rounded-full" />
+                                <div>
+                                    <div className="text-sm font-bold text-slate-700">{post.author.name}</div>
+                                </div>
+                            </div>
+                            <Button>Написать продавцу</Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {isModalOpen && <ImageModal src={selectedImage} onClose={closeModal} />}
+        </>
+    );
+};
+
+
+// --- Feed Component ---
+
+interface FeedProps {
+    activeTab: string;
+    feedItems: any[];
+    user: User;
+    onUpdate: () => void;
+}
+
+const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate }) => {
+    const AllEventsFeed = () => (
+        <div className="space-y-4">
+            {feedItems.map(item => {
+                switch(item.type) {
+                    case 'text_post':
+                        return <TextPost key={item.id} post={item} user={user} onUpdate={onUpdate} />;
+                    case 'partner_search':
+                        return <PartnerSearchPost key={item.id} post={item} />;
+                    case 'match_result':
+                        return <MatchResultPost key={item.id} post={item} />;
+                    case 'marketplace':
+                        return <MarketplacePost key={item.id} post={item} />;
+                    default:
+                        return null;
+                }
+            })}
+        </div>
+    );
+
+    const SearchPlayFeed = () => (
+         <div className="space-y-4">
+            {feedItems.filter(item => item.type === 'partner_search').map(item => (
+                <PartnerSearchPost key={item.id} post={item} />
+            ))}
+        </div>
+    );
+
+     const MatchResultsFeed = () => (
+         <div className="space-y-4">
+            {feedItems.filter(item => item.type === 'match_result').map(item => (
+                <MatchResultPost key={item.id} post={item} />
+            ))}
+        </div>
+    );
+
+    const FleaMarketFeed = () => (
+        <div className="space-y-4">
+            {feedItems.filter(item => item.type === 'marketplace').map(item => (
+                <MarketplacePost key={item.id} post={item} />
+            ))}
+        </div>
+    );
+
+    if (activeTab === 'Результаты матчей') {
+        return <MatchResultsFeed />;
+    } else if (activeTab === 'Поиск игры') {
+        return <SearchPlayFeed />;
+    } else if (activeTab === 'Барахолка') {
+        return <FleaMarketFeed />;
+    } else {
+        return <AllEventsFeed />;
+    }
+};
+
+// --- Widgets ---
 
 const TournamentsWidget = () => (
     <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
@@ -241,7 +321,6 @@ const TournamentsWidget = () => (
             <a href="#" className="text-sm font-bold text-lime-600">Все</a>
         </div>
         <div className="space-y-4">
-            {/* Mock tournament data */}
             <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-slate-100 rounded-lg flex flex-col items-center justify-center">
                     <span className="text-xs font-bold text-red-600">ОКТ</span>
@@ -266,36 +345,70 @@ const TournamentsWidget = () => (
     </div>
 );
 
-const TopPlayersWidget = () => (
-    <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-sm">
-        <div className="flex justify-between items-center mb-4">
-            <h3 className="font-bold text-lg flex items-center gap-2">
-                <Trophy size={20} className="text-amber-400"/>
-                Топ игроков
-            </h3>
-            <a href="#" className="text-sm font-bold text-lime-400">&rarr;</a>
+const TopPlayersWidget = () => {
+    const [players, setPlayers] = useState<LadderPlayer[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchPlayers = async () => {
+            try {
+                setLoading(true);
+                const rankings = await api.ladder.getRankings();
+                setPlayers(rankings);
+                setError(null);
+            } catch (err) {
+                setError("Не удалось загрузить рейтинг.");
+                console.error(err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchPlayers();
+    }, []);
+    
+    const currentUserRanking = players.find(p => p.name.includes('Вы'));
+
+    return (
+        <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-sm">
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                    <Trophy size={20} className="text-amber-400"/>
+                    Топ игроков
+                </h3>
+                <a href="#" className="text-sm font-bold text-lime-400">&rarr;</a>
+            </div>
+            <div className="space-y-3">
+                {loading && <div className="text-center text-slate-400">Загрузка...</div>}
+                {error && <div className="text-center text-red-400">{error}</div>}
+                {!loading && !error && (
+                    <>
+                        {players.slice(0, 3).map(p => (
+                             <div key={p.id} className="flex justify-between items-center text-sm">
+                                 <div className="flex items-center gap-2">
+                                     <span className="font-bold bg-amber-400 text-slate-900 rounded-md w-6 h-6 flex items-center justify-center">{p.rank}</span>
+                                     <span className="font-bold">{p.name}</span>
+                                 </div>
+                                 <span className="font-bold text-lime-400">{p.points}</span>
+                             </div>
+                        ))}
+                        {currentUserRanking && (
+                             <div className="border-t border-slate-700 my-3 pt-3">
+                                 <div className="flex justify-between items-center text-sm">
+                                     <div className="flex items-center gap-2">
+                                         <span className="font-normal text-slate-400">Вы: #{currentUserRanking.rank}</span>
+                                     </div>
+                                     <span className="font-normal text-slate-400">{currentUserRanking.points} pts</span>
+                                 </div>
+                             </div>
+                        )}
+                    </>
+                )}
+            </div>
         </div>
-        <div className="space-y-3">
-            {MOCK_LADDER.slice(0, 3).map(p => (
-                 <div key={p.id} className="flex justify-between items-center text-sm">
-                     <div className="flex items-center gap-2">
-                         <span className="font-bold bg-amber-400 text-slate-900 rounded-md w-6 h-6 flex items-center justify-center">{p.rank}</span>
-                         <span className="font-bold">{p.name}</span>
-                     </div>
-                     <span className="font-bold text-lime-400">{p.points}</span>
-                 </div>
-            ))}
-            <div className="border-t border-slate-700 my-3 pt-3">
-             <div className="flex justify-between items-center text-sm">
-                 <div className="flex items-center gap-2">
-                     <span className="font-normal text-slate-400">Вы: #{MOCK_LADDER[4].rank}</span>
-                 </div>
-                 <span className="font-normal text-slate-400">{MOCK_LADDER[4].points} pts</span>
-             </div>
-             </div>
-        </div>
-    </div>
-);
+    );
+};
 
 const GroupsWidget = () => (
      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
@@ -324,15 +437,327 @@ const GroupsWidget = () => (
     </div>
 );
 
-const MarketplaceWidget = () => (
-    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-        <div className="flex justify-between items-center">
-             <h3 className="font-bold text-lg flex items-center gap-2">
-                <ShoppingCart size={20} className="text-slate-400"/>
-                Барахолка
-            </h3>
+const MarketplaceWidget = () => {
+    const [items, setItems] = useState<MarketplaceItem[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchItems = async () => {
+            try {
+                setLoading(true);
+                const marketplaceItems = await api.getMarketplaceItems();
+                setItems(marketplaceItems);
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchItems();
+    }, []);
+
+    const firstItem = items[0];
+
+    return (
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+            <div className="flex justify-between items-center mb-4">
+                 <h3 className="font-bold text-lg flex items-center gap-2">
+                    <ShoppingCart size={20} className="text-slate-400"/>
+                    Барахолка
+                </h3>
+                <a href="#" className="text-sm font-bold text-lime-600">Все</a>
+            </div>
+            {loading && <div className="text-center text-slate-400">Загрузка...</div>}
+            {!loading && firstItem && (
+                <div>
+                    <img src={firstItem.image} alt={firstItem.title} className="rounded-lg h-32 w-full object-cover mb-2" />
+                    <h4 className="font-bold text-sm">{firstItem.title}</h4>
+                    <p className="text-lg font-bold text-slate-800">{firstItem.price} ₽</p>
+                </div>
+            )}
+            {!loading && !firstItem && (
+                 <div className="text-center text-slate-400 py-4">Нет товаров</div>
+            )}
         </div>
-    </div>
-);
+    );
+};
+
+// --- Post Creation Forms ---
+const PartnerSearchForm = ({ onPublish }: { onPublish: (data: any) => void }) => {
+    const [when, setWhen] = useState('');
+    const [where, setWhere] = useState('');
+    const [requirement, setRequirement] = useState('');
+    const [text, setText] = useState('');
+
+    const handlePublish = () => {
+        onPublish({ when, where, requirement, text });
+        setWhen(''); setWhere(''); setRequirement(''); setText('');
+    };
+
+    return (
+        <div className="space-y-3 p-4 bg-slate-50 rounded-xl mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <input type="text" placeholder="Когда? (напр. Завтра, 20:00)" value={when} onChange={e => setWhen(e.target.value)} className="bg-white p-2 rounded-lg outline-none border border-slate-200 w-full" />
+                <input type="text" placeholder="Где? (напр. ТК Спартак)" value={where} onChange={e => setWhere(e.target.value)} className="bg-white p-2 rounded-lg outline-none border border-slate-200 w-full" />
+            </div>
+            <input type="text" placeholder="Требования к партнеру (напр. 3.5 - 4.0)" value={requirement} onChange={e => setRequirement(e.target.value)} className="w-full bg-white p-2 rounded-lg outline-none border border-slate-200" />
+            <textarea placeholder="Дополнительная информация..." value={text} onChange={e => setText(e.target.value)} className="w-full bg-white p-2 rounded-lg outline-none border border-slate-200 h-20" />
+            <Button onClick={handlePublish} className="w-full">Опубликовать поиск</Button>
+        </div>
+    );
+};
+
+const MatchResultForm = ({ onPublish, user }: { onPublish: (data: any) => void, user: User }) => {
+    const [opponentName, setOpponentName] = useState('');
+    const [score, setScore] = useState('');
+    const [isWinner, setIsWinner] = useState(true);
+
+    const handlePublish = () => {
+        if (!opponentName || !score) return;
+        onPublish({ opponentName, score, isWinner });
+        setOpponentName('');
+        setScore('');
+        setIsWinner(true);
+    };
+
+    return (
+        <div className="space-y-3 p-4 bg-slate-50 rounded-xl mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <input type="text" placeholder="Имя оппонента" value={opponentName} onChange={e => setOpponentName(e.target.value)} className="bg-white p-2 rounded-lg outline-none border border-slate-200 w-full" />
+                <input type="text" placeholder="Счет (напр. 6:4, 6:3)" value={score} onChange={e => setScore(e.target.value)} className="bg-white p-2 rounded-lg outline-none border border-slate-200 w-full" />
+            </div>
+            <div className="flex items-center gap-4 py-2">
+                 <label className="text-sm font-bold text-slate-600">Результат:</label>
+                 <button onClick={() => setIsWinner(true)} className={`px-3 py-1 text-sm rounded-full font-semibold transition-colors ${isWinner ? 'bg-lime-500 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}>Победа</button>
+                 <button onClick={() => setIsWinner(false)} className={`px-3 py-1 text-sm rounded-full font-semibold transition-colors ${!isWinner ? 'bg-red-500 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}>Поражение</button>
+            </div>
+            <Button onClick={handlePublish} className="w-full">Опубликовать результат</Button>
+        </div>
+    );
+};
+
+const MarketplaceForm = ({ onPublish }: { onPublish: (data: any) => void }) => {
+    const [title, setTitle] = useState('');
+    const [price, setPrice] = useState('');
+    const [description, setDescription] = useState('');
+    const [images, setImages] = useState<string[]>([]);
+
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const filesArray = Array.from(e.target.files);
+            const imagePromises = filesArray.map(file => {
+                return new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        resolve(reader.result as string);
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            });
+
+            Promise.all(imagePromises).then(base64Images => {
+                setImages(prevImages => [...prevImages, ...base64Images]);
+            });
+        }
+    };
+    
+    const removeImage = (index: number) => {
+        setImages(prevImages => prevImages.filter((_, i) => i !== index));
+    };
+
+    const handlePublish = () => {
+        if (!title || !price) return;
+        onPublish({ title, price, description, images });
+        setTitle('');
+        setPrice('');
+        setDescription('');
+        setImages([]);
+    };
+
+    return (
+        <div className="space-y-3 p-4 bg-slate-50 rounded-xl mt-4">
+            <input type="text" placeholder="Название товара" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-white p-2 rounded-lg outline-none border border-slate-200" />
+            <input type="number" placeholder="Цена в рублях" value={price} onChange={e => setPrice(e.target.value)} className="w-full bg-white p-2 rounded-lg outline-none border border-slate-200" />
+            <textarea placeholder="Описание товара..." value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-white p-2 rounded-lg outline-none border border-slate-200 h-20" />
+            
+            <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Фотографии</label>
+                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-300 border-dashed rounded-md">
+                    <div className="space-y-1 text-center">
+                        <svg className="mx-auto h-12 w-12 text-slate-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        <div className="flex text-sm text-slate-600">
+                            <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-lime-600 hover:text-lime-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-lime-500">
+                                <span>Загрузите файлы</span>
+                                <input id="file-upload" name="file-upload" type="file" className="sr-only" multiple onChange={handleImageChange} accept="image/*" />
+                            </label>
+                            <p className="pl-1">или перетащите</p>
+                        </div>
+                        <p className="text-xs text-slate-500">PNG, JPG, GIF до 10MB</p>
+                    </div>
+                </div>
+            </div>
+
+            {images.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                    {images.map((image, index) => (
+                        <div key={index} className="relative">
+                            <img src={image} alt={`Preview ${index}`} className="h-24 w-full object-cover rounded-lg" />
+                            <button onClick={() => removeImage(index)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5">
+                                <X size={12}/>
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+            
+            <Button onClick={handlePublish} className="w-full">Выставить на продажу</Button>
+        </div>
+    );
+};
+
+
+// --- Main View Component ---
+
+const CommunityView2 = ({ user }: { user: User }) => {
+    const [activeTab, setActiveTab] = useState('Все события');
+    const [postText, setPostText] = useState('');
+    const [feedItems, setFeedItems] = useState<any[]>([]);
+    const [postType, setPostType] = useState<'text' | 'partner_search' | 'match_result' | 'event' | 'marketplace'>('text');
+    const [loadingFeed, setLoadingFeed] = useState(true);
+
+    const fetchFeed = async () => {
+        try {
+            setLoadingFeed(true);
+            const posts = await api.posts.getAll(user.id);
+            setFeedItems(posts);
+        } catch (error) {
+            console.error("Failed to fetch feed", error);
+        } finally {
+            setLoadingFeed(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchFeed();
+    }, []);
+
+    const handlePublishPost = async (data: any) => {
+        let postData;
+
+        if (postType === 'partner_search') {
+            if (!data.text) return;
+            postData = {
+                userId: user.id,
+                type: 'partner_search',
+                content: {
+                    details: {
+                        when: data.when || 'Не указано',
+                        where: data.where || 'Не указано',
+                        text: data.text,
+                        requirement: data.requirement || 'Любой',
+                        ntrp: user.level || 'N/A'
+                    }
+                }
+            };
+        } else if (postType === 'match_result') {
+            if (!data.opponentName || !data.score) return;
+            postData = {
+                userId: user.id,
+                type: 'match_result',
+                content: {
+                    opponent: { name: data.opponentName, avatar: `https://ui-avatars.com/api/?name=${data.opponentName.replace(' ', '+')}`},
+                    score: data.score,
+                    isWinner: data.isWinner,
+                }
+            };
+        } else if (postType === 'marketplace') {
+            if (!data.title || !data.price) return;
+            postData = {
+                userId: user.id,
+                type: 'marketplace',
+                content: {
+                    title: data.title,
+                    price: data.price,
+                    description: data.description,
+                    images: data.images
+                }
+            };
+        }
+        else { // 'text'
+            if (!postText.trim()) return;
+            postData = {
+                userId: user.id,
+                type: 'text_post',
+                content: {
+                    text: postText
+                }
+            };
+            setPostText('');
+        }
+        
+        try {
+            await api.posts.create(postData);
+            fetchFeed(); // Re-fetch feed after creating a new post
+        } catch (error) {
+            console.error("Failed to create post", error);
+        }
+
+        setPostType('text'); // Reset to default post type
+    };
+
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            <div className="lg:col-span-2">
+                <div className="flex space-x-2 mb-6">
+                    {['Все события', 'Результаты матчей', 'Поиск игры', 'Барахолка'].map(tab => (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            className={`px-5 py-2 text-sm font-bold rounded-full transition-colors ${activeTab === tab ? 'bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+                        >
+                            {tab}
+                        </button>
+                    ))}
+                </div>
+                
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6">
+                    <div className="flex gap-4 items-center">
+                        <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full" />
+                        <input 
+                            type="text" 
+                            placeholder="Что нового?" 
+                            className="flex-1 bg-transparent outline-none"
+                            value={postText}
+                            onChange={(e) => setPostText(e.target.value)}
+                             onFocus={() => setPostType('text')}
+                        />
+                        <div className="flex items-center gap-4 text-slate-400">
+                             <button onClick={() => setPostType('partner_search')} className={`p-2 rounded-full transition-colors ${postType === 'partner_search' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Swords size={20}/></button>
+                             <button onClick={() => setPostType('match_result')} className={`p-2 rounded-full transition-colors ${postType === 'match_result' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Trophy size={20}/></button>
+                             <button onClick={() => setPostType('event')} className={`p-2 rounded-full transition-colors ${postType === 'event' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Calendar size={20}/></button>
+                             <button onClick={() => setPostType('marketplace')} className={`p-2 rounded-full transition-colors ${postType === 'marketplace' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><ShoppingCart size={20}/></button>
+                        </div>
+                        <Button onClick={() => handlePublishPost(postText)} disabled={!postText.trim()}>Опубликовать</Button>
+                    </div>
+                     {postType === 'partner_search' && <PartnerSearchForm onPublish={handlePublishPost} />}
+                     {postType === 'match_result' && <MatchResultForm onPublish={handlePublishPost} user={user} />}
+                     {postType === 'marketplace' && <MarketplaceForm onPublish={handlePublishPost} />}
+                     {postType === 'event' && <div className="text-center p-4 text-slate-500 mt-4">Форма для событий скоро появится!</div>}
+                </div>
+
+                {loadingFeed ? <Loader2 className="animate-spin text-slate-400 mx-auto" /> : <Feed activeTab={activeTab} feedItems={feedItems} user={user} onUpdate={fetchFeed} />}
+            </div>
+            <div className="space-y-6">
+                <TournamentsWidget />
+                <TopPlayersWidget />
+                <GroupsWidget />
+                <MarketplaceWidget />
+            </div>
+        </div>
+    );
+};
 
 export default CommunityView2;

@@ -226,9 +226,9 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({ user, onNo
 
 import CommunityView2 from './CommunityView2';
 
-export const CommunityView = () => (
+export const CommunityView = ({ user }: { user: User }) => (
     <div className="max-w-7xl mx-auto">
-        <CommunityView2 />
+        <CommunityView2 user={user} />
     </div>
 );
 

@@ -981,6 +981,109 @@ app.get('/api/ladder/player/:userId', async (req, res) => {
     }
 });
 
+// --- POSTS (Community Feed) ROUTES ---
+
+app.get('/api/posts', async (req, res) => {
+    const { userId } = req.query; // Get userId from query params
+
+    try {
+        const result = await pool.query(`
+            SELECT 
+                p.id,
+                p.type,
+                p.content,
+                p.created_at,
+                json_build_object('id', u.id, 'name', u.name, 'avatar', u.avatar) as author,
+                (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes_count,
+                EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $1) as liked_by_user,
+                (SELECT json_agg(json_build_object(
+                    'id', c.id, 
+                    'text', c.text, 
+                    'created_at', c.created_at,
+                    'author', json_build_object('id', cu.id, 'name', cu.name, 'avatar', cu.avatar)
+                ) ORDER BY c.created_at ASC) FROM post_comments c JOIN users cu ON c.user_id = cu.id WHERE c.post_id = p.id) as comments
+            FROM posts p
+            JOIN users u ON p.user_id = u.id
+            ORDER BY p.created_at DESC
+            LIMIT 50
+        `, [userId || null]);
+        res.json(result.rows);
+    } catch (err) {
+        console.error("Fetch Posts Error:", err);
+        res.status(500).json({ error: 'Failed to fetch posts' });
+    }
+});
+
+app.post('/api/posts', async (req, res) => {
+    const { userId, type, content } = req.body;
+    if (!userId || !type || !content) {
+        return res.status(400).json({ error: 'userId, type, and content are required' });
+    }
+
+    try {
+        const result = await pool.query(
+            'INSERT INTO posts (user_id, type, content) VALUES ($1, $2, $3) RETURNING id',
+            [userId, type, content]
+        );
+        res.status(201).json({ success: true, postId: result.rows[0].id });
+    } catch (err) {
+        console.error("Create Post Error:", err);
+        res.status(500).json({ error: 'Failed to create post' });
+    }
+});
+
+app.post('/api/posts/:id/like', async (req, res) => {
+    const { id } = req.params;
+    const { userId } = req.body;
+
+    try {
+        const likeCheck = await pool.query(
+            'SELECT * FROM post_likes WHERE post_id = $1 AND user_id = $2',
+            [id, userId]
+        );
+
+        if (likeCheck.rows.length > 0) {
+            // Unlike
+            await pool.query(
+                'DELETE FROM post_likes WHERE post_id = $1 AND user_id = $2',
+                [id, userId]
+            );
+            res.json({ success: true, action: 'unliked' });
+        } else {
+            // Like
+            await pool.query(
+                'INSERT INTO post_likes (post_id, user_id) VALUES ($1, $2)',
+                [id, userId]
+            );
+            res.json({ success: true, action: 'liked' });
+        }
+    } catch (err) {
+        console.error('Like Post Error:', err);
+        res.status(500).json({ error: 'Failed to toggle like' });
+    }
+});
+
+app.post('/api/posts/:id/comments', async (req, res) => {
+    const { id } = req.params;
+    const { userId, text } = req.body;
+
+    if (!userId || !text) {
+        return res.status(400).json({ error: 'userId and text are required' });
+    }
+
+    try {
+        const result = await pool.query(
+            'INSERT INTO post_comments (post_id, user_id, text) VALUES ($1, $2, $3) RETURNING *',
+            [id, userId, text]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error('Add Comment Error:', err);
+        res.status(500).json({ error: 'Failed to add comment' });
+    }
+});
+
+
 // --- STUDENTS CRM ROUTES ---
 
 app.get('/api/students', async (req, res) => {
