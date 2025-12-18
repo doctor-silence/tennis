@@ -29,6 +29,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [unreadLadderNotifications, setUnreadLadderNotifications] = useState(0);
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
 
   const fetchUnreadCount = () => {
     api.notifications.getUnreadCount(user.id).then(data => {
@@ -41,6 +42,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
       setConversations(data);
       setLoadingConversations(false);
     });
+    api.ladder.getChallenges().then(setChallenges);
     fetchUnreadCount();
   }, [user.id]);
 
@@ -61,6 +63,24 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
       }
     } catch (error) {
       console.error("Failed to start conversation:", error);
+    }
+  };
+
+  const handleCreateChallenge = async (opponentId: string) => {
+    try {
+        const rankings = await api.ladder.getRankings('club_elo');
+        const challenger = rankings.find(p => p.userId === user.id);
+        const opponent = rankings.find(p => p.userId === opponentId);
+
+        if (challenger && opponent) {
+            const newChallenge = await api.ladder.createChallenge(challenger, opponent, 'friendly');
+            setChallenges(prev => [newChallenge, ...prev]);
+            setActiveTab('ladder');
+        } else {
+            console.error("Could not find challenger or opponent in rankings");
+        }
+    } catch (error) {
+        console.error("Failed to create challenge:", error);
     }
   };
   
@@ -131,7 +151,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
 
           <div className="animate-fade-in-up">
             {activeTab === 'profile' && <ProfileView user={user} onUserUpdate={onUserUpdate} />}
-            {activeTab === 'search' && <PartnerSearchView onNavigate={handleNavigate} onStartConversation={handleStartConversation} />}
+            {activeTab === 'search' && <PartnerSearchView onNavigate={handleNavigate} onStartConversation={handleStartConversation} onCreateChallenge={handleCreateChallenge} />}
             {activeTab === 'courts' && <CourtBookingView />}
             {activeTab === 'ai_coach' && <AiCoachView user={user} />}
             {activeTab === 'messages' && <MessagesView 
@@ -146,7 +166,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
             {activeTab === 'tactics' && <TacticsView user={user} />}
             {activeTab === 'students' && <StudentsView user={user} />}
             {activeTab === 'video_analysis' && <VideoAnalysisView />}
-            {activeTab === 'ladder' && <LadderView user={user} />}
+            {activeTab === 'ladder' && <LadderView user={user} challenges={challenges} setChallenges={setChallenges} />}
             {activeTab === 'community' && <CommunityView user={user} onNavigate={handleNavigate} onStartConversation={handleStartConversation} />}
           </div>
         </div>

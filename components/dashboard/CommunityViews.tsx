@@ -232,9 +232,8 @@ export const CommunityView = ({ user, onNavigate, onStartConversation }: { user:
     </div>
 );
 
-export const LadderView = ({ user }: { user: User }) => {
+export const LadderView = ({ user, challenges, setChallenges }: { user: User, challenges: Challenge[], setChallenges: React.Dispatch<React.SetStateAction<Challenge[]>> }) => {
     const [ranking, setRanking] = useState<LadderPlayer[]>([]);
-    const [challenges, setChallenges] = useState<Challenge[]>([]);
     const [viewMode, setViewMode] = useState<'ranking' | 'challenges'>('ranking');
     const [selectedOpponent, setSelectedOpponent] = useState<LadderPlayer | null>(null);
     const [showChallengeModal, setShowChallengeModal] = useState(false);
@@ -251,8 +250,6 @@ export const LadderView = ({ user }: { user: User }) => {
         const loadData = async () => {
              const rankData = await api.ladder.getRankings(ladderType);
              setRanking(rankData);
-             const challengeData = await api.ladder.getChallenges();
-             setChallenges(challengeData);
         };
         loadData();
     }, [ladderType]);

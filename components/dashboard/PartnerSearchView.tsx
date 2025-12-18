@@ -8,9 +8,10 @@ import { api } from '../../services/api';
 interface PartnerSearchViewProps {
     onNavigate: (tab: DashboardTab) => void;
     onStartConversation: (partnerId: string) => void;
+    onCreateChallenge: (opponentId: string) => void;
 }
 
-const PartnerSearchView = ({ onNavigate, onStartConversation }: PartnerSearchViewProps) => {
+const PartnerSearchView = ({ onNavigate, onStartConversation, onCreateChallenge }: PartnerSearchViewProps) => {
     const [partners, setPartners] = useState<Partner[]>([]);
     const [filter, setFilter] = useState({ city: '', level: 'all', search: '' });
     const [cities, setCities] = useState<string[]>([]); // New state for cities
@@ -85,7 +86,7 @@ const PartnerSearchView = ({ onNavigate, onStartConversation }: PartnerSearchVie
                         <p className="text-slate-500 text-sm mb-4 flex items-center justify-center gap-1"><MapPin size={12}/> {partner.city} • {partner.role === 'rtt_pro' ? `${partner.rating} очков РТТ` : partner.level}</p>
                         <div className="grid grid-cols-2 gap-2 w-full mt-auto">
                             <Button variant="outline" size="sm" onClick={() => onStartConversation(partner.id)}>Написать</Button>
-                            <Button size="sm">Играть</Button>
+                            <Button size="sm" onClick={() => onCreateChallenge(partner.id)}>Играть</Button>
                         </div>
                     </div>
                 ))}
