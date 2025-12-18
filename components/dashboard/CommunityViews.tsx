@@ -244,16 +244,17 @@ export const LadderView = ({ user }: { user: User }) => {
     const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
     const [score, setScore] = useState("");
     const [winnerId, setWinnerId] = useState<string | null>(null);
+    const [ladderType, setLadderType] = useState<'club_elo' | 'rtt_rating'>('club_elo');
     
     useEffect(() => {
         const loadData = async () => {
-             const rankData = await api.ladder.getRankings();
+             const rankData = await api.ladder.getRankings(ladderType);
              setRanking(rankData);
              const challengeData = await api.ladder.getChallenges();
              setChallenges(challengeData);
         };
         loadData();
-    }, []);
+    }, [ladderType]);
 
     const handleChallengeClick = (opponent: LadderPlayer) => {
         setSelectedOpponent(opponent);
@@ -319,7 +320,7 @@ export const LadderView = ({ user }: { user: User }) => {
             await api.ladder.enterScore(selectedChallenge.id, score, winnerId);
     
             // refresh data
-            const rankData = await api.ladder.getRankings();
+            const rankData = await api.ladder.getRankings(ladderType);
             setRanking(rankData);
             const challengeData = await api.ladder.getChallenges();
             setChallenges(challengeData);
@@ -338,36 +339,61 @@ export const LadderView = ({ user }: { user: User }) => {
             {selectedProfile && <PlayerProfileFlyout profile={selectedProfile} onClose={() => setSelectedProfile(null)} />}
 
             {/* Header / Tabs */}
-            <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-200 inline-flex">
-                <button 
-                    onClick={() => setViewMode('ranking')}
-                    className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${viewMode === 'ranking' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'}`}
-                >
-                    Рейтинг
-                </button>
-                <button 
-                    onClick={() => setViewMode('challenges')}
-                    className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${viewMode === 'challenges' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'}`}
-                >
-                    Вызовы
-                    {challenges.filter(c => c.status === 'pending' || c.status === 'scheduled').length > 0 && 
-                        <span className="bg-lime-500 text-slate-900 text-[10px] px-1.5 rounded-full">
-                            {challenges.filter(c => c.status === 'pending' || c.status === 'scheduled').length}
-                        </span>
-                    }
-                </button>
+            <div className="flex flex-wrap items-center gap-4">
+                {/* Ladder Type Tabs */}
+                <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-200 inline-flex">
+                    <button 
+                        onClick={() => setLadderType('club_elo')}
+                        className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${ladderType === 'club_elo' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'}`}
+                    >
+                        Любители (Club ELO)
+                    </button>
+                    <button 
+                        onClick={() => setLadderType('rtt_rating')}
+                        className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${ladderType === 'rtt_rating' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'}`}
+                    >
+                        Профи (Рейтинг РТТ)
+                    </button>
+                </div>
+
+                {/* View Mode Tabs */}
+                <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-200 inline-flex">
+                    <button 
+                        onClick={() => setViewMode('ranking')}
+                        className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${viewMode === 'ranking' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'}`}
+                    >
+                        Рейтинг
+                    </button>
+                    <button 
+                        onClick={() => setViewMode('challenges')}
+                        className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${viewMode === 'challenges' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'}`}
+                    >
+                        Вызовы
+                        {challenges.filter(c => c.status === 'pending' || c.status === 'scheduled').length > 0 && 
+                            <span className="bg-lime-500 text-slate-900 text-[10px] px-1.5 rounded-full">
+                                {challenges.filter(c => c.status === 'pending' || c.status === 'scheduled').length}
+                            </span>
+                        }
+                    </button>
+                </div>
             </div>
 
             {viewMode === 'ranking' && (
                 <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden animate-fade-in-up">
-                    <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
+                    <div className={`p-6 text-white flex justify-between items-center ${ladderType === 'club_elo' ? 'bg-slate-900' : 'bg-orange-900'}`}>
                         <div>
-                            <h3 className="text-xl font-bold mb-1">Турнирная лестница</h3>
-                            <p className="text-slate-400 text-xs uppercase tracking-wider">Сезон: Октябрь 2024</p>
+                            <h3 className="text-xl font-bold mb-1">
+                                {ladderType === 'club_elo' ? 'Турнирная лестница клуба' : 'Официальный топ РТТ'}
+                            </h3>
+                            <p className="text-slate-300 text-xs uppercase tracking-wider">
+                                {ladderType === 'club_elo' ? 'Сезон: Октябрь 2024 • Общий зачет' : 'Категория: взрослые • Обновлено 21.10'}
+                            </p>
                         </div>
                         <div className="bg-white/10 px-4 py-2 rounded-xl text-center">
-                            <div className="text-2xl font-bold text-lime-400">#{ranking.find(r => r.userId === user.id)?.rank || '-'}</div>
-                            <div className="text-[10px] font-bold text-slate-400 uppercase">Твой ранг</div>
+                            <div className={`text-2xl font-bold ${ladderType === 'club_elo' ? 'text-lime-400' : 'text-orange-400'}`}>
+                                #{ranking.find(r => r.userId === user.id)?.rank || '-'}
+                            </div>
+                            <div className="text-[10px] font-bold text-slate-300 uppercase">Твой ранг</div>
                         </div>
                     </div>
                     <div className="overflow-x-auto">
@@ -386,7 +412,7 @@ export const LadderView = ({ user }: { user: User }) => {
                                     <tr 
                                         key={p.id} 
                                         onClick={() => handlePlayerClick(p)}
-                                        className={`transition-colors cursor-pointer ${p.userId === user.id ? 'bg-lime-50/50 hover:bg-lime-50' : 'hover:bg-slate-50'}`}
+                                        className={`transition-colors cursor-pointer ${p.userId === user.id ? (ladderType === 'club_elo' ? 'bg-lime-50/50 hover:bg-lime-50' : 'bg-orange-50/50 hover:bg-orange-50') : 'hover:bg-slate-50'}`}
                                     >
                                         <td className="px-6 py-4">
                                             <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm ${i < 3 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>

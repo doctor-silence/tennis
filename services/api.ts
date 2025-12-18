@@ -763,9 +763,9 @@ export const api = {
     },
 
     ladder: {
-        getRankings: async (): Promise<LadderPlayer[]> => {
+        getRankings: async (ladderType: 'club_elo' | 'rtt_rating'): Promise<LadderPlayer[]> => {
             try {
-                const res = await fetch(`${API_URL}/ladder/rankings`);
+                const res = await fetch(`${API_URL}/ladder/rankings?type=${ladderType}`);
                 if (!res.ok) throw new Error('Failed to fetch ladder rankings');
                 return await res.json();
             } catch (e) {

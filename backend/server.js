@@ -499,7 +499,20 @@ app.get('/api/partners', async (req, res) => {
 // --- LADDER ROUTES ---
 
 app.get('/api/ladder/rankings', async (req, res) => {
+    const { type } = req.query; // 'club_elo' or 'rtt_rating'
+
     try {
+        let orderByClause = '';
+        let whereClause = 'WHERE u.role != \'admin\'';
+        const queryParams = [];
+
+        if (type === 'rtt_rating') {
+            orderByClause = 'ORDER BY u.rtt_rank ASC, u.rtt_category ASC, u.rating DESC'; // For professional (RTT) players
+            whereClause += ' AND u.rtt_rank IS NOT NULL AND u.rtt_rank > 0'; // Only show players with an RTT rank
+        } else { // Default to 'club_elo'
+            orderByClause = 'ORDER BY u.xp DESC, u.rating DESC, u.name ASC'; // For amateur (Club ELO) players
+        }
+
         // Get all users ordered by rank
         const usersResult = await pool.query(`
             SELECT 
@@ -508,10 +521,10 @@ app.get('/api/ladder/rankings', async (req, res) => {
                 COUNT(m.id) FILTER (WHERE m.result = 'win') AS wins
             FROM users u
             LEFT JOIN matches m ON u.id = m.user_id
-            WHERE u.role != 'admin'
+            ${whereClause}
             GROUP BY u.id
-            ORDER BY u.xp DESC, u.rating DESC, u.name ASC
-        `);
+            ${orderByClause}
+        `, queryParams);
 
         // Get all active defenders' IDs
         const activeChallengesResult = await pool.query(
