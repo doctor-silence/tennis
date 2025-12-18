@@ -808,12 +808,16 @@ export const api = {
                 return profile;
             }
         },
-        createChallenge: async (challenger: LadderPlayer, defender: LadderPlayer): Promise<Challenge> => {
+        createChallenge: async (challenger: LadderPlayer, defender: LadderPlayer, eventType: 'friendly' | 'cup' | 'masters'): Promise<Challenge> => {
             try {
                 const res = await fetch(`${API_URL}/ladder/challenges`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ challengerId: challenger.userId, defenderId: defender.userId })
+                    body: JSON.stringify({ 
+                        challengerId: challenger.userId, 
+                        defenderId: defender.userId,
+                        eventType: eventType
+                    })
                 });
                 if (!res.ok) throw new Error('Failed to create challenge');
                 return await res.json();
@@ -827,7 +831,8 @@ export const api = {
                     defenderName: defender.name,
                     rankGap: challenger.rank - defender.rank,
                     status: 'pending',
-                    deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+                    deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    eventType: eventType
                 };
             }
         },

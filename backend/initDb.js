@@ -56,7 +56,8 @@ const initDb = async () => {
         rtt_category VARCHAR(50),
         is_private BOOLEAN DEFAULT FALSE,
         notifications_enabled BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_activity_bonus DATE
       );
     `);
     
@@ -68,6 +69,7 @@ const initDb = async () => {
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS xp INTEGER DEFAULT 0;`);
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_private BOOLEAN DEFAULT FALSE;`);
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS notifications_enabled BOOLEAN DEFAULT TRUE;`);
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_activity_bonus DATE;`);
     
     console.log('✅ Table "users" checked and updated.');
 
@@ -183,11 +185,13 @@ const initDb = async () => {
         match_date DATE,
         winner_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
         score VARCHAR(50),
+        event_type VARCHAR(20) DEFAULT 'friendly',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
     await client.query(`ALTER TABLE challenges ADD COLUMN IF NOT EXISTS winner_id INTEGER REFERENCES users(id) ON DELETE SET NULL;`);
     await client.query(`ALTER TABLE challenges ADD COLUMN IF NOT EXISTS score VARCHAR(50);`);
+    await client.query(`ALTER TABLE challenges ADD COLUMN IF NOT EXISTS event_type VARCHAR(20) DEFAULT 'friendly';`);
     console.log('✅ Table "challenges" checked.');
     
     // 12. Create Notifications Table
@@ -279,16 +283,11 @@ const initDb = async () => {
     }
 
     // Seed Courts (Real Moscow Data - Extended List)
-    // We check if we have less than 6 courts, if so, we seed the full list to update old dbs
+    // We only seed if the courts table is empty
     const courtCount = await pool.query('SELECT count(*) FROM courts');
-    if (parseInt(courtCount.rows[0].count) < 6) {
+    if (parseInt(courtCount.rows[0].count) === 0) {
         console.log('🌱 Заполнение расширенного списка московских кортов...');
         
-        // Clear old small list to avoid duplicates if re-seeding
-        if (parseInt(courtCount.rows[0].count) > 0) {
-             await pool.query('DELETE FROM courts');
-        }
-
         const courts = [
             {
                 name: 'Мультиспорт (Лужники)',

@@ -56,6 +56,53 @@ const mapStudent = (row) => ({
     notes: row.notes
 });
 
+
+const calculateEloPoints = (winner, loser, score, eventType) => {
+    // 1. Базовый расчет
+    const ratingDifference = loser.xp - winner.xp;
+    let winnerPoints = 15 + Math.max(0, ratingDifference / 10); // +1 очко за каждые 10 очков разницы
+    let loserPoints = -5 - Math.max(0, -ratingDifference / 10);
+
+    // Ограничения
+    winnerPoints = Math.min(winnerPoints, 50);
+    loserPoints = Math.max(loserPoints, -25);
+
+    // 2. Бонусы за доминирование
+    const scoreParts = score.split(',').map(s => s.trim().split(':').map(Number));
+    let winnerSets = 0;
+    let loserSets = 0;
+    let isDryWin = false;
+
+    scoreParts.forEach(set => {
+        if (set[0] > set[1]) winnerSets++;
+        else loserSets++;
+        if (set[1] === 0 && set[0] >= 6) isDryWin = true; // Check for a 6:0 set or similar
+    });
+
+    if (isDryWin && scoreParts.length >= 2) { // 6:0, 6:0
+        winnerPoints += 15;
+    }
+    if (loserSets > 0 && winnerSets > loserSets) { // Волевая победа
+        winnerPoints += 10;
+    }
+    
+    // 3. Коэффициент турнира
+    const multipliers = {
+        'friendly': 1.0,
+        'cup': 1.5,
+        'masters': 2.0
+    };
+    const multiplier = multipliers[eventType] || 1.0;
+
+    winnerPoints *= multiplier;
+    loserPoints *= multiplier;
+
+    return {
+        winnerXpGained: Math.round(winnerPoints),
+        loserXpLost: Math.round(loserPoints)
+    };
+};
+
 // --- ROUTES ---
 
 // Health Check
@@ -568,6 +615,7 @@ app.get('/api/ladder/challenges', async (req, res) => {
                 c.status, 
                 c.deadline, 
                 c.match_date,
+                c.event_type,
                 uc.name as challenger_name,
                 uc.avatar as challenger_avatar,
                 ud.name as defender_name,
@@ -588,7 +636,8 @@ app.get('/api/ladder/challenges', async (req, res) => {
             rankGap: row.rank_gap_xp, // Using XP difference as rank gap
             status: row.status,
             deadline: row.deadline,
-            matchDate: row.match_date
+            matchDate: row.match_date,
+            eventType: row.event_type
         }));
         res.json(challenges);
     } catch (err) {
@@ -598,7 +647,7 @@ app.get('/api/ladder/challenges', async (req, res) => {
 });
 
 app.post('/api/ladder/challenges', async (req, res) => {
-    const { challengerId, defenderId } = req.body;
+    const { challengerId, defenderId, eventType } = req.body;
     if (!challengerId || !defenderId) {
         return res.status(400).json({ error: 'Challenger and defender IDs are required' });
     }
@@ -616,10 +665,10 @@ app.post('/api/ladder/challenges', async (req, res) => {
         deadline.setDate(deadline.getDate() + 7); // 7 days from now
 
         const result = await pool.query(
-            `INSERT INTO challenges (challenger_id, defender_id, status, deadline)
-             VALUES ($1, $2, 'pending', $3)
+            `INSERT INTO challenges (challenger_id, defender_id, status, deadline, event_type)
+             VALUES ($1, $2, 'pending', $3, $4)
              RETURNING *`,
-            [parsedChallengerId, parsedDefenderId, deadline.toISOString().split('T')[0]]
+            [parsedChallengerId, parsedDefenderId, deadline.toISOString().split('T')[0], eventType || 'friendly']
         );
         const newChallenge = result.rows[0];
 
@@ -643,7 +692,8 @@ app.post('/api/ladder/challenges', async (req, res) => {
             rankGap: 0, // Will be calculated on frontend based on rankings
             status: newChallenge.status,
             deadline: newChallenge.deadline,
-            matchDate: newChallenge.match_date
+            matchDate: newChallenge.match_date,
+            eventType: newChallenge.event_type
         });
     } catch (err) {
         console.error("Create Ladder Challenge Error:", err);
@@ -722,24 +772,48 @@ app.post('/api/ladder/challenges/:challengeId/result', async (req, res) => {
         const parsedWinnerId = parseInt(winnerId, 10);
         const loserId = parsedWinnerId === challengerId ? defenderId : challengerId;
 
-        // Logic for XP change
-        if (parsedWinnerId === challengerId) { // Challenger won
-            const challengerRes = await client.query('SELECT xp FROM users WHERE id = $1', [challengerId]);
-            const defenderRes = await client.query('SELECT xp FROM users WHERE id = $1', [defenderId]);
-            let challengerXp = challengerRes.rows[0].xp;
-            let defenderXp = defenderRes.rows[0].xp;
+        // Get full user objects to check roles and current XP
+        const winnerRes = await client.query('SELECT * FROM users WHERE id = $1', [parsedWinnerId]);
+        const loserRes = await client.query('SELECT * FROM users WHERE id = $1', [loserId]);
+        const winner = winnerRes.rows[0];
+        const loser = loserRes.rows[0];
+        
+        // Check if both players are amateurs to apply the new ELO logic
+        if (winner.role === 'amateur' && loser.role === 'amateur') {
+            const { winnerXpGained, loserXpLost } = calculateEloPoints(winner, loser, score, challenge.event_type);
+            
+            // Update XP for both players
+            await client.query('UPDATE users SET xp = xp + $1 WHERE id = $2', [winnerXpGained, winner.id]);
+            await client.query('UPDATE users SET xp = xp + $1 WHERE id = $2', [loserXpLost, loser.id]);
 
-            if (defenderXp <= challengerXp) {
-                defenderXp = challengerXp + 1;
+            // Streak Bonus Check
+            const lastTwoMatches = await client.query(
+                `SELECT result FROM matches WHERE user_id = $1 ORDER BY date DESC LIMIT 2`,
+                [winner.id]
+            );
+
+            if (lastTwoMatches.rows.length === 2 && lastTwoMatches.rows.every(m => m.result === 'win')) {
+                await client.query('UPDATE users SET xp = xp + 25 WHERE id = $1', [winner.id]);
+                await logSystemEvent('info', `3-win streak bonus (+25) for ${winner.name}.`, 'Ladder');
             }
 
-            // Challenger takes defender's XP, defender takes challenger's.
-            await client.query('UPDATE users SET xp = $1 WHERE id = $2', [defenderXp, challengerId]);
-            await client.query('UPDATE users SET xp = $1 WHERE id = $2', [challengerXp, defenderId]);
+            await logSystemEvent('info', `ELO calculated for ${winner.name} (+${winnerXpGained}) and ${loser.name} (${loserXpLost}).`, 'Ladder');
 
-        } else if (parsedWinnerId === defenderId) { // Defender won
-            // Defender gets a bonus for a successful defense.
-            await client.query('UPDATE users SET xp = xp + 5 WHERE id = $1', [defenderId]);
+        } else {
+            // Fallback to the old, simple XP logic for pro players or mixed matches
+            if (parsedWinnerId === challengerId) { // Challenger won
+                if (loser.xp <= winner.xp) {
+                    await client.query('UPDATE users SET xp = xp + 1 WHERE id = $1', [loserId]);
+                } else {
+                    // Challenger takes defender's XP, defender takes challenger's.
+                    await client.query('UPDATE users SET xp = $1 WHERE id = $2', [loser.xp, challengerId]);
+                    await client.query('UPDATE users SET xp = $1 WHERE id = $2', [winner.xp, defenderId]);
+                }
+            } else if (parsedWinnerId === defenderId) { // Defender won
+                // Defender gets a bonus for a successful defense.
+                await client.query('UPDATE users SET xp = xp + 5 WHERE id = $1', [defenderId]);
+            }
+             await logSystemEvent('info', `Simple XP update for pro match. Winner: ${winner.id}`, 'Ladder');
         }
 
         // Update challenge status
@@ -756,19 +830,47 @@ app.post('/api/ladder/challenges/:challengeId/result', async (req, res) => {
         );
 
         // Add match record for both players
-        const winner = await client.query('SELECT name FROM users WHERE id = $1', [parsedWinnerId]);
-        const loser = await client.query('SELECT name FROM users WHERE id = $1', [loserId]);
+        const winnerData = await client.query('SELECT name FROM users WHERE id = $1', [parsedWinnerId]);
+        const loserData = await client.query('SELECT name FROM users WHERE id = $1', [loserId]);
 
         await client.query(
             `INSERT INTO matches (user_id, opponent_name, score, result, surface)
              VALUES ($1, $2, $3, 'win', 'hard')`, // Assuming hard court for now
-            [parsedWinnerId, loser.rows[0].name, score]
+            [parsedWinnerId, loserData.rows[0].name, score]
         );
          await client.query(
             `INSERT INTO matches (user_id, opponent_name, score, result, surface)
              VALUES ($1, $2, $3, 'loss', 'hard')`,
-            [loserId, winner.rows[0].name, score]
+            [loserId, winnerData.rows[0].name, score]
         );
+
+        // Activity Bonus Check for both players
+        for (const player of [winner, loser]) {
+            const currentMonth = new Date().getMonth() + 1;
+            const currentYear = new Date().getFullYear();
+
+            // Check if bonus was already awarded this month
+            if (player.last_activity_bonus) {
+                const bonusDate = new Date(player.last_activity_bonus);
+                if (bonusDate.getMonth() + 1 === currentMonth && bonusDate.getFullYear() === currentYear) {
+                    continue; // Already awarded this month, skip
+                }
+            }
+            
+            // Count matches in the current month
+            const matchesThisMonth = await client.query(
+                `SELECT COUNT(*) FROM matches WHERE user_id = $1 AND EXTRACT(MONTH FROM date) = $2 AND EXTRACT(YEAR FROM date) = $3`,
+                [player.id, currentMonth, currentYear]
+            );
+
+            if (parseInt(matchesThisMonth.rows[0].count) >= 5) {
+                await client.query(
+                    'UPDATE users SET xp = xp + 50, last_activity_bonus = CURRENT_DATE WHERE id = $1',
+                    [player.id]
+                );
+                await logSystemEvent('info', `Monthly activity bonus (+50) for ${player.name}.`, 'Ladder');
+            }
+        }
 
         await logSystemEvent('info', `Score entered for challenge ${challengeId}. Winner: ${winnerId}`, 'Ladder');
         
@@ -778,8 +880,6 @@ app.post('/api/ladder/challenges/:challengeId/result', async (req, res) => {
         await client.query('ROLLBACK');
         console.error("Enter Score Error:", err);
         res.status(500).json({ error: 'Failed to enter score' });
-    } finally {
-        client.release();
     }
 });
 

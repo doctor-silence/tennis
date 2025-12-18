@@ -245,6 +245,7 @@ export const LadderView = ({ user }: { user: User }) => {
     const [score, setScore] = useState("");
     const [winnerId, setWinnerId] = useState<string | null>(null);
     const [ladderType, setLadderType] = useState<'club_elo' | 'rtt_rating'>('club_elo');
+    const [eventType, setEventType] = useState<'friendly' | 'cup' | 'masters'>('friendly');
     
     useEffect(() => {
         const loadData = async () => {
@@ -281,7 +282,7 @@ export const LadderView = ({ user }: { user: User }) => {
         }
 
         try {
-            const newChallenge = await api.ladder.createChallenge(challenger, selectedOpponent);
+            const newChallenge = await api.ladder.createChallenge(challenger, selectedOpponent, eventType);
             setChallenges([newChallenge, ...challenges]);
             setShowChallengeModal(false);
             setViewMode('challenges');
@@ -523,6 +524,19 @@ export const LadderView = ({ user }: { user: User }) => {
                         Вы собираетесь оспорить {selectedOpponent?.rank} место в рейтинге. 
                         Матч должен быть сыгран в течение 7 дней.
                     </p>
+
+                    <div className="my-6">
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Тип матча</label>
+                        <select
+                            value={eventType}
+                            onChange={(e) => setEventType(e.target.value as 'friendly' | 'cup' | 'masters')}
+                            className="w-full mt-1 p-2 border rounded-xl bg-slate-50 focus:ring-2 focus:ring-lime-400 outline-none"
+                        >
+                            <option value="friendly">Товарищеский матч</option>
+                            <option value="cup">Клубный турнир</option>
+                            <option value="masters">Турнир серии Masters</option>
+                        </select>
+                    </div>
                     
                     <div className="bg-amber-50 p-4 rounded-xl text-left mb-6 border border-amber-100">
                         <div className="flex gap-3">
