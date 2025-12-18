@@ -194,7 +194,7 @@ const MatchResultPost = ({ post }: { post: any }) => {
     );
 };
 
-const MarketplacePost = ({ post }: { post: any }) => {
+const MarketplacePost = ({ post, onStartConversation }: { post: any, onStartConversation: (partnerId: string) => void }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedImage, setSelectedImage] = useState('');
 
@@ -239,7 +239,7 @@ const MarketplacePost = ({ post }: { post: any }) => {
                                     <div className="text-sm font-bold text-slate-700">{post.author.name}</div>
                                 </div>
                             </div>
-                            <Button>Написать продавцу</Button>
+                            <Button onClick={() => onStartConversation(post.author.id)}>Написать продавцу</Button>
                         </div>
                     </div>
                 </div>
@@ -257,9 +257,10 @@ interface FeedProps {
     feedItems: any[];
     user: User;
     onUpdate: () => void;
+    onStartConversation: (partnerId: string) => void;
 }
 
-const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate }) => {
+const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate, onStartConversation }) => {
     const AllEventsFeed = () => (
         <div className="space-y-4">
             {feedItems.map(item => {
@@ -271,7 +272,7 @@ const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate }) => 
                     case 'match_result':
                         return <MatchResultPost key={item.id} post={item} />;
                     case 'marketplace':
-                        return <MarketplacePost key={item.id} post={item} />;
+                        return <MarketplacePost key={item.id} post={item} onStartConversation={onStartConversation} />;
                     default:
                         return null;
                 }
@@ -298,7 +299,7 @@ const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate }) => 
     const FleaMarketFeed = () => (
         <div className="space-y-4">
             {feedItems.filter(item => item.type === 'marketplace').map(item => (
-                <MarketplacePost key={item.id} post={item} />
+                <MarketplacePost key={item.id} post={item} onStartConversation={onStartConversation} />
             ))}
         </div>
     );
@@ -626,7 +627,7 @@ const MarketplaceForm = ({ onPublish }: { onPublish: (data: any) => void }) => {
 
 // --- Main View Component ---
 
-const CommunityView2 = ({ user, onNavigate }: { user: User, onNavigate: (tab: string) => void }) => {
+const CommunityView2 = ({ user, onNavigate, onStartConversation }: { user: User, onNavigate: (tab: string) => void, onStartConversation: (partnerId: string) => void }) => {
     const [activeTab, setActiveTab] = useState('Все события');
     const [postText, setPostText] = useState('');
     const [feedItems, setFeedItems] = useState<any[]>([]);
@@ -753,7 +754,7 @@ const CommunityView2 = ({ user, onNavigate }: { user: User, onNavigate: (tab: st
                      {postType === 'event' && <div className="text-center p-4 text-slate-500 mt-4">Форма для событий скоро появится!</div>}
                 </div>
 
-                {loadingFeed ? <Loader2 className="animate-spin text-slate-400 mx-auto" /> : <Feed activeTab={activeTab} feedItems={feedItems} user={user} onUpdate={fetchFeed} />}
+                {loadingFeed ? <Loader2 className="animate-spin text-slate-400 mx-auto" /> : <Feed activeTab={activeTab} feedItems={feedItems} user={user} onUpdate={fetchFeed} onStartConversation={onStartConversation} />}
             </div>
             <div className="space-y-6">
                 <TournamentsWidget />

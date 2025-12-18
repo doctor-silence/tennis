@@ -147,7 +147,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
             {activeTab === 'students' && <StudentsView user={user} />}
             {activeTab === 'video_analysis' && <VideoAnalysisView />}
             {activeTab === 'ladder' && <LadderView user={user} />}
-            {activeTab === 'community' && <CommunityView user={user} onNavigate={handleNavigate} />}
+            {activeTab === 'community' && <CommunityView user={user} onNavigate={handleNavigate} onStartConversation={handleStartConversation} />}
           </div>
         </div>
       </main>
