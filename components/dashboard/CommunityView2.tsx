@@ -153,12 +153,51 @@ const PartnerSearchPost = ({ post }: { post: any }) => (
     </div>
 );
 
-const MatchResultPost = ({ post }: { post: any }) => {
+const MatchResultPost = ({ post, user, onUpdate }: { post: any, user: User, onUpdate: () => void }) => {
     const { author, content } = post;
     const { opponent, score, isWinner } = content;
     const winner = isWinner ? author : opponent;
     const loser = isWinner ? opponent : author;
     
+    const [isLiked, setIsLiked] = useState(post.liked_by_user);
+    const [currentLikes, setCurrentLikes] = useState(parseInt(post.likes_count) || 0);
+    const [showCommentInput, setShowCommentInput] = useState(false);
+    const [newCommentText, setNewCommentText] = useState('');
+    const [comments, setComments] = useState(post.comments || []);
+
+    const handleLikeClick = async () => {
+        const originalIsLiked = isLiked;
+        const originalLikes = currentLikes;
+        
+        setIsLiked(!originalIsLiked);
+        setCurrentLikes(originalIsLiked ? originalLikes - 1 : originalLikes + 1);
+
+        try {
+            await api.posts.toggleLike(post.id, user.id);
+        } catch (error) {
+            console.error("Failed to toggle like", error);
+            // Revert on error
+            setIsLiked(originalIsLiked);
+            setCurrentLikes(originalLikes);
+        }
+    };
+
+    const handleCommentClick = () => {
+        setShowCommentInput(!showCommentInput);
+    };
+
+    const handleAddComment = async () => {
+        if (newCommentText.trim()) {
+            try {
+                await api.posts.addComment(post.id, user.id, newCommentText);
+                setNewCommentText('');
+                onUpdate(); // Re-fetch all posts to get the new comment
+            } catch (error) {
+                console.error("Failed to add comment", error);
+            }
+        }
+    };
+
     return (
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
             <div className="flex justify-between items-center text-xs text-slate-400 mb-2">
@@ -190,6 +229,45 @@ const MatchResultPost = ({ post }: { post: any }) => {
                     <img src={loser.avatar} alt={loser.name} className="w-12 h-12 rounded-full filter grayscale" />
                 </div>
             </div>
+
+            <div className="flex items-center gap-4 text-slate-500 text-sm mt-4 pt-4 border-t border-slate-100">
+                <button onClick={handleLikeClick} className="flex items-center gap-1">
+                    <Heart size={16} className={`transition-colors ${isLiked ? "text-red-500 fill-current" : "hover:text-red-500"}`}/> {currentLikes}
+                </button>
+                <button onClick={handleCommentClick} className="flex items-center gap-1">
+                    <MessageCircle size={16} /> {comments.length}
+                </button>
+                <Share2 size={16} className="ml-auto"/>
+            </div>
+
+            {showCommentInput && (
+                <div className="mt-4">
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="text"
+                            placeholder="Написать комментарий..."
+                            value={newCommentText}
+                            onChange={(e) => setNewCommentText(e.target.value)}
+                            className="flex-1 bg-slate-100 p-2 rounded-lg outline-none border border-slate-200"
+                        />
+                        <Button onClick={handleAddComment} disabled={!newCommentText.trim()}>Отправить</Button>
+                    </div>
+                     {comments.length > 0 && (
+                        <div className="mt-4 space-y-3 pt-3 border-t border-slate-100">
+                            {comments.map((comment: any) => (
+                                <div key={comment.id} className="flex gap-2 text-xs text-slate-600">
+                                    <img src={comment.author.avatar} alt={comment.author.name} className="w-5 h-5 rounded-full" />
+                                    <div>
+                                        <span className="font-bold">{comment.author.name}</span>
+                                        <p className="text-slate-500">{comment.text}</p>
+                                    </div>
+                                    <span className="text-slate-400 ml-auto text-[10px]">{new Date(comment.created_at).toLocaleString()}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };
@@ -291,7 +369,7 @@ const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate, onSta
      const MatchResultsFeed = () => (
          <div className="space-y-4">
             {feedItems.filter(item => item.type === 'match_result').map(item => (
-                <MatchResultPost key={item.id} post={item} />
+                <MatchResultPost key={item.id} post={item} user={user} onUpdate={onUpdate} />
             ))}
         </div>
     );
