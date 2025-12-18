@@ -167,7 +167,12 @@ const MatchResultPost = ({ post }: { post: any }) => {
             </div>
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <img src={winner.avatar} alt={winner.name} className="w-10 h-10 rounded-full border-2 border-lime-400 p-0.5" />
+                    <div className="relative">
+                        <img src={winner.avatar} alt={winner.name} className="w-12 h-12 rounded-full border-2 border-lime-400 p-0.5" />
+                        <div className="absolute -top-1 -left-2 bg-lime-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full transform -rotate-12">
+                            WIN
+                        </div>
+                    </div>
                     <div>
                         <p className="font-bold text-sm">{winner.name}</p>
                         <p className="text-xs text-slate-500">Победитель</p>
@@ -182,7 +187,7 @@ const MatchResultPost = ({ post }: { post: any }) => {
                         <p className="font-bold text-sm text-right">{loser.name}</p>
                         <p className="text-xs text-slate-500 text-right">Оппонент</p>
                     </div>
-                    <img src={loser.avatar} alt={loser.name} className="w-10 h-10 rounded-full" />
+                    <img src={loser.avatar} alt={loser.name} className="w-12 h-12 rounded-full filter grayscale" />
                 </div>
             </div>
         </div>
