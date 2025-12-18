@@ -87,7 +87,6 @@ const TextPost = ({ post, user, onUpdate }: { post: any, user: User, onUpdate: (
                 <button onClick={handleCommentClick} className="flex items-center gap-1">
                     <MessageCircle size={16} /> {comments.length}
                 </button>
-                <Share2 size={16} className="ml-auto"/>
             </div>
 
             {showCommentInput && (
@@ -197,7 +196,7 @@ const MatchResultPost = ({ post, user, onUpdate }: { post: any, user: User, onUp
             }
         }
     };
-
+    
     return (
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
             <div className="flex justify-between items-center text-xs text-slate-400 mb-2">
@@ -237,7 +236,6 @@ const MatchResultPost = ({ post, user, onUpdate }: { post: any, user: User, onUp
                 <button onClick={handleCommentClick} className="flex items-center gap-1">
                     <MessageCircle size={16} /> {comments.length}
                 </button>
-                <Share2 size={16} className="ml-auto"/>
             </div>
 
             {showCommentInput && (
