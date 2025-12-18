@@ -345,7 +345,7 @@ const TournamentsWidget = () => (
     </div>
 );
 
-const TopPlayersWidget = () => {
+const TopPlayersWidget = ({ onNavigate }: { onNavigate: (tab: string) => void }) => {
     const [players, setPlayers] = useState<LadderPlayer[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -377,7 +377,7 @@ const TopPlayersWidget = () => {
                     <Trophy size={20} className="text-amber-400"/>
                     Топ игроков
                 </h3>
-                <a href="#" className="text-sm font-bold text-lime-400">&rarr;</a>
+                <button onClick={() => onNavigate('ladder')} className="text-sm font-bold text-lime-400 focus:outline-none">&rarr;</button>
             </div>
             <div className="space-y-3">
                 {loading && <div className="text-center text-slate-400">Загрузка...</div>}
@@ -621,7 +621,7 @@ const MarketplaceForm = ({ onPublish }: { onPublish: (data: any) => void }) => {
 
 // --- Main View Component ---
 
-const CommunityView2 = ({ user }: { user: User }) => {
+const CommunityView2 = ({ user, onNavigate }: { user: User, onNavigate: (tab: string) => void }) => {
     const [activeTab, setActiveTab] = useState('Все события');
     const [postText, setPostText] = useState('');
     const [feedItems, setFeedItems] = useState<any[]>([]);
@@ -752,7 +752,7 @@ const CommunityView2 = ({ user }: { user: User }) => {
             </div>
             <div className="space-y-6">
                 <TournamentsWidget />
-                <TopPlayersWidget />
+                <TopPlayersWidget onNavigate={onNavigate} />
                 <GroupsWidget />
                 <MarketplaceWidget />
             </div>
