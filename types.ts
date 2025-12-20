@@ -95,6 +95,19 @@ export interface Student {
   notes?: string;
 }
 
+export interface CalendarEvent {
+  id: string;
+  coachId: string;
+  title: string;
+  start: Date;
+  end: Date;
+  eventType: 'individual' | 'group' | 'sparring' | 'split';
+  studentId?: string;
+  courtId?: string;
+  notes?: string;
+  location?: string;
+}
+
 export interface Product {
   id: string;
   title: string;
