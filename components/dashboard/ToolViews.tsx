@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { BookOpen, Video, Upload, Users, Plus, Loader2 } from 'lucide-react';
+import { BookOpen, Video, Upload, Users, Plus, Loader2, Trash2 } from 'lucide-react';
 import { User, Student } from '../../types';
 import Button from '../Button';
 import { api } from '../../services/api';
@@ -11,19 +11,173 @@ const TennisCourt3D = lazy(() => import('./TennisCourt3D'));
 
 
 export const TacticsView = ({ user }: { user: User }) => {
+    const [trajectories, setTrajectories] = useState<any[]>([]);
+    const [savedTactics, setSavedTactics] = useState<any[]>([]);
+    const [tacticName, setTacticName] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [tacticToDelete, setTacticToDelete] = useState<any | null>(null);
+
+    const fetchTactics = async () => {
+        try {
+            setIsLoading(true);
+            const tactics = await api.tactics.list(user.id);
+            setSavedTactics(tactics || []);
+        } catch (err) {
+            setError('Не удалось загрузить тактики');
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchTactics();
+    }, [user.id]);
+
+    const handleSaveTactic = async () => {
+        if (!tacticName) {
+            setError('Введите название тактики');
+            return;
+        }
+        if (trajectories.length === 0) {
+            setError('Нарисуйте хотя бы одну траекторию');
+            return;
+        }
+        try {
+            setIsLoading(true);
+            setError('');
+            const newTactic = await api.tactics.create({
+                userId: user.id,
+                name: tacticName,
+                trajectories: trajectories,
+            });
+            setSavedTactics([newTactic, ...savedTactics]);
+            setTacticName('');
+            setTrajectories([]);
+        } catch (err) {
+            setError('Ошибка сохранения');
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    const handleLoadTactic = (tactic: any) => {
+        const trajectoriesData = typeof tactic.tactics_data === 'string' 
+            ? JSON.parse(tactic.tactics_data) 
+            : tactic.tactics_data;
+        setTrajectories(trajectoriesData || []);
+    };
+
+    const handleDeleteTactic = (tactic: any) => {
+        setTacticToDelete(tactic);
+    };
+
+    const confirmDelete = async () => {
+        if (!tacticToDelete) return;
+
+        try {
+            setIsLoading(true);
+            setError('');
+            await api.tactics.delete(tacticToDelete.id);
+            setSavedTactics(savedTactics.filter(t => t.id !== tacticToDelete.id));
+            setTacticToDelete(null);
+        } catch (err) {
+            setError('Ошибка удаления');
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
-        <div className="h-[700px]">
-            <Suspense fallback={
-                <div className="w-full h-full bg-slate-100 rounded-3xl flex items-center justify-center text-slate-500">
-                    <Loader2 className="animate-spin mr-2" /> Загрузка 3D-модели...
+        <>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[700px]">
+                <div className="lg:col-span-2 h-full">
+                    <Suspense fallback={
+                        <div className="w-full h-full bg-slate-100 rounded-3xl flex items-center justify-center text-slate-500">
+                            <Loader2 className="animate-spin mr-2" /> Загрузка 3D-модели...
+                        </div>
+                    }>
+                        <TennisCourt3D 
+                            user={user} 
+                            trajectories={trajectories}
+                            setTrajectories={setTrajectories}
+                        />
+                    </Suspense>
                 </div>
-            }>
-                <TennisCourt3D user={user} />
-            </Suspense>
-        </div>
+                <div className="lg:col-span-1 bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex flex-col">
+                    <h3 className="text-xl font-bold mb-4">Библиотека Тактик</h3>
+                    
+                    {/* Save Form */}
+                    <div className="mb-4 p-4 bg-slate-50 rounded-2xl">
+                        <h4 className="font-bold text-md mb-2">Сохранить новую тактику</h4>
+                        <input 
+                            type="text"
+                            value={tacticName}
+                            onChange={(e) => setTacticName(e.target.value)}
+                            placeholder="Название тактики (например, Подача в квадрат 1)"
+                            className="w-full p-2 border border-slate-300 rounded-lg mb-2"
+                            disabled={isLoading}
+                        />
+                        <Button 
+                            onClick={handleSaveTactic} 
+                            disabled={isLoading || trajectories.length === 0}
+                            className="w-full"
+                        >
+                            {isLoading ? <Loader2 className="animate-spin" /> : 'Сохранить'}
+                        </Button>
+                        {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+                    </div>
+
+                    {/* Tactics List */}
+                    <div className="flex-grow overflow-y-auto space-y-3">
+                        {isLoading && savedTactics.length === 0 && <div className="text-center p-4"><Loader2 className="animate-spin mx-auto"/></div>}
+                        {!isLoading && savedTactics.length === 0 && (
+                            <div className="text-center text-slate-400 p-8 border-2 border-dashed rounded-2xl">
+                                <BookOpen className="mx-auto mb-2"/>
+                                <p>Ваша библиотека пуста.</p>
+                                <p className="text-sm">Нарисуйте схему и сохраните ее.</p>
+                            </div>
+                        )}
+                        {savedTactics.map((tactic) => (
+                            <div key={tactic.id} className="p-3 bg-white border rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-colors">
+                                <div className="flex justify-between items-center">
+                                    <span className="font-semibold">{tactic.name}</span>
+                                    <div className="flex items-center gap-2">
+                                        <Button size="sm" variant="secondary" onClick={() => handleLoadTactic(tactic)}>Загрузить</Button>
+                                        <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => handleDeleteTactic(tactic)}>
+                                            <Trash2 size={16}/>
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {tacticToDelete && (
+                <Modal
+                    isOpen={!!tacticToDelete}
+                    onClose={() => setTacticToDelete(null)}
+                    title="Подтвердите удаление"
+                >
+                    <p>Вы уверены, что хотите удалить тактику "{tacticToDelete.name}"?</p>
+                    <div className="flex justify-end gap-4 mt-6">
+                        <Button variant="secondary" onClick={() => setTacticToDelete(null)} disabled={isLoading}>
+                            Отмена
+                        </Button>
+                        <Button variant="danger" onClick={confirmDelete} disabled={isLoading}>
+                            {isLoading ? <Loader2 className="animate-spin" /> : 'Удалить'}
+                        </Button>
+                    </div>
+                </Modal>
+            )}
+        </>
     );
 };
-
 export const VideoAnalysisView = () => (
     <div className="bg-white rounded-3xl p-12 shadow-sm border border-slate-200 text-center">
          <div className="max-w-md mx-auto">

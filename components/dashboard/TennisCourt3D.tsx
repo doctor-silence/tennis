@@ -1,3 +1,4 @@
+
 import React, { Suspense, useState, useEffect } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, CatmullRomLine } from '@react-three/drei';
@@ -26,9 +27,15 @@ const LINE_Y_OFFSET = 0.01;
 
 const calculateArcPoints = (flatPoints: THREE.Vector3[], arcHeight: number): THREE.Vector3[] => {
     if (flatPoints.length < 2) return [];
-    const totalDistance = flatPoints[flatPoints.length - 1].distanceTo(flatPoints[0]);
+    // Ensure points are THREE.Vector3 instances before calling distanceTo
+    const startPoint = new THREE.Vector3(flatPoints[0].x, flatPoints[0].y, flatPoints[0].z);
+    const endPoint = new THREE.Vector3(flatPoints[flatPoints.length - 1].x, flatPoints[flatPoints.length - 1].y, flatPoints[flatPoints.length - 1].z);
+    
+    const totalDistance = endPoint.distanceTo(startPoint);
     const maxHeight = Math.min(arcHeight, totalDistance / 1.5);
-    return flatPoints.map((point, i) => {
+    
+    return flatPoints.map((p, i) => {
+        const point = new THREE.Vector3(p.x, p.y, p.z);
         const progress = i / (flatPoints.length - 1);
         const y = 4 * maxHeight * progress * (1 - progress);
         return new THREE.Vector3(point.x, point.y + y, point.z);
@@ -153,10 +160,16 @@ const ArcPicker = ({ activeHeight, setArcHeight, disabled }) => (
     </div>
 );
 
+interface TennisCourt3DProps {
+  user: User;
+  trajectories: Trajectory[];
+  setTrajectories: React.Dispatch<React.SetStateAction<Trajectory[]>>;
+}
+
+
 // --- Основной Компонент ---
 
-const TennisCourt3D = ({ user }: { user: User }) => {
-    const [trajectories, setTrajectories] = useState<any[]>([]);
+const TennisCourt3D = ({ user, trajectories, setTrajectories }: TennisCourt3DProps) => {
     const [activeColor, setActiveColor] = useState<string>(COLORS.WHITE);
     const [activeArcHeight, setActiveArcHeight] = useState<number>(ARC_HEIGHTS.LOW);
     

@@ -933,35 +933,21 @@ export const api = {
     },
 
     tactics: {
-        getAll: async (userId: string): Promise<Trajectory[]> => {
+        list: async (userId: string): Promise<any[]> => {
             try {
                 const res = await fetch(`${API_URL}/tactics/list/${userId}`);
                 if (!res.ok) throw new Error('Failed to fetch tactics list');
-                const data = await res.json();
-                
-                // The backend returns tactics_data, we need to deserialize it
-                return data.map(tactic => {
-                    const trajectories = tactic.tactics_data || [];
-                    return {
-                        ...tactic,
-                        // Ensure points are converted back to THREE.Vector3 objects
-                        points: trajectories.map(p => new THREE.Vector3(p.x, p.y, p.z)),
-                    };
-                });
+                return await res.json();
             } catch (e) {
                 console.warn("Backend offline or failed to fetch tactics. Returning mock data.", e);
                 return MOCK_TACTICS; 
             }
         },
-        create: async (userId: string, tactic: Omit<Trajectory, 'id' | 'user_id'>): Promise<Trajectory> => {
+        create: async (data: { userId: string, name: string, trajectories: any[] }): Promise<Trajectory> => {
             const res = await fetch(`${API_URL}/tactics`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId,
-                    name: tactic.name,
-                    trajectories: tactic.points 
-                })
+                body: JSON.stringify(data)
             });
             if (!res.ok) {
                  const err = await res.json();
@@ -969,14 +955,11 @@ export const api = {
             }
             return await res.json();
         },
-        update: async (tacticId: string, tactic: Trajectory): Promise<Trajectory> => {
+        update: async (tacticId: string, data: { name: string, trajectories: any[] }): Promise<Trajectory> => {
             const res = await fetch(`${API_URL}/tactic/${tacticId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: tactic.name,
-                    trajectories: tactic.points
-                })
+                body: JSON.stringify(data)
             });
             if (!res.ok) {
                 const err = await res.json();
