@@ -1199,6 +1199,37 @@ app.post('/api/posts/:id/comments', async (req, res) => {
 
 // --- STUDENTS CRM ROUTES ---
 
+app.get('/api/crm/stats/:coachId', async (req, res) => {
+    const { coachId } = req.params;
+    if (!coachId) return res.status(400).json({ error: 'coachId required' });
+
+    const coachIdInt = parseInt(coachId);
+    if (isNaN(coachIdInt)) {
+        return res.status(400).json({ error: 'Invalid coachId' });
+    }
+
+    try {
+        const activePlayersRes = await pool.query(
+            `SELECT COUNT(*) FROM students WHERE coach_id = $1 AND status = 'active'`,
+            [coachIdInt]
+        );
+
+        const debtRes = await pool.query(
+            `SELECT SUM(balance) as total_debt, COUNT(*) as players_in_debt FROM students WHERE coach_id = $1 AND balance < 0`,
+            [coachIdInt]
+        );
+
+        res.json({
+            activePlayers: parseInt(activePlayersRes.rows[0].count, 10),
+            totalDebt: parseInt(debtRes.rows[0].total_debt || 0, 10),
+            playersInDebt: parseInt(debtRes.rows[0].players_in_debt, 10)
+        });
+    } catch (err) {
+        console.error("Get CRM Stats Error:", err);
+        res.status(500).json({ error: 'Db error' });
+    }
+});
+
 app.get('/api/students', async (req, res) => {
     const { coachId } = req.query;
     if (!coachId) return res.status(400).json({ error: 'coachId required' });
@@ -1210,9 +1241,49 @@ app.get('/api/students', async (req, res) => {
 
     try {
         const result = await pool.query('SELECT * FROM students WHERE coach_id = $1 ORDER BY id DESC', [coachIdInt]);
-        res.json(result.rows.map(mapStudent));
+        res.json(result.rows.map(row => ({
+            ...mapStudent(row),
+            skillLevelXp: row.skill_level_xp
+        })));
     } catch (err) {
         console.error("Get Students Error:", err);
+        res.status(500).json({ error: 'Db error' });
+    }
+});
+
+app.get('/api/students/:id', async (req, res) => {
+    const { id } = req.params;
+    const studentId = parseInt(id);
+    if (isNaN(studentId)) {
+        return res.status(400).json({ error: 'Invalid student ID' });
+    }
+
+    try {
+        const studentRes = await pool.query('SELECT * FROM students WHERE id = $1', [studentId]);
+        if (studentRes.rows.length === 0) {
+            return res.status(404).json({ error: 'Student not found' });
+        }
+
+        const skillsRes = await pool.query('SELECT skill_name, skill_value FROM student_skills WHERE student_id = $1', [studentId]);
+        const historyRes = await pool.query('SELECT * FROM lesson_history WHERE student_id = $1 ORDER BY date DESC', [studentId]);
+
+        const student = {
+            ...mapStudent(studentRes.rows[0]),
+            skillLevelXp: studentRes.rows[0].skill_level_xp,
+            skills: skillsRes.rows.map(r => ({ name: r.skill_name, value: r.skill_value })),
+            lessonHistory: historyRes.rows.map(r => ({
+                id: r.id.toString(),
+                date: r.date,
+                description: r.description,
+                amount: r.amount,
+                location: r.location
+            }))
+        };
+
+        res.json(student);
+
+    } catch (err) {
+        console.error("Get Student Details Error:", err);
         res.status(500).json({ error: 'Db error' });
     }
 });

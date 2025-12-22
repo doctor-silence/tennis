@@ -1,4 +1,4 @@
-import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Match, Product, PlayerProfile, Trajectory, Conversation, ChatMessage, MarketplaceItem } from '../types';
+import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Match, Product, PlayerProfile, Trajectory, Conversation, ChatMessage, MarketplaceItem, CrmStats, Skill, Lesson } from '../types';
 import * as THREE from 'three'; // Import THREE for Vector3 deserialization
 
 // Frontend API Service
@@ -492,7 +492,20 @@ export const api = {
                 const res = await fetch(`${API_URL}/students?coachId=${coachId}`);
                 if (!res.ok) throw new Error('Failed to fetch students');
                 return await res.json();
-            } catch (e) { return []; }
+            } catch (e) { 
+                console.error("Fetch Students Error:", e);
+                return []; 
+            }
+        },
+        getOne: async (studentId: string): Promise<Student> => {
+            try {
+                const res = await fetch(`${API_URL}/students/${studentId}`);
+                if (!res.ok) throw new Error('Failed to fetch student details');
+                return await res.json();
+            } catch (e) {
+                console.error("Fetch Student Details Error:", e);
+                throw e;
+            }
         },
         create: async (data: any): Promise<Student> => {
             try {
@@ -516,6 +529,20 @@ export const api = {
                 if (!res.ok) throw new Error('Failed to update student');
                 return await res.json();
             } catch (e) { throw e; }
+        }
+    },
+
+    crm: {
+        getStats: async (coachId: string): Promise<CrmStats> => {
+            try {
+                const res = await fetch(`${API_URL}/crm/stats/${coachId}`);
+                if (!res.ok) throw new Error('Failed to fetch CRM stats');
+                return await res.json();
+            } catch (e) {
+                console.error("Fetch CRM Stats Error:", e);
+                // Fallback for demo mode or error
+                return { activePlayers: 3, totalDebt: 1500, playersInDebt: 1 };
+            }
         }
     },
 

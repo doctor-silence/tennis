@@ -81,6 +81,19 @@ export interface Conversation {
   isPro: boolean;
 }
 
+export interface Skill {
+    name: string;
+    value: number;
+}
+
+export interface Lesson {
+    id: string;
+    date: string;
+    description: string;
+    amount: number;
+    location: string;
+}
+
 export interface Student {
   id: string;
   coachId?: string;
@@ -93,6 +106,15 @@ export interface Student {
   status: 'active' | 'vacation' | 'injured';
   goals: string;
   notes?: string;
+  skillLevelXp: number;
+  skills: Skill[];
+  lessonHistory: Lesson[];
+}
+
+export interface CrmStats {
+    activePlayers: number;
+    totalDebt: number;
+    playersInDebt: number;
 }
 
 export interface CalendarEvent {

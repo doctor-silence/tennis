@@ -86,10 +86,37 @@ const initDb = async () => {
         avatar TEXT,
         status VARCHAR(20) DEFAULT 'active',
         goals TEXT,
-        notes TEXT
+        notes TEXT,
+        skill_level_xp INTEGER DEFAULT 0
       );
     `);
+    await client.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS skill_level_xp INTEGER DEFAULT 0;`);
     console.log('✅ Table "students" checked.');
+
+    // Create student_skills table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS student_skills (
+        id SERIAL PRIMARY KEY,
+        student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
+        skill_name VARCHAR(100) NOT NULL,
+        skill_value INTEGER DEFAULT 0,
+        UNIQUE(student_id, skill_name)
+      );
+    `);
+    console.log('✅ Table "student_skills" checked.');
+
+    // Create lesson_history table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS lesson_history (
+        id SERIAL PRIMARY KEY,
+        student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
+        date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        description TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        location TEXT
+      );
+    `);
+    console.log('✅ Table "lesson_history" checked.');
 
     // 5. Create Matches Table (Statistics)
     await client.query(`
@@ -369,6 +396,67 @@ const initDb = async () => {
            );
        }
     }
+
+    // Seed CRM data only if students table is empty for the demo coach
+    const coachRes = await pool.query("SELECT id FROM users WHERE email = 'coach@test.com'");
+    if (coachRes.rows.length > 0) {
+        const coachId = coachRes.rows[0].id;
+        const studentCountRes = await pool.query('SELECT COUNT(*) FROM students WHERE coach_id = $1', [coachId]);
+        
+        if (parseInt(studentCountRes.rows[0].count) === 0) {
+            console.log('🌱 Seeding CRM data for demo coach...');
+            
+            // Student 1: Александр П.
+            const student1Res = await pool.query(
+                `INSERT INTO students (coach_id, name, age, level, balance, next_lesson, avatar, status, skill_level_xp) 
+                 VALUES ($1, 'Александр П.', 28, 'NTRP 4.0', 5000, 'Завтра, 10:00', 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80', 'active', 1200) 
+                 RETURNING id`,
+                [coachId]
+            );
+            const student1Id = student1Res.rows[0].id;
+            await pool.query(
+                `INSERT INTO student_skills (student_id, skill_name, skill_value) VALUES 
+                 ($1, 'Подача', 75), ($1, 'Форхенд', 85), ($1, 'Бэкхенд', 60), ($1, 'Выносливость', 90), ($1, 'Тактика', 70)`,
+                [student1Id]
+            );
+            await pool.query(
+                `INSERT INTO lesson_history (student_id, date, description, amount, location) VALUES
+                 ($1, '2025-12-11 10:00', 'Индивидуальная тренировка', -2500, 'ТК СПАРТАК'),
+                 ($1, '2025-12-12 10:00', 'Индивидуальная тренировка', -2500, 'ТК СПАРТАК'),
+                 ($1, '2025-12-13 10:00', 'Индивидуальная тренировка', -2500, 'ТК СПАРТАК')`,
+                [student1Id]
+            );
+
+            // Student 2: Мария Ш.
+            const student2Res = await pool.query(
+                `INSERT INTO students (coach_id, name, age, level, balance, next_lesson, avatar, status, skill_level_xp) 
+                 VALUES ($1, 'Мария Ш.', 24, 'NTRP 5.0', -1500, 'Ср, 18:00', 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80', 'active', 3400) 
+                 RETURNING id`,
+                [coachId]
+            );
+            const student2Id = student2Res.rows[0].id;
+            await pool.query(
+                `INSERT INTO student_skills (student_id, skill_name, skill_value) VALUES 
+                 ($1, 'Подача', 80), ($1, 'Форхенд', 90), ($1, 'Бэкхенд', 85), ($1, 'Выносливость', 75), ($1, 'Тактика', 88)`,
+                [student2Id]
+            );
+
+             // Student 3: Даниил М.
+            const student3Res = await pool.query(
+                `INSERT INTO students (coach_id, name, age, level, balance, next_lesson, avatar, status, skill_level_xp) 
+                 VALUES ($1, 'Даниил М.', 26, 'PRO', 12000, 'Пт, 15:00', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80', 'active', 5600) 
+                 RETURNING id`,
+                [coachId]
+            );
+            const student3Id = student3Res.rows[0].id;
+            await pool.query(
+                `INSERT INTO student_skills (student_id, skill_name, skill_value) VALUES 
+                 ($1, 'Подача', 95), ($1, 'Форхенд', 92), ($1, 'Бэкхенд', 88), ($1, 'Выносливость', 94), ($1, 'Тактика', 91)`,
+                [student3Id]
+            );
+        }
+    }
+
 
     console.log('🚀 Инициализация базы данных завершена.');
   } catch (error) {
