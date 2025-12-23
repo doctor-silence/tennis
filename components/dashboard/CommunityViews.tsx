@@ -11,27 +11,52 @@ import LadderBanner from './LadderBanner';
 
 // --- STICKER FEATURE START ---
 
-type StickerCategory = 'game' | 'tactics' | 'emotions';
+type StickerCategory = 'match' | 'tactics' | 'gear';
 
 interface Sticker {
-  name: string;
+  id: string;
+  icon: string;
+  label: string;
   category: StickerCategory;
-  image: string;
+  animation: string;
 }
 
-const stickerData: Sticker[] = [
-    { name: 'ACE!', category: 'game', image: 'sticker-ball.svg'},
-    { name: 'VAMOS!', category: 'game', image: 'sticker-trophy.svg'},
-    { name: 'WINNER', category: 'emotions', image: 'sticker-racket.svg'},
-    // Add more placeholders for other categories if needed
+const TENNIS_PRO_PACK: Sticker[] = [
+    // --- КАТЕГОРИЯ: ИГРА (MATCH) ---
+    { id: 'm1', icon: '🎾', label: 'ACE!', category: 'match', animation: 'animate-bounce-short' },
+    { id: 'm2', icon: '🏆', label: 'WINNER', category: 'match', animation: 'animate-pulse' },
+    { id: 'm3', icon: '🛑', label: 'OUT!', category: 'match', animation: 'animate-shake' },
+    { id: 'm4', icon: '🥅', label: 'NET', category: 'match', animation: 'animate-shake' },
+    { id: 'm5', icon: '⚖️', label: 'DEUCE', category: 'match', animation: 'animate-tilt' },
+    { id: 'm6', icon: '🌟', label: 'SET PT', category: 'match', animation: 'animate-scan' },
+    { id: 'm7', icon: '🤝', label: 'HANDSHAKE', category: 'match', animation: 'animate-pulse' },
+    { id: 'm8', icon: '🏟️', label: 'CENTER COURT', category: 'match', animation: 'animate-scan' },
+
+    // --- КАТЕГОРИЯ: УДАРЫ (TACTICS) ---
+    { id: 't1', icon: '🚀', label: 'FLAT SERVE', category: 'tactics', animation: 'animate-shake' },
+    { id: 't2', icon: '🎯', label: 'PRECISION', category: 'tactics', animation: 'animate-scan' },
+    { id: 't3', icon: '🔨', label: 'SMASH', category: 'tactics', animation: 'animate-shake' },
+    { id: 't4', icon: '🌀', label: 'TOP SPIN', category: 'tactics', animation: 'animate-scan' },
+    { id: 't5', icon: '👣', label: 'FOOTWORK', category: 'tactics', animation: 'animate-bounce-short' },
+    { id: 't6', icon: '🎈', label: 'LOB', category: 'tactics', animation: 'animate-bounce-short' },
+    { id: 't7', icon: '🏹', label: 'CROSS', category: 'tactics', animation: 'animate-tilt' },
+    { id: 't8', icon: '📏', label: 'ON LINE', category: 'tactics', animation: 'animate-scan' },
+
+    // --- КАТЕГОРИЯ: ИНВЕНТАРЬ (GEAR) ---
+    { id: 'g1', icon: '🎾', label: 'RACKET', category: 'gear', animation: 'animate-tilt' },
+    { id: 'g2', icon: '👟', label: 'SHOES', category: 'gear', animation: 'animate-bounce-short' },
+    { id: 'g3', icon: '🎒', label: 'BAG', category: 'gear', animation: 'animate-bounce-short' },
+    { id: 'g4', icon: '🍌', label: 'RECOVERY', category: 'gear', animation: 'animate-pulse' },
+    { id: 'g5', icon: '🥤', label: 'ISOTONIC', category: 'gear', animation: 'animate-pulse' },
+    { id: 'g6', icon: '🧵', label: 'STRINGS', category: 'gear', animation: 'animate-scan' },
 ];
 
 const StickerPanel = ({ onSelectSticker, onClose }: { onSelectSticker: (sticker: Sticker) => void, onClose: () => void }) => {
     const [activeCategory, setActiveCategory] = useState<StickerCategory | 'all'>('all');
 
     const filteredStickers = activeCategory === 'all' 
-        ? stickerData 
-        : stickerData.filter(s => s.category === activeCategory);
+        ? TENNIS_PRO_PACK 
+        : TENNIS_PRO_PACK.filter(s => s.category === activeCategory);
 
     const CategoryButton = ({ category, label, icon }: { category: StickerCategory | 'all', label: string, icon: React.ReactNode }) => (
         <button 
@@ -55,18 +80,18 @@ const StickerPanel = ({ onSelectSticker, onClose }: { onSelectSticker: (sticker:
             </div>
             <div className="p-3 bg-white flex gap-2">
                 <CategoryButton category="all" label="Все" icon={<Grid size={16}/>} />
-                <CategoryButton category="game" label="Игра" icon={<img src="/assets/sticker-ball.svg" className="w-4 h-4"/>} />
-                <CategoryButton category="tactics" label="Тактика" icon={<BrainCircuit size={16}/>} />
-                <CategoryButton category="emotions" label="Эмоции" icon={<Flame size={16}/>} />
+                <CategoryButton category="match" label="Игра" icon="🎾" />
+                <CategoryButton category="tactics" label="Тактика" icon="🎯" />
+                <CategoryButton category="gear" label="Инвентарь" icon="🎒" />
             </div>
             <div className="p-4 h-64 overflow-y-auto">
                 <div className="grid grid-cols-5 gap-4">
                     {filteredStickers.map(sticker => (
-                        <div key={sticker.name} className="text-center cursor-pointer group" onClick={() => onSelectSticker(sticker)}>
-                            <div className="p-3 bg-slate-50 rounded-2xl group-hover:bg-slate-100 transition-colors">
-                                <img src={`/assets/${sticker.image}`} alt={sticker.name} className="w-full h-full object-contain"/>
+                        <div key={sticker.id} className="text-center cursor-pointer group" onClick={() => onSelectSticker(sticker)}>
+                            <div className={`p-3 bg-slate-50 rounded-2xl group-hover:bg-slate-100 transition-colors flex items-center justify-center aspect-square ${sticker.animation}`}>
+                                <span className="text-4xl">{sticker.icon}</span>
                             </div>
-                            <div className="text-[10px] uppercase font-bold text-slate-400 mt-1.5">{sticker.name}</div>
+                            <div className="text-[10px] uppercase font-bold text-slate-400 mt-1.5">{sticker.label}</div>
                         </div>
                     ))}
                 </div>
@@ -144,7 +169,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
         const activeConvo = conversations.find(c => c.id === activeConversationId);
         if (!activeConvo) return;
 
-        const stickerText = `::sticker:${sticker.image}::`;
+        const stickerText = `::sticker:${sticker.id}::`;
         const sentMessage = await api.messages.sendMessage(user.id, activeConvo.partnerId, stickerText);
         setMessages(currentMessages => [...currentMessages, sentMessage]);
         setShowStickerPanel(false);
@@ -155,8 +180,16 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
         const match = text.match(stickerRegex);
 
         if (match && match[1]) {
-            const stickerFileName = match[1];
-            return <img src={`/assets/${stickerFileName}`} alt="sticker" className="w-24 h-24" />;
+            const stickerId = match[1];
+            const sticker = TENNIS_PRO_PACK.find(s => s.id === stickerId);
+            if (sticker) {
+                return (
+                    <div className="text-center p-4">
+                        <div className={`text-5xl ${sticker.animation}`}>{sticker.icon}</div>
+                        <div className="text-xs font-bold uppercase text-slate-500 mt-2">{sticker.label}</div>
+                    </div>
+                );
+            }
         }
 
         return text;

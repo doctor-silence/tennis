@@ -50,7 +50,49 @@
           -ms-overflow-style: none;
           scrollbar-width: none;
       }
+/* TENNIS STICKER ANIMATIONS */
+      @keyframes bounceShort {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-15px); }
+      }
+      .animate-bounce-short {
+        animation: bounceShort 0.8s ease-in-out infinite;
+      }
 
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        20% { transform: translateX(-5px) rotate(-1deg); }
+        40% { transform: translateX(5px) rotate(1deg); }
+        60% { transform: translateX(-5px) rotate(-1deg); }
+        80% { transform: translateX(5px) rotate(1deg); }
+      }
+      .animate-shake {
+        animation: shake 0.5s ease-in-out infinite;
+      }
+
+      @keyframes tilt {
+        0%, 100% { transform: rotate(-5deg); }
+        50% { transform: rotate(10deg); }
+      }
+      .animate-tilt {
+        animation: tilt 2s ease-in-out infinite;
+      }
+
+      @keyframes scan {
+        0%, 100% { opacity: 0.6; transform: scale(1); }
+        50% { opacity: 1; transform: scale(1.08); }
+      }
+      .animate-scan {
+        animation: scan 2.5s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: .5; }
+      }
+      .animate-pulse {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
       @keyframes fadeInUp {
         from { opacity: 0; transform: translateY(20px); }
         to { opacity: 1; transform: translateY(0); }
