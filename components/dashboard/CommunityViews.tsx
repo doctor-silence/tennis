@@ -11,7 +11,7 @@ import LadderBanner from './LadderBanner';
 
 // --- STICKER FEATURE START ---
 
-type StickerCategory = 'match' | 'tactics' | 'gear';
+type StickerCategory = 'match' | 'tactics' | 'gear' | 'emotions';
 
 interface Sticker {
   id: string;
@@ -49,6 +49,9 @@ const TENNIS_PRO_PACK: Sticker[] = [
     { id: 'g4', icon: '🍌', label: 'RECOVERY', category: 'gear', animation: 'animate-pulse' },
     { id: 'g5', icon: '🥤', label: 'ISOTONIC', category: 'gear', animation: 'animate-pulse' },
     { id: 'g6', icon: '🧵', label: 'STRINGS', category: 'gear', animation: 'animate-scan' },
+
+    // --- КАТЕГОРИЯ: ЭМОЦИИ (EMOTIONS) ---
+    { id: 'e1', icon: '/assets/rublev_cry.webm', label: 'Rublev Cry', category: 'emotions', animation: '' },
 ];
 
 const StickerPanel = ({ onSelectSticker, onClose }: { onSelectSticker: (sticker: Sticker) => void, onClose: () => void }) => {
@@ -83,13 +86,18 @@ const StickerPanel = ({ onSelectSticker, onClose }: { onSelectSticker: (sticker:
                 <CategoryButton category="match" label="Игра" icon="🎾" />
                 <CategoryButton category="tactics" label="Тактика" icon="🎯" />
                 <CategoryButton category="gear" label="Инвентарь" icon="🎒" />
+                <CategoryButton category="emotions" label="Эмоции" icon="😢" />
             </div>
             <div className="p-4 h-64 overflow-y-auto">
                 <div className="grid grid-cols-5 gap-4">
                     {filteredStickers.map(sticker => (
                         <div key={sticker.id} className="text-center cursor-pointer group" onClick={() => onSelectSticker(sticker)}>
-                            <div className={`p-3 bg-slate-50 rounded-2xl group-hover:bg-slate-100 transition-colors flex items-center justify-center aspect-square ${sticker.animation}`}>
-                                <span className="text-4xl">{sticker.icon}</span>
+                            <div className={`p-3 bg-slate-50 rounded-2xl group-hover:bg-slate-100 transition-colors flex items-center justify-center aspect-square`}>
+                                {sticker.icon.endsWith('.webm') ? (
+                                    <video src={sticker.icon} className="w-full h-full object-contain" loop autoPlay muted playsInline />
+                                ) : (
+                                    <span className={`text-4xl ${sticker.animation}`}>{sticker.icon}</span>
+                                )}
                             </div>
                             <div className="text-[10px] uppercase font-bold text-slate-400 mt-1.5">{sticker.label}</div>
                         </div>
@@ -183,6 +191,9 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
             const stickerId = match[1];
             const sticker = TENNIS_PRO_PACK.find(s => s.id === stickerId);
             if (sticker) {
+                if (sticker.icon.endsWith('.webm')) {
+                    return <video src={sticker.icon} className="w-32 h-32 rounded-lg" loop autoPlay muted playsInline />;
+                }
                 return (
                     <div className="text-center p-4">
                         <div className={`text-5xl ${sticker.animation}`}>{sticker.icon}</div>
@@ -244,10 +255,9 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                                 ) : (
                                     messages.map((msg, i) => (
                                         <div key={i} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                            <div className={`max-w-xs md:max-w-md p-0 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-lime-500/20 rounded-br-lg' : 'bg-white border border-slate-100 rounded-bl-lg'}`}>
+                                            <div className={`max-w-xs md:max-w-md p-0 rounded-2xl text-sm ${msg.role === 'user' ? (msg.text.startsWith('::sticker:') ? '' : 'bg-lime-500/20 rounded-br-lg') : 'bg-white border border-slate-100 rounded-bl-lg'}`}>
                                                 {renderMessageContent(msg.text)}
-                                            </div>
-                                        </div>
+                                            </div>                                        </div>
                                     ))
                                 )}
                                 <div ref={messagesEndRef} />

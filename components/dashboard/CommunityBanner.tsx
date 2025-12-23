@@ -11,7 +11,7 @@ const CommunityBanner: React.FC<CommunityBannerProps> = ({
   groupsCount = 42 
 }) => {
   return (
-    <div className="relative w-full h-44 bg-indigo-700 rounded-[40px] overflow-hidden flex items-center px-10 shadow-[0_20px_50px_rgba(67,56,202,0.3)] border border-indigo-400/30 group">
+    <div className="relative w-full h-44 bg-gradient-to-br from-emerald-600 to-emerald-900 rounded-[40px] overflow-hidden flex items-center px-10 shadow-[0_25px_60px_rgba(6,78,59,0.3)] group">
       
       {/* 1. ФОНОВЫЕ ДЕКОРАЦИИ */}
       {/* Анимированный глобус */}
@@ -34,7 +34,7 @@ const CommunityBanner: React.FC<CommunityBannerProps> = ({
         <div className="flex flex-col">
           <div className="inline-flex items-center gap-2 mb-3 bg-white/10 backdrop-blur-xl px-4 py-1.5 rounded-full border border-white/20 w-fit">
             <div className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(248,113,113,0.8)]"></div>
-            <span className="text-[9px] font-black uppercase tracking-[0.25em] text-indigo-50">Community Pulse Live</span>
+            <span className="text-[9px] font-black uppercase tracking-[0.25em] text-emerald-50">Community Pulse Live</span>
           </div>
           
           <h2 className="text-4xl md:text-5xl font-black italic uppercase tracking-tighter leading-none text-white">
@@ -44,7 +44,7 @@ const CommunityBanner: React.FC<CommunityBannerProps> = ({
             </span>
           </h2>
           
-          <p className="text-indigo-100/40 text-[10px] font-bold uppercase tracking-[0.4em] mt-3 ml-1">
+          <p className="text-emerald-100/40 text-[10px] font-bold uppercase tracking-[0.4em] mt-3 ml-1">
             Сообщество теннисистов России
           </p>
         </div>
@@ -52,7 +52,7 @@ const CommunityBanner: React.FC<CommunityBannerProps> = ({
         {/* Правая часть: Статистика */}
         <div className="hidden lg:flex gap-10 items-center bg-black/20 backdrop-blur-md p-5 px-10 rounded-[32px] border border-white/10 hover:bg-black/30 transition-all duration-500">
           <div className="text-center group/stat cursor-default">
-            <div className="text-[9px] font-black text-indigo-300 uppercase mb-1 tracking-widest group-hover/stat:text-white transition-colors">Активность</div>
+            <div className="text-[9px] font-black text-emerald-300 uppercase mb-1 tracking-widest group-hover/stat:text-white transition-colors">Активность</div>
             <div className="text-2xl font-black text-white flex items-center gap-3">
               <Zap size={20} className="text-lime-400 fill-lime-400 animate-pulse"/>
               {activityLevel}
@@ -62,7 +62,7 @@ const CommunityBanner: React.FC<CommunityBannerProps> = ({
           <div className="w-px h-12 bg-white/10"></div>
           
           <div className="text-center group/stat cursor-default">
-            <div className="text-[9px] font-black text-indigo-300 uppercase mb-1 tracking-widest group-hover/stat:text-white transition-colors">Группы</div>
+            <div className="text-[9px] font-black text-emerald-300 uppercase mb-1 tracking-widest group-hover/stat:text-white transition-colors">Группы</div>
             <div className="text-2xl font-black text-white flex items-center gap-3">
               <Users size={20} className="text-blue-400"/>
               {groupsCount}
