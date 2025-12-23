@@ -33,9 +33,9 @@
       }
       
       .glass-dark {
-        background: rgba(15, 23, 42, 0.6);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
         border: 1px solid rgba(255, 255, 255, 0.1);
       }
 
@@ -58,6 +58,86 @@
       
       .animate-fade-in-up {
         animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+      /* Анимация полета теннисного мяча */
+      @keyframes tennisFly {
+        0% { transform: translate(-100px, 50px) scale(0.5); opacity: 0; }
+        20% { opacity: 1; }
+        50% { transform: translate(200px, -20px) scale(1.2); }
+        80% { opacity: 1; }
+        100% { transform: translate(500px, 30px) scale(0.8); opacity: 0; }
+      }
+      .animate-tennis-fly {
+        animation: tennisFly 3s linear infinite;
+      }
+
+      /* Анимация замаха ракетки */
+      @keyframes racketSwing {
+        0%, 100% { transform: rotate(-15deg) translateY(0); }
+        50% { transform: rotate(15deg) translateY(-10px); }
+      }
+      .animate-racket-swing {
+        animation: racketSwing 2s ease-in-out infinite;
+      }
+
+      /* Пульсация радара (поиск партнера) */
+      @keyframes radarScan {
+        0% { transform: scale(1); opacity: 0.5; }
+        100% { transform: scale(2.5); opacity: 0; }
+      }
+      .animate-radar {
+        animation: radarScan 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+      }
+
+      /* Плавное покачивание (для иконок) */
+      @keyframes floatSlow {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-15px); }
+      }
+      .animate-float-slow {
+        animation: floatSlow 4s ease-in-out infinite;
+      }
+
+      /* Анимация парящих кубков */
+      @keyframes trophyFloat {
+        0% { transform: translateY(100%) rotate(-15deg) scale(0.8); opacity: 0; }
+        15% { opacity: 0.15; }
+        50% { transform: translateY(10%) rotate(15deg) scale(1.05); opacity: 0.22; } /* Пик прозрачности 22% */
+        85% { opacity: 0.15; }
+        100% { transform: translateY(-100%) rotate(-10deg) scale(0.9); opacity: 0; }
+      }
+
+      /* Эффект блеска на тексте */
+      @keyframes shiny {
+        0% { transform: translateX(-100%) skewX(-20deg); }
+        100% { transform: translateX(300%) skewX(-20deg); }
+      }
+
+      /* Мерцание золотого фона */
+      @keyframes glimmer {
+        0%, 100% { opacity: 0.2; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(1.1); }
+      }
+
+      .animate-trophy-float {
+        animation: trophyFloat 12s linear infinite;
+      }
+
+      .animate-shiny {
+        animation: shiny 3s ease-in-out infinite;
+      }
+
+      .animate-glimmer {
+        animation: glimmer 6s ease-in-out infinite;
+      }
+
+      /* Медленное вращение */
+      @keyframes spinSlow {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .animate-spin-slow {
+        animation: spinSlow 30s linear infinite; /* 30 seconds for a full rotation */
       }
     </style>
   <script type="importmap">

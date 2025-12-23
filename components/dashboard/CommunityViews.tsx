@@ -1,12 +1,82 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Bell, Heart, MessageCircle, Share2, Swords, Clock, CheckCircle2, AlertCircle, Loader2, Send } from 'lucide-react';
+import { MessageSquare, Bell, Heart, MessageCircle, Share2, Swords, Clock, CheckCircle2, AlertCircle, Loader2, Send, Smile, X, Zap, BrainCircuit, Flame, Grid } from 'lucide-react';
 import { User, LadderPlayer, Challenge, PlayerProfile, Conversation, ChatMessage, Notification } from '../../types';
 import Button from '../Button';
 import { api } from '../../services/api';
 import { Modal } from '../Shared';
 import PlayerProfileFlyout from './PlayerProfileFlyout';
 import CommunityFeatures from './CommunityFeatures';
+import LadderBanner from './LadderBanner';
+
+// --- STICKER FEATURE START ---
+
+type StickerCategory = 'game' | 'tactics' | 'emotions';
+
+interface Sticker {
+  name: string;
+  category: StickerCategory;
+  image: string;
+}
+
+const stickerData: Sticker[] = [
+    { name: 'ACE!', category: 'game', image: 'sticker-ball.svg'},
+    { name: 'VAMOS!', category: 'game', image: 'sticker-trophy.svg'},
+    { name: 'WINNER', category: 'emotions', image: 'sticker-racket.svg'},
+    // Add more placeholders for other categories if needed
+];
+
+const StickerPanel = ({ onSelectSticker, onClose }: { onSelectSticker: (sticker: Sticker) => void, onClose: () => void }) => {
+    const [activeCategory, setActiveCategory] = useState<StickerCategory | 'all'>('all');
+
+    const filteredStickers = activeCategory === 'all' 
+        ? stickerData 
+        : stickerData.filter(s => s.category === activeCategory);
+
+    const CategoryButton = ({ category, label, icon }: { category: StickerCategory | 'all', label: string, icon: React.ReactNode }) => (
+        <button 
+            onClick={() => setActiveCategory(category)}
+            className={`flex-1 px-3 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${activeCategory === category ? 'bg-slate-800 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+        >
+            {icon} {label}
+        </button>
+    );
+
+    return (
+        <div className="absolute bottom-full left-0 right-0 bg-white border-t border-slate-200 rounded-t-2xl shadow-lg animate-fade-in-up duration-200">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 bg-slate-900 rounded-lg flex items-center justify-center">
+                        <Zap size={14} className="text-lime-400"/>
+                    </div>
+                    <h3 className="font-bold text-sm">TENNIS PRO STICKER PACK 2.0</h3>
+                </div>
+                <button onClick={onClose} className="text-slate-400 hover:text-slate-800"><X size={20}/></button>
+            </div>
+            <div className="p-3 bg-white flex gap-2">
+                <CategoryButton category="all" label="Все" icon={<Grid size={16}/>} />
+                <CategoryButton category="game" label="Игра" icon={<img src="/assets/sticker-ball.svg" className="w-4 h-4"/>} />
+                <CategoryButton category="tactics" label="Тактика" icon={<BrainCircuit size={16}/>} />
+                <CategoryButton category="emotions" label="Эмоции" icon={<Flame size={16}/>} />
+            </div>
+            <div className="p-4 h-64 overflow-y-auto">
+                <div className="grid grid-cols-5 gap-4">
+                    {filteredStickers.map(sticker => (
+                        <div key={sticker.name} className="text-center cursor-pointer group" onClick={() => onSelectSticker(sticker)}>
+                            <div className="p-3 bg-slate-50 rounded-2xl group-hover:bg-slate-100 transition-colors">
+                                <img src={`/assets/${sticker.image}`} alt={sticker.name} className="w-full h-full object-contain"/>
+                            </div>
+                            <div className="text-[10px] uppercase font-bold text-slate-400 mt-1.5">{sticker.name}</div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// --- STICKER FEATURE END ---
+
 
 interface MessagesViewProps {
     user: User;
@@ -28,10 +98,13 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [loadingMessages, setLoadingMessages] = useState(false);
+    const [showStickerPanel, setShowStickerPanel] = useState(false);
     const messagesEndRef = useRef<null | HTMLDivElement>(null);
+
 
     useEffect(() => {
         if (activeConversationId) {
+            setShowStickerPanel(false); // Close sticker panel on convo change
             const currentConvo = conversations.find(c => c.id === activeConversationId);
             
             setLoadingMessages(true);
@@ -64,6 +137,30 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
         setMessages(currentMessages => [...currentMessages, sentMessage]);
         setNewMessage('');
     };
+
+    const handleSendSticker = async (sticker: Sticker) => {
+        if (!activeConversationId) return;
+        
+        const activeConvo = conversations.find(c => c.id === activeConversationId);
+        if (!activeConvo) return;
+
+        const stickerText = `::sticker:${sticker.image}::`;
+        const sentMessage = await api.messages.sendMessage(user.id, activeConvo.partnerId, stickerText);
+        setMessages(currentMessages => [...currentMessages, sentMessage]);
+        setShowStickerPanel(false);
+    };
+
+    const renderMessageContent = (text: string) => {
+        const stickerRegex = /::sticker:(.*)::/;
+        const match = text.match(stickerRegex);
+
+        if (match && match[1]) {
+            const stickerFileName = match[1];
+            return <img src={`/assets/${stickerFileName}`} alt="sticker" className="w-24 h-24" />;
+        }
+
+        return text;
+    };
     
     const activeConversation = conversations.find(c => c.id === activeConversationId);
 
@@ -91,7 +188,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                                         <div className="text-[10px] text-slate-400 font-medium">{convo.timestamp}</div>
                                     </div>
                                     <div className="flex justify-between items-start">
-                                        <p className="text-xs text-slate-500 truncate">{convo.lastMessage}</p>
+                                        <p className="text-xs text-slate-500 truncate">{convo.lastMessage.startsWith('::sticker:') ? '[Стикер]' : convo.lastMessage}</p>
                                         {convo.unread > 0 && <span className="bg-lime-500 text-slate-900 text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full ml-2">{convo.unread}</span>}
                                     </div>
                                 </div>
@@ -113,9 +210,9 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                                     <div className="flex justify-center items-center h-full"><Loader2 className="animate-spin text-slate-400"/></div>
                                 ) : (
                                     messages.map((msg, i) => (
-                                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                            <div className={`max-w-xs md:max-w-md p-3 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-lime-500 text-white rounded-br-lg' : 'bg-white border border-slate-100 text-slate-700 rounded-bl-lg'}`}>
-                                                {msg.text}
+                                        <div key={i} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                            <div className={`max-w-xs md:max-w-md p-0 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-lime-500/20 rounded-br-lg' : 'bg-white border border-slate-100 rounded-bl-lg'}`}>
+                                                {renderMessageContent(msg.text)}
                                             </div>
                                         </div>
                                     ))
@@ -123,15 +220,25 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                                 <div ref={messagesEndRef} />
                             </div>
                         </div>
-                        <div className="p-4 border-t border-slate-100 bg-white">
+                        <div className="p-4 border-t border-slate-100 bg-white relative">
+                            {showStickerPanel && (
+                                <StickerPanel 
+                                    onClose={() => setShowStickerPanel(false)}
+                                    onSelectSticker={handleSendSticker}
+                                />
+                            )}
                             <form onSubmit={handleSendMessage} className="flex gap-2">
+                                <Button type="button" variant="ghost" className="w-12 h-12 px-0 text-slate-400 hover:text-lime-500 rounded-full" onClick={() => setShowStickerPanel(!showStickerPanel)}>
+                                    <Smile size={22}/>
+                                </Button>
                                 <input 
                                     className="flex-1 bg-slate-100 border-transparent rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-lime-400"
                                     placeholder="Напишите сообщение..."
                                     value={newMessage}
                                     onChange={e => setNewMessage(e.target.value)}
+                                    onFocus={() => setShowStickerPanel(false)}
                                 />
-                                <Button type="submit" className="w-12 h-12 px-0" disabled={!newMessage.trim()}>
+                                <Button type="submit" variant="primary" className="w-12 h-12 px-0 rounded-full" disabled={!newMessage.trim()}>
                                     <Send size={20}/>
                                 </Button>
                             </form>
@@ -226,11 +333,25 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({ user, onNo
 
 import CommunityView2 from './CommunityView2';
 
-export const CommunityView = ({ user, onNavigate, onStartConversation }: { user: User, onNavigate: (tab: string) => void, onStartConversation: (partnerId: string) => void }) => (
-    <div className="max-w-7xl mx-auto">
+import CommunityBanner from './CommunityBanner';
+
+
+export const CommunityView = ({ user, onNavigate, onStartConversation }: { user: User, onNavigate: (tab: string) => void, onStartConversation: (partnerId: string) => void }) => {
+    const [groupsCount, setGroupsCount] = useState(0);
+
+    useEffect(() => {
+        api.getPartners().then(partners => {
+            setGroupsCount(partners.length);
+        });
+    }, []);
+
+    return (
+    <div className="max-w-7xl mx-auto space-y-6">
+        <CommunityBanner groupsCount={groupsCount}/>
         <CommunityView2 user={user} onNavigate={onNavigate} onStartConversation={onStartConversation} />
     </div>
 );
+}
 
 export const LadderView = ({ user, challenges, setChallenges }: { user: User, challenges: Challenge[], setChallenges: React.Dispatch<React.SetStateAction<Challenge[]>> }) => {
     const [ranking, setRanking] = useState<LadderPlayer[]>([]);
@@ -334,6 +455,7 @@ export const LadderView = ({ user, challenges, setChallenges }: { user: User, ch
 
     return (
         <div className="space-y-6">
+            <LadderBanner leaderName={ranking[0]?.name} />
             {selectedProfile && <PlayerProfileFlyout profile={selectedProfile} onClose={() => setSelectedProfile(null)} />}
 
             {/* Header / Tabs */}
