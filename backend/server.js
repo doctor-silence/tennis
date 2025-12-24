@@ -1196,6 +1196,72 @@ app.post('/api/posts/:id/comments', async (req, res) => {
     }
 });
 
+// --- TOURNAMENT AND GROUPS ROUTES ---
+
+app.get('/api/groups', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM groups ORDER BY name ASC');
+        res.json(result.rows.map(g => ({ ...g, id: g.id.toString() })));
+    } catch (err) {
+        console.error("Fetch Groups Error:", err);
+        res.status(500).json({ error: 'Failed to fetch groups' });
+    }
+});
+
+app.get('/api/tournaments', async (req, res) => {
+    const { userId } = req.query;
+    if (!userId) {
+        return res.status(400).json({ error: 'userId is required' });
+    }
+    try {
+        const result = await pool.query('SELECT * FROM tournaments WHERE user_id = $1 ORDER BY date DESC', [userId]);
+        res.json(result.rows.map(t => ({ ...t, id: t.id.toString() })));
+    } catch (err) {
+        console.error("Fetch Tournaments Error:", err);
+        res.status(500).json({ error: 'Failed to fetch tournaments' });
+    }
+});
+
+app.post('/api/tournaments', async (req, res) => {
+    const { userId, name, groupName, date, prizePool, status, type, targetGroupId, rounds } = req.body;
+    if (!userId || !name) {
+        return res.status(400).json({ error: 'userId and name are required' });
+    }
+    try {
+        const result = await pool.query(
+            `INSERT INTO tournaments (user_id, name, group_name, date, prize_pool, status, type, target_group_id, rounds)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+            [userId, name, groupName, date, prizePool, status, type, targetGroupId, JSON.stringify(rounds)]
+        );
+        const newTournament = result.rows[0];
+        res.status(201).json({ ...newTournament, id: newTournament.id.toString() });
+    } catch (err) {
+        console.error("Create Tournament Error:", err);
+        res.status(500).json({ error: 'Failed to create tournament' });
+    }
+});
+
+app.put('/api/tournaments/:id', async (req, res) => {
+    const { id } = req.params;
+    const { name, groupName, date, prizePool, status, type, targetGroupId, rounds } = req.body;
+
+    try {
+        const result = await pool.query(
+            `UPDATE tournaments 
+             SET name = $1, group_name = $2, date = $3, prize_pool = $4, status = $5, type = $6, target_group_id = $7, rounds = $8
+             WHERE id = $9 RETURNING *`,
+            [name, groupName, date, prizePool, status, type, targetGroupId, JSON.stringify(rounds), id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Tournament not found' });
+        }
+        res.json({ ...result.rows[0], id: result.rows[0].id.toString() });
+    } catch (err) {
+        console.error("Update Tournament Error:", err);
+        res.status(500).json({ error: 'Failed to update tournament' });
+    }
+});
+
 
 // --- STUDENTS CRM ROUTES ---
 

@@ -1,4 +1,4 @@
-import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Match, Product, PlayerProfile, Trajectory, Conversation, ChatMessage, MarketplaceItem, CrmStats, Skill, Lesson } from '../types';
+import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Match, Product, PlayerProfile, Trajectory, Conversation, ChatMessage, MarketplaceItem, CrmStats, Skill, Lesson, Tournament, Group } from '../types';
 import * as THREE from 'three'; // Import THREE for Vector3 deserialization
 
 // Frontend API Service
@@ -380,6 +380,15 @@ const MOCK_MESSAGES: { [key: string]: ChatMessage[] } = {
     ],
 };
 
+const MOCK_GROUPS: Group[] = [
+    { id: 'g1', name: 'UTR Pro League', location: 'Москва' },
+    { id: 'g2', name: 'Weekend Warriors', location: 'Москва' },
+    { id: 'g3', name: 'Новички (Лужники)', location: 'Москва' }
+];
+
+let MOCK_TOURNAMENTS: Tournament[] = [];
+
+
 export const api = {
     auth: {
         register: async (userData: any): Promise<User> => {
@@ -635,6 +644,68 @@ export const api = {
                 console.error("Fetch CRM Stats Error:", e);
                 // Fallback for demo mode or error
                 return { activePlayers: 3, totalDebt: 1500, playersInDebt: 1 };
+            }
+        }
+    },
+
+    groups: {
+        getAll: async (): Promise<Group[]> => {
+            try {
+                const res = await fetch(`${API_URL}/groups`);
+                if (!res.ok) throw new Error('Failed to fetch groups');
+                return await res.json();
+            } catch (e) {
+                console.warn("Backend offline, returning mock groups", e);
+                return MOCK_GROUPS;
+            }
+        }
+    },
+
+    tournaments: {
+        getAll: async (userId: string): Promise<Tournament[]> => {
+            try {
+                const res = await fetch(`${API_URL}/tournaments?userId=${userId}`);
+                if (!res.ok) throw new Error('Failed to fetch tournaments');
+                return await res.json();
+            } catch (e) {
+                console.warn("Backend offline, returning mock tournaments", e);
+                return MOCK_TOURNAMENTS;
+            }
+        },
+        create: async (data: Partial<Tournament> & { userId: string }): Promise<Tournament> => {
+            try {
+                const res = await fetch(`${API_URL}/tournaments`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const json = await res.json();
+                if (!res.ok) throw new Error(json.error || 'Failed to create tournament');
+                return json;
+            } catch (e) {
+                console.warn("Backend offline, mocking tournament creation", e);
+                const newTournament = { id: `mock-tourney-${Date.now()}`, ...data } as Tournament;
+                MOCK_TOURNAMENTS.push(newTournament);
+                return newTournament;
+            }
+        },
+        update: async (id: string, data: Partial<Tournament>): Promise<Tournament> => {
+            try {
+                const res = await fetch(`${API_URL}/tournaments/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) throw new Error('Failed to update tournament');
+                return await res.json();
+            } catch (e) {
+                console.warn(`Backend offline, mocking tournament update for id: ${id}`, e);
+                const index = MOCK_TOURNAMENTS.findIndex(t => t.id === id);
+                if (index > -1) {
+                    MOCK_TOURNAMENTS[index] = { ...MOCK_TOURNAMENTS[index], ...data };
+                    return MOCK_TOURNAMENTS[index];
+                }
+                throw new Error("Mock tournament not found for update");
             }
         }
     },

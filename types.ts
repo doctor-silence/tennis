@@ -1,5 +1,5 @@
 export type ViewState = 'landing' | 'auth' | 'dashboard' | 'pro' | 'shop' | 'admin';
-export type DashboardTab = 'profile' | 'search' | 'courts' | 'ai_coach' | 'messages' | 'notifications' | 'tactics' | 'students' | 'video_analysis' | 'ladder' | 'community';
+export type DashboardTab = 'profile' | 'search' | 'courts' | 'ai_coach' | 'messages' | 'notifications' | 'tactics' | 'students' | 'tournaments' | 'video_analysis' | 'ladder' | 'community';
 
 export interface User {
   id: string;
@@ -265,4 +265,41 @@ export interface MarketplaceItem {
   sellerName: string;
   sellerAvatar: string;
   city: string;
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  location: string;
+}
+
+export interface TournamentPlayer {
+  id: string;
+  name: string;
+  avatar: string;
+  lastMatchScore?: string;
+}
+
+export interface TournamentMatch {
+  id: string;
+  player1?: TournamentPlayer;
+  player2?: TournamentPlayer;
+  score?: string;
+  winnerId?: string;
+  status: 'pending' | 'live' | 'finished';
+}
+
+export interface Tournament {
+  id: string;
+  name: string;
+  groupName?: string;
+  date: string;
+  prizePool: string;
+  status: 'draft' | 'live' | 'finished';
+  type: 'single_elimination' | 'round_robin';
+  targetGroupId?: string;
+  rounds: {
+    name: string;
+    matches: TournamentMatch[];
+  }[];
 }

@@ -320,6 +320,35 @@ const initDb = async () => {
     `);
     console.log('✅ "post_comments" table created or already exists.');
 
+    // 14. Create Groups Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS groups (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        location VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Table "groups" checked.');
+
+    // 15. Create Tournaments Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS tournaments (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        group_name VARCHAR(255),
+        date DATE,
+        prize_pool VARCHAR(100),
+        status VARCHAR(20),
+        type VARCHAR(50),
+        target_group_id VARCHAR(255),
+        rounds JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Table "tournaments" checked.');
 
     await client.query('COMMIT');
 
@@ -327,35 +356,57 @@ const initDb = async () => {
     
     // Seed Default User (Coach) if none exist
     const coachEmail = 'coach@test.com';
-    const coachCheck = await pool.query('SELECT id FROM users WHERE email = $1', [coachEmail]);
-    
+    const coachCheck = await pool.query('SELECT id FROM users WHERE email = ', [coachEmail]);
+    let coachId;
     if (coachCheck.rows.length === 0) {
         console.log('🌱 Seeding default Coach user...');
         const hashedPassword = await bcrypt.hash('123456', 10);
-        await pool.query(`
+        const res = await pool.query(`
             INSERT INTO users (name, email, password, role, city, avatar, rating, age, level)
-            VALUES ('Тренер Демо', $1, $2, 'coach', 'Москва', 'https://ui-avatars.com/api/?name=Coach+Demo&background=0D8ABC&color=fff', 1500, 30, 'Coach')
+            VALUES ('Тренер Демо', , $2, 'coach', 'Москва', 'https://ui-avatars.com/api/?name=Coach+Demo&background=0D8ABC&color=fff', 1500, 30, 'Coach')
+            RETURNING id
         `, [coachEmail, hashedPassword]);
+        coachId = res.rows[0].id;
+    } else {
+        coachId = coachCheck.rows[0].id;
     }
+
+    // Seed Groups if empty for the coach
+    const groupCount = await pool.query('SELECT count(*) FROM groups WHERE user_id = ', [coachId]);
+    if (parseInt(groupCount.rows[0].count) === 0) {
+        console.log('🌱 Seeding groups for demo coach...');
+        const groups = [
+            { name: 'UTR Pro League', location: 'Москва' },
+            { name: 'Weekend Warriors', location: 'Москва' },
+            { name: 'Новички (Лужники)', location: 'Москва' }
+        ];
+        for (const g of groups) {
+            await pool.query(
+                'INSERT INTO groups (user_id, name, location) VALUES (, $2, $3)',
+                [coachId, g.name, g.location]
+            );
+        }
+    }
+
 
     // Seed Admin from Environment Variables
     const adminEmail = process.env.ADMIN_EMAIL;
     const adminPassword = process.env.ADMIN_PASSWORD;
 
     if (adminEmail && adminPassword) {
-        const adminCheck = await pool.query('SELECT id FROM users WHERE email = $1', [adminEmail]);
+        const adminCheck = await pool.query('SELECT id FROM users WHERE email = ', [adminEmail]);
         const hashedAdminPassword = await bcrypt.hash(adminPassword, 10);
         
         if (adminCheck.rows.length === 0) {
             console.log(`🌱 Creating Admin User (${adminEmail}) from .env...`);
             await pool.query(`
                 INSERT INTO users (name, email, password, role, city, avatar, rating, age, level)
-                VALUES ('Супер Админ', $1, $2, 'admin', 'HQ', 'https://ui-avatars.com/api/?name=Admin&background=000&color=fff', 9999, 99, 'GOD MODE')
+                VALUES ('Супер Админ', , $2, 'admin', 'HQ', 'https://ui-avatars.com/api/?name=Admin&background=000&color=fff', 9999, 99, 'GOD MODE')
             `, [adminEmail, hashedAdminPassword]);
         } else {
             // Update admin password/role if env changed
             await pool.query(`
-                UPDATE users SET password = $1, role = 'admin' WHERE email = $2
+                UPDATE users SET password = , role = 'admin' WHERE email = $2
             `, [hashedAdminPassword, adminEmail]);
         }
     } else {
@@ -427,8 +478,8 @@ const initDb = async () => {
 
         for (const c of courts) {
             await pool.query(
-                'INSERT INTO courts (name, address, surface, price_per_hour, rating, image, website) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-                [c.name, c.address, c.surface, c.price, c.rating, c.image, c.website]
+                'INSERT INTO courts (name, address, surface, price_per_hour, rating, image, website) VALUES (, $2, $3, $4, $5, $6, $7)',
+                [c.name, c.address, JSON.stringify(c.surface), c.price, c.rating, c.image, c.website]
             );
         }
     }
@@ -444,17 +495,15 @@ const initDb = async () => {
        ];
        for (const p of products) {
            await pool.query(
-               'INSERT INTO products (title, category, price, image, is_hit) VALUES ($1, $2, $3, $4, $5)',
+               'INSERT INTO products (title, category, price, image, is_hit) VALUES (, $2, $3, $4, $5)',
                p
            );
        }
     }
 
     // Seed CRM data only if students table is empty for the demo coach
-    const coachRes = await pool.query("SELECT id FROM users WHERE email = 'coach@test.com'");
-    if (coachRes.rows.length > 0) {
-        const coachId = coachRes.rows[0].id;
-        const studentCountRes = await pool.query('SELECT COUNT(*) FROM students WHERE coach_id = $1', [coachId]);
+    if (coachId) {
+        const studentCountRes = await pool.query('SELECT COUNT(*) FROM students WHERE coach_id = ', [coachId]);
         
         if (parseInt(studentCountRes.rows[0].count) === 0) {
             console.log('🌱 Seeding CRM data for demo coach...');
@@ -462,49 +511,49 @@ const initDb = async () => {
             // Student 1: Александр П.
             const student1Res = await pool.query(
                 `INSERT INTO students (coach_id, name, age, level, balance, next_lesson, avatar, status, skill_level_xp) 
-                 VALUES ($1, 'Александр П.', 28, 'NTRP 4.0', 5000, 'Завтра, 10:00', 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80', 'active', 1200) 
+                 VALUES (, 'Александр П.', 28, 'NTRP 4.0', 5000, 'Завтра, 10:00', 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80', 'active', 1200) 
                  RETURNING id`,
                 [coachId]
             );
             const student1Id = student1Res.rows[0].id;
             await pool.query(
                 `INSERT INTO student_skills (student_id, skill_name, skill_value) VALUES 
-                 ($1, 'serve', 75), ($1, 'forehand', 85), ($1, 'backhand', 60), ($1, 'stamina', 90), ($1, 'tactics', 70)`,
+                 (, 'serve', 75), (, 'forehand', 85), (, 'backhand', 60), (, 'stamina', 90), (, 'tactics', 70)`,
                 [student1Id]
             );
             await pool.query(
                 `INSERT INTO lesson_history (student_id, date, description, amount, location) VALUES
-                 ($1, '2025-12-11 10:00', 'Индивидуальная тренировка', -2500, 'ТК СПАРТАК'),
-                 ($1, '2025-12-12 10:00', 'Индивидуальная тренировка', -2500, 'ТК СПАРТАК'),
-                 ($1, '2025-12-13 10:00', 'Индивидуальная тренировка', -2500, 'ТК СПАРТАК')`,
+                 (, '2025-12-11 10:00', 'Индивидуальная тренировка', -2500, 'ТК СПАРТАК'),
+                 (, '2025-12-12 10:00', 'Индивидуальная тренировка', -2500, 'ТК СПАРТАК'),
+                 (, '2025-12-13 10:00', 'Индивидуальная тренировка', -2500, 'ТК СПАРТАК')`,
                 [student1Id]
             );
 
             // Student 2: Мария Ш.
             const student2Res = await pool.query(
                 `INSERT INTO students (coach_id, name, age, level, balance, next_lesson, avatar, status, skill_level_xp) 
-                 VALUES ($1, 'Мария Ш.', 24, 'NTRP 5.0', -1500, 'Ср, 18:00', 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80', 'active', 3400) 
+                 VALUES (, 'Мария Ш.', 24, 'NTRP 5.0', -1500, 'Ср, 18:00', 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80', 'active', 3400) 
                  RETURNING id`,
                 [coachId]
             );
             const student2Id = student2Res.rows[0].id;
             await pool.query(
                 `INSERT INTO student_skills (student_id, skill_name, skill_value) VALUES 
-                 ($1, 'serve', 80), ($1, 'forehand', 90), ($1, 'backhand', 85), ($1, 'stamina', 75), ($1, 'tactics', 88)`,
+                 (, 'serve', 80), (, 'forehand', 90), (, 'backhand', 85), (, 'stamina', 75), (, 'tactics', 88)`,
                 [student2Id]
             );
 
              // Student 3: Даниил М.
             const student3Res = await pool.query(
                 `INSERT INTO students (coach_id, name, age, level, balance, next_lesson, avatar, status, skill_level_xp) 
-                 VALUES ($1, 'Даниил М.', 26, 'PRO', 12000, 'Пт, 15:00', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80', 'active', 5600) 
+                 VALUES (, 'Даниил М.', 26, 'PRO', 12000, 'Пт, 15:00', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80', 'active', 5600) 
                  RETURNING id`,
                 [coachId]
             );
             const student3Id = student3Res.rows[0].id;
             await pool.query(
                 `INSERT INTO student_skills (student_id, skill_name, skill_value) VALUES 
-                 ($1, 'serve', 95), ($1, 'forehand', 92), ($1, 'backhand', 88), ($1, 'stamina', 94), ($1, 'tactics', 91)`,
+                 (, 'serve', 95), (, 'forehand', 92), (, 'backhand', 88), (, 'stamina', 94), (, 'tactics', 91)`,
                 [student3Id]
             );
         }

@@ -2,7 +2,7 @@
 import React from 'react';
 import { 
   User as UserIcon, Search, MapPin, MessageSquare, LogOut, 
-  Bot, Video, BookOpen, Swords, Globe, Users
+  Bot, Video, BookOpen, Swords, Globe, Users, Trophy
 } from 'lucide-react';
 import { User, DashboardTab } from '../../types';
 
@@ -59,7 +59,10 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogo
           <SidebarItem icon={<MessageSquare size={20} />} label="Сообщения" active={activeTab === 'messages'} onClick={() => setActiveTab('messages')} badge={unreadCount > 0 && unreadCount} />
           <SidebarItem icon={<Bot size={20} />} label="AI Тренер" active={activeTab === 'ai_coach'} onClick={() => setActiveTab('ai_coach')} />
           {user.role === 'coach' && (
-            <SidebarItem icon={<Users size={20} />} label="Ученики (CRM)" active={activeTab === 'students'} onClick={() => setActiveTab('students')} />
+            <>
+              <SidebarItem icon={<Users size={20} />} label="Ученики (CRM)" active={activeTab === 'students'} onClick={() => setActiveTab('students')} />
+              <SidebarItem icon={<Trophy size={20} />} label="Мои Турниры" active={activeTab === 'tournaments'} onClick={() => setActiveTab('tournaments')} />
+            </>
           )}
         </nav>
       </div>

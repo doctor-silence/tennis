@@ -4,7 +4,7 @@ import {
   MessageSquare, LogOut, Bell, 
   User as UserIcon, Swords, Globe, Bot
 } from 'lucide-react';
-import { User, DashboardTab, Conversation } from '../types';
+import { User, DashboardTab, Conversation, Challenge } from '../types';
 import Sidebar from './dashboard/Sidebar';
 import { NavButton } from './Shared';
 import { api } from '../services/api';
@@ -16,6 +16,7 @@ import PartnerSearchView from './dashboard/PartnerSearchView';
 import AiCoachView from './dashboard/AiCoachView';
 import { MessagesView, NotificationsView, LadderView, CommunityView } from './dashboard/CommunityViews';
 import { TacticsView, VideoAnalysisView, StudentsView } from './dashboard/ToolViews';
+import { TournamentsView } from './dashboard/TournamentsView';
 
 interface DashboardProps {
   user: User;
@@ -127,6 +128,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
                   {activeTab === 'video_analysis' ? 'Видео-анализ ударов' : 
                    activeTab === 'ai_coach' ? 'AI Тренер' : 
                    activeTab === 'students' ? 'CRM Система' :
+                   activeTab === 'tournaments' ? 'Мои Турниры' :
                    activeTab === 'ladder' ? 'Турнирная лестница' :
                    activeTab === 'community' ? 'Клубное сообщество' :
                    activeTab === 'profile' ? 'Личный кабинет' :
@@ -165,6 +167,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
             {activeTab === 'notifications' && <NotificationsView user={user} onNotificationsRead={handleNotificationsRead} />}
             {activeTab === 'tactics' && <TacticsView user={user} />}
             {activeTab === 'students' && <StudentsView user={user} />}
+            {activeTab === 'tournaments' && <TournamentsView user={user} />}
             {activeTab === 'video_analysis' && <VideoAnalysisView />}
             {activeTab === 'ladder' && <LadderView user={user} challenges={challenges} setChallenges={setChallenges} />}
             {activeTab === 'community' && <CommunityView user={user} onNavigate={handleNavigate} onStartConversation={handleStartConversation} />}
