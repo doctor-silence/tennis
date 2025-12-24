@@ -823,6 +823,22 @@ export const api = {
                 return null;
             }
         },
+        updateUser: async (id: string, data: Partial<User>): Promise<void> => {
+            try {
+                const res = await fetch(`${API_URL}/admin/users/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.error || 'Failed to update user');
+                }
+            } catch (e) {
+                console.error(e);
+                throw e; // Re-throw the error to be caught by the calling component
+            }
+        },
         deleteUser: async (id: string) => {
             try {
                 await fetch(`${API_URL}/admin/users/${id}`, { method: 'DELETE' });
@@ -964,9 +980,9 @@ export const api = {
                 return MOCK_LADDER;
             }
         },
-        getChallenges: async (): Promise<Challenge[]> => {
+        getChallenges: async (userId: string): Promise<Challenge[]> => {
             try {
-                const res = await fetch(`${API_URL}/ladder/challenges`);
+                const res = await fetch(`${API_URL}/ladder/challenges?userId=${userId}`);
                 if (!res.ok) throw new Error('Failed to fetch ladder challenges');
                 return await res.json();
             } catch (e) {

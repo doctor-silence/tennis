@@ -606,8 +606,10 @@ app.get('/api/ladder/rankings', async (req, res) => {
 });
 
 app.get('/api/ladder/challenges', async (req, res) => {
+    const { userId } = req.query;
+
     try {
-        const result = await pool.query(`
+        let query = `
             SELECT 
                 c.id, 
                 c.challenger_id, 
@@ -624,8 +626,17 @@ app.get('/api/ladder/challenges', async (req, res) => {
             FROM challenges c
             JOIN users uc ON c.challenger_id = uc.id
             JOIN users ud ON c.defender_id = ud.id
-            ORDER BY c.deadline ASC
-        `);
+        `;
+        const params = [];
+
+        if (userId) {
+            query += ' WHERE c.challenger_id = $1 OR c.defender_id = $1';
+            params.push(userId);
+        }
+
+        query += ' ORDER BY c.deadline ASC';
+
+        const result = await pool.query(query, params);
 
         const challenges = result.rows.map(row => ({
             id: row.id.toString(),

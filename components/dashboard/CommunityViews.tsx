@@ -484,7 +484,7 @@ export const LadderView = ({ user, challenges, setChallenges }: { user: User, ch
             // refresh data
             const rankData = await api.ladder.getRankings(ladderType);
             setRanking(rankData);
-            const challengeData = await api.ladder.getChallenges();
+            const challengeData = await api.ladder.getChallenges(user.id);
             setChallenges(challengeData);
     
             setShowEnterScoreModal(false);

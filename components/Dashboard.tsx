@@ -43,7 +43,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
       setConversations(data);
       setLoadingConversations(false);
     });
-    api.ladder.getChallenges().then(setChallenges);
+    api.ladder.getChallenges(user.id).then(setChallenges);
     fetchUnreadCount();
   }, [user.id]);
 
