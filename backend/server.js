@@ -1209,6 +1209,43 @@ app.post('/api/posts/:id/comments', async (req, res) => {
 
 // --- TOURNAMENT AND GROUPS ROUTES ---
 
+app.post('/api/groups', async (req, res) => {
+    const { name, description, location, avatar, userId } = req.body;
+
+    if (!name || !userId) {
+        return res.status(400).json({ error: 'Name and userId are required to create a group.' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Insert the new group
+        const groupResult = await client.query(
+            'INSERT INTO groups (name, description, location, avatar) VALUES ($1, $2, $3, $4) RETURNING *',
+            [name, description, location, avatar]
+        );
+        const newGroup = groupResult.rows[0];
+
+        // Add the creator as an admin member
+        await client.query(
+            'INSERT INTO group_members (group_id, user_id, role) VALUES ($1, $2, $3)',
+            [newGroup.id, userId, 'admin']
+        );
+
+        await client.query('COMMIT');
+        
+        await logSystemEvent('info', `User ${userId} created new group: ${name}`, 'Groups');
+        res.status(201).json(newGroup);
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error("Create Group Error:", err);
+        res.status(500).json({ error: 'Failed to create group.' });
+    } finally {
+        client.release();
+    }
+});
+
 app.get('/api/groups', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM groups ORDER BY name ASC');
@@ -1995,4 +2032,51 @@ app.listen(PORT, async () => {
     console.log(`🔌 Attempting to connect to DB at ${process.env.DB_HOST || 'localhost'}...`);
     // Run DB Init only after server starts to catch errors better
     await initDb();
+});
+
+app.post('/api/groups/:groupId/join', async (req, res) => {
+    const { groupId } = req.params;
+    const { userId } = req.body;
+    try {
+        await pool.query(
+            'INSERT INTO group_members (group_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [groupId, userId]
+        );
+        res.status(200).json({ success: true });
+    } catch (err) {
+        console.error("Join Group Error:", err);
+        res.status(500).json({ error: 'Failed to join group.' });
+    }
+});
+
+app.post('/api/groups/:groupId/leave', async (req, res) => {
+    const { groupId } = req.params;
+    const { userId } = req.body;
+    try {
+        await pool.query(
+            'DELETE FROM group_members WHERE group_id = $1 AND user_id = $2',
+            [groupId, userId]
+        );
+        res.status(200).json({ success: true });
+    } catch (err) {
+        console.error("Leave Group Error:", err);
+        res.status(500).json({ error: 'Failed to leave group.' });
+    }
+});
+
+app.get('/api/groups/:groupId/members', async (req, res) => {
+    const { groupId } = req.params;
+    try {
+        const result = await pool.query(
+            `SELECT u.id, u.name, u.avatar, gm.role 
+             FROM group_members gm 
+             JOIN users u ON gm.user_id = u.id 
+             WHERE gm.group_id = $1`,
+            [groupId]
+        );
+        res.json(result.rows.map(r => ({...r, id: r.id.toString()})));
+    } catch (err) {
+        console.error("Fetch Group Members Error:", err);
+        res.status(500).json({ error: 'Failed to fetch group members.' });
+    }
 });

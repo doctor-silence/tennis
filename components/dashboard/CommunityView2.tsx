@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Heart, MessageCircle, Calendar, Globe, Swords, Trophy, Users, ShoppingCart, Share2, Loader2, X } from 'lucide-react';
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { Heart, MessageCircle, Calendar, Globe, Swords, Trophy, Users, ShoppingCart, Share2, Loader2, X, PlusCircle } from 'lucide-react';
 import { api } from '../../services/api';
 import Button from '../Button';
-import { MarketplaceItem, LadderPlayer, User } from '../../types';
+import { MarketplaceItem, LadderPlayer, User, Group } from '../../types';
 
 const mockGroups = [
     { id: 1, avatar: 'Т', name: 'Теннис Хамовники', members: 1240 },
@@ -391,6 +391,38 @@ const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate, onSta
     }
 };
 
+const GroupsView = forwardRef(({ user }: { user: User }, ref) => {
+    const [groups, setGroups] = useState<Group[]>([]);
+    
+    const fetchGroups = () => {
+        api.groups.getAll().then(setGroups);
+    }
+
+    useImperativeHandle(ref, () => ({
+        fetchGroups
+    }));
+
+    useEffect(() => {
+        fetchGroups();
+    }, []);
+
+    return (
+        <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {groups.map(group => (
+                    <div key={group.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <h3 className="font-bold text-lg">{group.name}</h3>
+                        <p className="text-sm text-slate-500">{group.location}</p>
+                        <p className="text-sm text-slate-600 mt-2">{group.description}</p>
+                        {/* TODO: Add join/leave functionality and member list */}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+});
+
+
 // --- Widgets ---
 
 const TournamentsWidget = () => (
@@ -701,14 +733,41 @@ const MarketplaceForm = ({ onPublish }: { onPublish: (data: any) => void }) => {
 };
 
 
+const GroupForm = ({ onPublish, user }: { onPublish: (data: any) => void, user: User }) => {
+    const [name, setName] = useState('');
+    const [location, setLocation] = useState('');
+    const [description, setDescription] = useState('');
+
+    const handlePublish = () => {
+        if (!name.trim()) return;
+        onPublish({ name, location, description });
+        setName('');
+        setLocation('');
+        setDescription('');
+    };
+
+    return (
+        <div className="space-y-3 p-4 bg-slate-50 rounded-xl mt-4">
+            <input type="text" placeholder="Название группы" value={name} onChange={e => setName(e.target.value)} className="w-full bg-white p-2 rounded-lg outline-none border border-slate-200" />
+            <input type="text" placeholder="Город" value={location} onChange={e => setLocation(e.target.value)} className="w-full bg-white p-2 rounded-lg outline-none border border-slate-200" />
+            <textarea placeholder="Описание группы..." value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-white p-2 rounded-lg outline-none border border-slate-200 h-20" />
+            <Button onClick={handlePublish} className="w-full">Создать группу</Button>
+        </div>
+    );
+};
+
+
 // --- Main View Component ---
 
-const CommunityView2 = ({ user, onNavigate, onStartConversation }: { user: User, onNavigate: (tab: string) => void, onStartConversation: (partnerId: string) => void }) => {
+const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated }: { user: User, onNavigate: (tab: string) => void, onStartConversation: (partnerId: string) => void, onGroupCreated: () => void }) => {
     const [activeTab, setActiveTab] = useState('Все события');
     const [postText, setPostText] = useState('');
     const [feedItems, setFeedItems] = useState<any[]>([]);
-    const [postType, setPostType] = useState<'text' | 'partner_search' | 'match_result' | 'event' | 'marketplace'>('text');
+    useEffect(() => { setPostType('text'); }, [activeTab]);
+    const [postType, setPostType] = useState<'text' | 'partner_search' | 'match_result' | 'event' | 'marketplace' | 'group'>('text');
     const [loadingFeed, setLoadingFeed] = useState(true);
+    const groupsViewRef = useRef<{ fetchGroups: () => void }>(null);
+
 
     const fetchFeed = async () => {
         try {
@@ -725,6 +784,13 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation }: { user: User,
     useEffect(() => {
         fetchFeed();
     }, []);
+
+    const handleGroupCreated = () => {
+        if (groupsViewRef.current) {
+            groupsViewRef.current.fetchGroups();
+        }
+        setActiveTab('Группы');
+    }
 
     const handlePublishPost = async (data: any) => {
         let postData;
@@ -744,6 +810,7 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation }: { user: User,
                     }
                 }
             };
+            await api.posts.create(postData);
         } else if (postType === 'match_result') {
             if (!data.opponentName || !data.score) return;
             postData = {
@@ -755,6 +822,7 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation }: { user: User,
                     isWinner: data.isWinner,
                 }
             };
+            await api.posts.create(postData);
         } else if (postType === 'marketplace') {
             if (!data.title || !data.price) return;
             postData = {
@@ -767,6 +835,17 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation }: { user: User,
                     images: data.images
                 }
             };
+            await api.posts.create(postData);
+        } else if (postType === 'group') {
+            if (!data.name) return;
+            const newGroup = await api.groups.create({
+                name: data.name,
+                location: data.location,
+                description: data.description,
+                userId: user.id
+            });
+            onGroupCreated();
+            handleGroupCreated();
         }
         else { // 'text'
             if (!postText.trim()) return;
@@ -778,23 +857,18 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation }: { user: User,
                 }
             };
             setPostText('');
+            await api.posts.create(postData);
         }
         
-        try {
-            await api.posts.create(postData);
-            fetchFeed(); // Re-fetch feed after creating a new post
-        } catch (error) {
-            console.error("Failed to create post", error);
-        }
-
         setPostType('text'); // Reset to default post type
+        fetchFeed(); // Re-fetch feed after creating a new post
     };
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div className="lg:col-span-2">
                 <div className="flex space-x-2 mb-6">
-                    {['Все события', 'Результаты матчей', 'Поиск игры', 'Барахолка'].map(tab => (
+                    {['Все события', 'Группы', 'Результаты матчей', 'Поиск игры', 'Барахолка'].map(tab => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -805,7 +879,7 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation }: { user: User,
                     ))}
                 </div>
                 
-                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6">
+                { activeTab !== 'Группы' && <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6">
                     <div className="flex gap-4 items-center">
                         <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full" />
                         <input 
@@ -819,18 +893,20 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation }: { user: User,
                         <div className="flex items-center gap-4 text-slate-400">
                              <button onClick={() => setPostType('partner_search')} className={`p-2 rounded-full transition-colors ${postType === 'partner_search' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Swords size={20}/></button>
                              <button onClick={() => setPostType('match_result')} className={`p-2 rounded-full transition-colors ${postType === 'match_result' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Trophy size={20}/></button>
+                             <button onClick={() => setPostType('group')} className={`p-2 rounded-full transition-colors ${postType === 'group' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Users size={20}/></button>
                              <button onClick={() => setPostType('event')} className={`p-2 rounded-full transition-colors ${postType === 'event' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Calendar size={20}/></button>
                              <button onClick={() => setPostType('marketplace')} className={`p-2 rounded-full transition-colors ${postType === 'marketplace' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><ShoppingCart size={20}/></button>
                         </div>
-                        <Button onClick={() => handlePublishPost(postText)} disabled={!postText.trim()}>Опубликовать</Button>
+                        <Button onClick={() => handlePublishPost({text: postText})} disabled={!postText.trim()}>Опубликовать</Button>
                     </div>
                      {postType === 'partner_search' && <PartnerSearchForm onPublish={handlePublishPost} />}
                      {postType === 'match_result' && <MatchResultForm onPublish={handlePublishPost} user={user} />}
                      {postType === 'marketplace' && <MarketplaceForm onPublish={handlePublishPost} />}
+                     {postType === 'group' && <GroupForm onPublish={handlePublishPost} user={user} />}
                      {postType === 'event' && <div className="text-center p-4 text-slate-500 mt-4">Форма для событий скоро появится!</div>}
-                </div>
+                </div>}
 
-                {loadingFeed ? <Loader2 className="animate-spin text-slate-400 mx-auto" /> : <Feed activeTab={activeTab} feedItems={feedItems} user={user} onUpdate={fetchFeed} onStartConversation={onStartConversation} />}
+                { activeTab === 'Группы' ? <GroupsView user={user} ref={groupsViewRef} /> : (loadingFeed ? <Loader2 className="animate-spin text-slate-400 mx-auto" /> : <Feed activeTab={activeTab} feedItems={feedItems} user={user} onUpdate={fetchFeed} onStartConversation={onStartConversation} />) }
             </div>
             <div className="space-y-6">
                 <TournamentsWidget />

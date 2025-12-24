@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Bell, Heart, MessageCircle, Share2, Swords, Clock, CheckCircle2, AlertCircle, Loader2, Send, Smile, X, Zap, BrainCircuit, Flame, Grid } from 'lucide-react';
 import { User, LadderPlayer, Challenge, PlayerProfile, Conversation, ChatMessage, Notification } from '../../types';
@@ -8,6 +7,9 @@ import { Modal } from '../Shared';
 import PlayerProfileFlyout from './PlayerProfileFlyout';
 import CommunityFeatures from './CommunityFeatures';
 import LadderBanner from './LadderBanner';
+import CommunityView2 from './CommunityView2';
+import CommunityBanner from './CommunityBanner';
+
 
 // --- STICKER FEATURE START ---
 
@@ -373,11 +375,6 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({ user, onNo
         </div>
     );
 };
-
-import CommunityView2 from './CommunityView2';
-
-import CommunityBanner from './CommunityBanner';
-
 
 export const CommunityView = ({ user, onNavigate, onStartConversation }: { user: User, onNavigate: (tab: string) => void, onStartConversation: (partnerId: string) => void }) => {
     const [groupsCount, setGroupsCount] = useState(0);

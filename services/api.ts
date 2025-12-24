@@ -658,6 +658,48 @@ export const api = {
                 console.warn("Backend offline, returning mock groups", e);
                 return MOCK_GROUPS;
             }
+        },
+        create: async (groupData: Partial<Group>): Promise<Group> => {
+            const res = await fetch(`${API_URL}/groups`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(groupData)
+            });
+            if (!res.ok) {
+                 const err = await res.json();
+                 throw new Error(err.error || 'Failed to create group');
+            }
+            return await res.json();
+        },
+        join: async (groupId: string, userId: string): Promise<void> => {
+            const res = await fetch(`${API_URL}/groups/${groupId}/join`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId })
+            });
+            if (!res.ok) {
+                 const err = await res.json();
+                 throw new Error(err.error || 'Failed to join group');
+            }
+        },
+        leave: async (groupId: string, userId: string): Promise<void> => {
+            const res = await fetch(`${API_URL}/groups/${groupId}/leave`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId })
+            });
+            if (!res.ok) {
+                 const err = await res.json();
+                 throw new Error(err.error || 'Failed to leave group');
+            }
+        },
+        getMembers: async (groupId: string): Promise<User[]> => {
+            const res = await fetch(`${API_URL}/groups/${groupId}/members`);
+            if (!res.ok) {
+                 const err = await res.json();
+                 throw new Error(err.error || 'Failed to get group members');
+            }
+            return await res.json();
         }
     },
 
