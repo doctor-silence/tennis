@@ -97,16 +97,27 @@ const initDb = async () => {
     await client.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS last_restring_date DATE;`);
     
     // --- Data Migration for goals/notes columns ---
-    // 1. Clean up existing invalid data
-    await client.query(`UPDATE students SET goals = '[]' WHERE goals IS NULL OR goals = '' OR goals = '""';`);
-    await client.query(`UPDATE students SET notes = '[]' WHERE notes IS NULL OR notes = '' OR notes = '""';`);
+    // Create a temporary, safe casting function to handle invalid JSON text
+    await client.query(`
+      CREATE OR REPLACE FUNCTION pg_temp.try_cast_jsonb(p_in text)
+      RETURNS jsonb AS
+      $BODY$
+      BEGIN
+          RETURN p_in::jsonb;
+      EXCEPTION
+          WHEN others THEN
+              RETURN '[]'::jsonb;
+      END;
+      $BODY$
+      LANGUAGE plpgsql IMMUTABLE;
+    `);
     
-    // 2. Now, safely alter the column type
+    // 2. Now, safely alter the column types using the helper function
     try {
-        await client.query(`ALTER TABLE students ALTER COLUMN goals SET DEFAULT '[]', ALTER goals TYPE JSONB USING goals::jsonb;`);
-        await client.query(`ALTER TABLE students ALTER COLUMN notes SET DEFAULT '[]', ALTER notes TYPE JSONB USING notes::jsonb;`);
+        await client.query(`ALTER TABLE students ALTER COLUMN goals SET DEFAULT '[]', ALTER goals TYPE JSONB USING pg_temp.try_cast_jsonb(goals);`);
+        await client.query(`ALTER TABLE students ALTER COLUMN notes SET DEFAULT '[]', ALTER notes TYPE JSONB USING pg_temp.try_cast_jsonb(notes);`);
     } catch (e) {
-        // Ignore error if columns are already JSONB
+        // This might fail if the columns are already jsonb but the function helps on first migration
         if (e.code !== '42804') { // 42804 is 'Datatype Mismatch'
             throw e;
         }

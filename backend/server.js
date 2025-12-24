@@ -1322,59 +1322,179 @@ app.get('/api/students/:id', async (req, res) => {
 });
 
 app.post('/api/students', async (req, res) => {
-    const { coachId, name, age, level, avatar } = req.body;
+    const { coachId, name, age, level, avatar, balance, status, skills, xp, badges, notes, goals, racketHours } = req.body;
     
     const coachIdInt = parseInt(coachId);
     if (isNaN(coachIdInt)) {
         return res.status(400).json({ error: 'Ошибка авторизации.' });
     }
 
+    const client = await pool.connect();
     try {
-        const result = await pool.query(
-            `INSERT INTO students (coach_id, name, age, level, avatar, balance, next_lesson, status, goals, notes)
-             VALUES ($1, $2, $3, $4, $5, 0, 'Не назначено', 'active', '', '')
+        await client.query('BEGIN');
+
+        const studentRes = await client.query(
+            `INSERT INTO students (coach_id, name, age, level, avatar, balance, status, notes, goals, skill_level_xp, badges, racket_hours)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
              RETURNING *`,
-            [coachIdInt, name, age, level, avatar]
+            [
+                coachIdInt, name, age, level, avatar, balance || 0, status || 'active', 
+                JSON.stringify(notes || []), JSON.stringify(goals || []), xp || 0, 
+                JSON.stringify(badges || []), racketHours || 0
+            ]
         );
+        const newStudent = studentRes.rows[0];
+
+        if (skills) {
+            for (const [skillName, skillValue] of Object.entries(skills)) {
+                await client.query(
+                    'INSERT INTO student_skills (student_id, skill_name, skill_value) VALUES ($1, $2, $3)',
+                    [newStudent.id, skillName, skillValue]
+                );
+            }
+        }
+
+        await client.query('COMMIT');
+        
+        // Re-fetch the student with aggregated skills to ensure consistency
+        const finalStudentQuery = `
+            SELECT s.*,
+                COALESCE((SELECT jsonb_object_agg(sk.skill_name, sk.skill_value) FROM student_skills sk WHERE sk.student_id = s.id), '{}'::jsonb) as skills
+            FROM students s
+            WHERE s.id = $1
+        `;
+        const finalResult = await client.query(finalStudentQuery, [newStudent.id]);
+        const finalStudentRow = finalResult.rows[0];
+
+
         await logSystemEvent('info', `Coach ${coachId} added student ${name}`, 'CRM');
-        res.json(mapStudent(result.rows[0]));
+        res.status(201).json({
+            id: finalStudentRow.id.toString(),
+            coachId: finalStudentRow.coach_id,
+            name: finalStudentRow.name,
+            age: finalStudentRow.age,
+            level: finalStudentRow.level,
+            balance: finalStudentRow.balance,
+            nextLesson: finalStudentRow.next_lesson,
+            avatar: finalStudentRow.avatar,
+            status: finalStudentRow.status,
+            xp: finalStudentRow.skill_level_xp,
+            skills: finalStudentRow.skills,
+            goals: finalStudentRow.goals,
+            notes: finalStudentRow.notes,
+            videos: finalStudentRow.videos,
+            badges: finalStudentRow.badges,
+            racketHours: finalStudentRow.racket_hours,
+            lastRestringDate: finalStudentRow.last_restring_date,
+        });
     } catch (err) {
+        await client.query('ROLLBACK');
+        console.error("Create Student Error:", err);
         res.status(500).json({ error: 'Ошибка БД: ' + err.message });
+    } finally {
+        client.release();
     }
 });
 
 app.put('/api/students/:id', async (req, res) => {
     const { id } = req.params;
-    const fields = req.body;
-    
-    const dbMap = {
-        name: 'name', age: 'age', level: 'level', balance: 'balance',
-        nextLesson: 'next_lesson', status: 'status', goals: 'goals', notes: 'notes'
-    };
-
-    const setClauses = [];
-    const values = [];
-    let idx = 1;
-
-    for (const [key, value] of Object.entries(fields)) {
-        if (dbMap[key]) {
-            setClauses.push(`${dbMap[key]} = $${idx}`);
-            values.push(value);
-            idx++;
-        }
+    const studentId = parseInt(id);
+    if (isNaN(studentId)) {
+        return res.status(400).json({ error: 'Invalid student ID' });
     }
 
-    if (setClauses.length === 0) return res.json({ message: 'No changes' });
-
-    values.push(parseInt(id));
-    const query = `UPDATE students SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`;
-
+    const { skills, xp, ...studentFields } = req.body;
+    
+    const client = await pool.connect();
     try {
-        const result = await pool.query(query, values);
-        if (result.rows.length === 0) return res.status(404).json({error: 'Student not found'});
-        res.json(mapStudent(result.rows[0]));
+        await client.query('BEGIN');
+        
+        // Update main students table
+        const dbMap = { name: 'name', age: 'age', level: 'level', balance: 'balance', nextLesson: 'next_lesson', status: 'status', goals: 'goals', notes: 'notes', badges: 'badges', racketHours: 'racket_hours', lastRestringDate: 'last_restring_date', videos: 'videos' };
+        const setClauses = [];
+        const values = [];
+        let idx = 1;
+
+        for (const [key, value] of Object.entries(studentFields)) {
+            if (dbMap[key]) {
+                setClauses.push(`${dbMap[key]} = $${idx}`);
+                // Handle JSON fields
+                if (['goals', 'notes', 'badges', 'videos'].includes(key)) {
+                    values.push(JSON.stringify(value || []));
+                } else {
+                    values.push(value);
+                }
+                idx++;
+            }
+        }
+
+        if (xp !== undefined) {
+             setClauses.push(`skill_level_xp = $${idx}`);
+             values.push(xp);
+             idx++;
+        }
+
+        if (setClauses.length > 0) {
+            values.push(studentId);
+            const query = `UPDATE students SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`;
+            await client.query(query, values);
+        }
+        
+        // Update skills table
+        if (skills) {
+            for (const [skillName, skillValue] of Object.entries(skills)) {
+                await client.query(
+                    `INSERT INTO student_skills (student_id, skill_name, skill_value)
+                     VALUES ($1, $2, $3)
+                     ON CONFLICT (student_id, skill_name) 
+                     DO UPDATE SET skill_value = $3`,
+                    [studentId, skillName, skillValue]
+                );
+            }
+        }
+        
+        await client.query('COMMIT');
+        
+        // Fetch the fully updated student to return
+        const finalStudentQuery = `
+            SELECT s.*,
+                COALESCE((SELECT jsonb_object_agg(sk.skill_name, sk.skill_value) FROM student_skills sk WHERE sk.student_id = s.id), '{}'::jsonb) as skills
+            FROM students s
+            WHERE s.id = $1
+        `;
+        const finalResult = await client.query(finalStudentQuery, [studentId]);
+        
+        if (finalResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Student not found after update' });
+        }
+        const updatedStudentRow = finalResult.rows[0];
+
+        res.json({
+            id: updatedStudentRow.id.toString(),
+            coachId: updatedStudentRow.coach_id,
+            name: updatedStudentRow.name,
+            age: updatedStudentRow.age,
+            level: updatedStudentRow.level,
+            balance: updatedStudentRow.balance,
+            nextLesson: updatedStudentRow.next_lesson,
+            avatar: updatedStudentRow.avatar,
+            status: updatedStudentRow.status,
+            xp: updatedStudentRow.skill_level_xp,
+            skills: updatedStudentRow.skills,
+            goals: updatedStudentRow.goals || [],
+            notes: updatedStudentRow.notes || [],
+            videos: updatedStudentRow.videos || [],
+            badges: updatedStudentRow.badges || [],
+            racketHours: updatedStudentRow.racket_hours || 0,
+            lastRestringDate: updatedStudentRow.last_restring_date,
+        });
+
     } catch (err) {
-        res.status(500).json({ error: 'Db error' });
+        await client.query('ROLLBACK');
+        console.error("Update Student Error:", err);
+        res.status(500).json({ error: 'Db error: ' + err.message });
+    } finally {
+        client.release();
     }
 });
 

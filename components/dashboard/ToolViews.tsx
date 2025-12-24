@@ -327,11 +327,14 @@ export const StudentsView = ({ user }: { user: User }) => {
         if (!newStudent.name) return;
         setIsSubmitting(true);
         try {
-            const added = await api.students.add({
+            const added = await api.students.create({
                 coachId: user.id,
                 ...newStudent,
                 avatar: `https://ui-avatars.com/api/?name=${newStudent.name.replace(' ', '+')}&background=random&color=fff`,
-                notes: [], goals: [], videos: [], racketHours: 0, trainingFrequency: 2, xp: 0, badges: []
+                notes: [], goals: [], videos: [], racketHours: 0, trainingFrequency: 2, xp: 0, badges: [],
+                skills: { serve: 0, forehand: 0, backhand: 0, stamina: 0, tactics: 0 },
+                status: 'active',
+                balance: 0,
             });
             setStudents(prev => [added, ...prev]);
             setShowAddStudentModal(false);
@@ -342,26 +345,31 @@ export const StudentsView = ({ user }: { user: User }) => {
 
     const updateSkill = async (skillKey: keyof SkillSet, delta: number) => {
         if (!selectedStudent) return;
-        const currentVal = selectedStudent.skills[skillKey];
+        const currentSkills = selectedStudent.skills || { serve: 0, forehand: 0, backhand: 0, stamina: 0, tactics: 0 };
+        const currentVal = currentSkills[skillKey] || 0;
         const newVal = Math.max(0, Math.min(100, currentVal + delta));
         const xpGain = delta > 0 ? 50 : 0;
-        const updatedSkills = { ...selectedStudent.skills, [skillKey]: newVal };
+        const updatedSkills = { ...currentSkills, [skillKey]: newVal };
         const updated = await api.students.update(selectedStudent.id, { 
             skills: updatedSkills,
-            xp: selectedStudent.xp + xpGain
+            xp: (selectedStudent.xp || 0) + xpGain
         });
-        setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updated : s));
-        setSelectedStudent(updated);
+        const updatedStudent = { ...selectedStudent, ...updated };
+        setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updatedStudent : s));
+        setSelectedStudent(updatedStudent);
     };
 
     const handleUpdateBalance = async (studentId: string, isAddition: boolean) => {
         const student = students.find(s => s.id === studentId);
         if (!student) return;
         const amount = parseInt(customAmount) || 0;
-        const newBalance = isAddition ? student.balance + amount : student.balance - amount;
+        const newBalance = isAddition ? (student.balance || 0) + amount : (student.balance || 0) - amount;
         const updated = await api.students.update(studentId, { balance: newBalance });
-        setStudents(prev => prev.map(s => s.id === student.id ? updated : s));
-        setSelectedStudent(updated);
+        const updatedStudent = { ...student, ...updated };
+        setStudents(prev => prev.map(s => s.id === student.id ? updatedStudent : s));
+        if (selectedStudent?.id === studentId) {
+            setSelectedStudent(updatedStudent);
+        }
     };
 
     const handleAddNote = async () => {
@@ -378,8 +386,9 @@ export const StudentsView = ({ user }: { user: User }) => {
             const updated = await api.students.update(selectedStudent.id, { 
                 notes: updatedNotes 
             });
-            setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updated : s));
-            setSelectedStudent(updated);
+            const updatedStudent = { ...selectedStudent, ...updated };
+            setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updatedStudent : s));
+            setSelectedStudent(updatedStudent);
             setNewNote('');
         } finally {
             setIsSubmitting(false);
@@ -395,9 +404,10 @@ export const StudentsView = ({ user }: { user: User }) => {
             isCompleted: false
         };
         const updatedGoals = [...(selectedStudent.goals || []), newGoal];
-        const updated = await api.students.update(selectedStudent.id, { goals: updatedGoals, xp: selectedStudent.xp + 100 });
-        setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updated : s));
-        setSelectedStudent(updated);
+        const updated = await api.students.update(selectedStudent.id, { goals: updatedGoals, xp: (selectedStudent.xp || 0) + 100 });
+        const updatedStudent = { ...selectedStudent, ...updated };
+        setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updatedStudent : s));
+        setSelectedStudent(updatedStudent);
         setNewGoalText('');
     };
 
@@ -410,10 +420,11 @@ export const StudentsView = ({ user }: { user: User }) => {
         );
         const updated = await api.students.update(selectedStudent.id, { 
             goals: updatedGoals,
-            xp: selectedStudent.xp + xpReward
+            xp: (selectedStudent.xp || 0) + xpReward
         });
-        setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updated : s));
-        setSelectedStudent(updated);
+        const updatedStudent = { ...selectedStudent, ...updated };
+        setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updatedStudent : s));
+        setSelectedStudent(updatedStudent);
     };
 
     const handleRestring = async () => {
@@ -422,8 +433,9 @@ export const StudentsView = ({ user }: { user: User }) => {
             racketHours: 0, 
             lastRestringDate: new Date().toLocaleDateString('ru') 
         });
-        setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updated : s));
-        setSelectedStudent(updated);
+        const updatedStudent = { ...selectedStudent, ...updated };
+        setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updatedStudent : s));
+        setSelectedStudent(updatedStudent);
         alert('Струны обновлены!');
     };
 
@@ -440,8 +452,9 @@ export const StudentsView = ({ user }: { user: User }) => {
                 };
                 const updatedVideos = [newVideo, ...(selectedStudent.videos || [])];
                 const updated = await api.students.update(selectedStudent.id, { videos: updatedVideos });
-                setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updated : s));
-                setSelectedStudent(updated);
+                const updatedStudent = { ...selectedStudent, ...updated };
+                setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updatedStudent : s));
+                setSelectedStudent(updatedStudent);
             } finally {
                 setIsSubmitting(false);
             }
@@ -464,13 +477,14 @@ export const StudentsView = ({ user }: { user: User }) => {
             });
 
             const updated = await api.students.update(student.id, {
-                racketHours: student.racketHours + 1,
-                balance: student.balance - totalCharge,
-                xp: student.xp + 20,
+                racketHours: (student.racketHours || 0) + 1,
+                balance: (student.balance || 0) - totalCharge,
+                xp: (student.xp || 0) + 20,
                 badges: newBadges
             });
             
-            setStudents(prev => prev.map(s => s.id === student.id ? updated : s));
+            const updatedStudent = { ...student, ...updated };
+            setStudents(prev => prev.map(s => s.id === student.id ? updatedStudent : s));
             setLessons(prev => [...prev, newLesson]);
             setShowBookLessonModal(false);
             
@@ -651,10 +665,10 @@ export const StudentsView = ({ user }: { user: User }) => {
                                             <h4 className="font-black text-xs uppercase text-slate-400 tracking-widest">Навыки (+XP за рост)</h4>
                                             {(['serve', 'forehand', 'backhand', 'stamina', 'tactics'] as const).map(skill => (
                                                 <div key={skill} className="space-y-3">
-                                                    <div className="flex justify-between items-end"><span className="text-[10px] font-black text-slate-600 uppercase">{skill}</span><span className="text-xs font-black text-indigo-600">{selectedStudent.skills[skill]}%</span></div>
+                                                    <div className="flex justify-between items-end"><span className="text-[10px] font-black text-slate-600 uppercase">{skill}</span><span className="text-xs font-black text-indigo-600">{(selectedStudent.skills && selectedStudent.skills[skill]) || 0}%</span></div>
                                                     <div className="flex items-center gap-4">
                                                         <button onClick={() => updateSkill(skill, -5)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-red-500 transition-all"><Minus size={14}/></button>
-                                                        <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden shadow-inner"><div className="h-full bg-indigo-500 transition-all duration-500" style={{ width: `${selectedStudent.skills[skill]}%` }}></div></div>
+                                                        <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden shadow-inner"><div className="h-full bg-indigo-500 transition-all duration-500" style={{ width: `${(selectedStudent.skills && selectedStudent.skills[skill]) || 0}%` }}></div></div>
                                                         <button onClick={() => updateSkill(skill, 5)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-emerald-500 transition-all"><Plus size={14}/></button>
                                                     </div>
                                                 </div>

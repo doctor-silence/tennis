@@ -10,7 +10,7 @@ const MOCK_USER: User = {
   id: 'mock-user-1',
   name: 'Гость (Демо Режим)',
   email: 'demo@tennis.pro',
-  role: 'amateur',
+  role: 'coach',
   city: 'Москва',
   avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80',
   rating: 1200,
@@ -21,16 +21,53 @@ const MOCK_USER: User = {
 
 const MOCK_ADMIN: User = {
   id: 'mock-admin-1',
-  name: 'Супер Админ (Демо)',
+  name: 'Евгений Смирнов',
   email: 'admin@tennis.pro',
   role: 'admin',
   city: 'HQ',
-  avatar: 'https://ui-avatars.com/api/?name=Admin&background=000&color=fff',
+  avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80',
   rating: 9999,
   xp: 9999,
   age: 99,
   level: 'GOD MODE'
 };
+
+let MOCK_STUDENTS: Student[] = [
+    {
+        id: 'mock-student-1',
+        coachId: 'mock-admin-1', // Assuming the admin is the coach in demo
+        name: 'Екатерина Сидорова',
+        age: 14,
+        level: 'NTRP 3.0',
+        balance: -2500,
+        avatar: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?q=80&w=400',
+        status: 'active',
+        goals: [],
+        notes: [{id: 'note-1', date: '20.12.2025', text: 'Отличный форхенд на последней тренировке.', coachId: 'mock-admin-1'}],
+        xp: 1250,
+        skills: { serve: 60, forehand: 75, backhand: 50, stamina: 80, tactics: 65 },
+        badges: ['early_bird'],
+        racketHours: 15,
+        videos: [],
+    },
+    {
+        id: 'mock-student-2',
+        coachId: 'mock-admin-1',
+        name: 'Алексей Петров',
+        age: 18,
+        level: 'NTRP 4.0',
+        balance: 5000,
+        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400',
+        status: 'active',
+        goals: [],
+        notes: [],
+        xp: 3400,
+        skills: { serve: 70, forehand: 65, backhand: 70, stamina: 85, tactics: 75 },
+        badges: ['marathon', 'pro_mindset'],
+        racketHours: 5,
+        videos: [],
+    }
+];
 
 let MOCK_PARTNERS: Partner[] = [];
 
@@ -493,8 +530,8 @@ export const api = {
                 if (!res.ok) throw new Error('Failed to fetch students');
                 return await res.json();
             } catch (e) { 
-                console.error("Fetch Students Error:", e);
-                return []; 
+                console.warn(`Backend offline. Serving in-memory students for coachId: ${coachId}`);
+                return MOCK_STUDENTS;
             }
         },
         getOne: async (studentId: string): Promise<Student> => {
@@ -503,11 +540,13 @@ export const api = {
                 if (!res.ok) throw new Error('Failed to fetch student details');
                 return await res.json();
             } catch (e) {
-                console.error("Fetch Student Details Error:", e);
-                throw e;
+                console.warn(`Backend offline. Serving in-memory student for id: ${studentId}`);
+                const student = MOCK_STUDENTS.find(s => s.id === studentId);
+                if (student) return student;
+                throw new Error("Mock student not found");
             }
         },
-        create: async (data: any): Promise<Student> => {
+        create: async (data: Partial<Student>): Promise<Student> => {
             try {
                 const res = await fetch(`${API_URL}/students`, {
                     method: 'POST',
@@ -517,7 +556,28 @@ export const api = {
                 const json = await res.json();
                 if (!res.ok) throw new Error(json.error || 'Error');
                 return json;
-            } catch (e) { throw e; }
+            } catch (e) {
+                console.warn("Backend offline. Mocking student creation.");
+                const newStudent: Student = {
+                    id: `mock-student-${Date.now()}`,
+                    name: data.name || 'No Name',
+                    age: data.age || 18,
+                    level: data.level || 'NTRP 3.0',
+                    balance: data.balance || 0,
+                    avatar: data.avatar || '',
+                    status: 'active',
+                    goals: [],
+                    notes: [],
+                    xp: 0,
+                    skills: { serve: 0, forehand: 0, backhand: 0, stamina: 0, tactics: 0 },
+                    badges: [],
+                    racketHours: 0,
+                    videos: [],
+                    ...data,
+                };
+                MOCK_STUDENTS.push(newStudent);
+                return newStudent;
+            }
         },
         update: async (id: string, updates: Partial<Student>): Promise<Student> => {
             try {
@@ -528,7 +588,15 @@ export const api = {
                 });
                 if (!res.ok) throw new Error('Failed to update student');
                 return await res.json();
-            } catch (e) { throw e; }
+            } catch (e) { 
+                console.warn(`Backend offline. Mocking student update for id: ${id}`);
+                const studentIndex = MOCK_STUDENTS.findIndex(s => s.id === id);
+                if (studentIndex !== -1) {
+                    MOCK_STUDENTS[studentIndex] = { ...MOCK_STUDENTS[studentIndex], ...updates };
+                    return MOCK_STUDENTS[studentIndex];
+                }
+                return updates as Student;
+            }
         }
     },
 
