@@ -609,7 +609,7 @@ export const StudentsView = ({ user }: { user: User }) => {
             )}
 
             {/* PLAYER PROFILE 360 MODAL */}
-            <Modal isOpen={showStudentDetails} onClose={() => setShowStudentDetails(false)} title="Профиль игрока 360" maxWidth="max-w-2xl">
+            <Modal isOpen={showStudentDetails} onClose={() => setShowStudentDetails(false)} title="Профиль игрока 360" maxWidth="max-w-4xl">
                 {selectedStudent && (
                     <div className="flex flex-col h-[750px] -m-6 overflow-hidden">
                         <div className="bg-slate-900 p-10 text-white shrink-0">
