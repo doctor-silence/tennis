@@ -1,15 +1,22 @@
-import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { BookOpen, Video, Upload, Users, Plus, Loader2, Trash2, IndianRupee, Clock } from 'lucide-react';
-import { User, Student, CrmStats } from '../../types';
+import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
+import { 
+    BookOpen,
+    IndianRupee,
+    Plus, Search, Users, Wallet, Calendar, MapPin, 
+    CheckCircle2, AlertCircle, Loader2, ChevronRight,
+    Trophy, Zap, Star, Phone, Trash2, Minus, CreditCard,
+    TrendingUp, Activity, Target, Notebook, Video, Award,
+    ChevronLeft, Edit3, ClipboardList, CheckCircle, Circle,
+    Upload, Play, X, Clock, AlertTriangle, MessageSquare, Send,
+    RefreshCw, Layers, Briefcase, Settings, User as UserIcon,
+    DollarSign, ArrowUpRight, ArrowDownRight, Calculator,
+    Eye, EyeOff, ChevronDown, ChevronUp, FileText, Download, Printer,
+    Dribbble
+} from 'lucide-react';
+import { User, Student, ScheduledLesson, LessonType, TrainingNote, PlayerGoal, SkillSet } from '../../types';
 import Button from '../Button';
 import { api } from '../../services/api';
 import { Modal } from '../Shared';
-import SmartScheduleView from './SmartScheduleView';
-import StudentListView from './StudentListView';
-import StudentProfileFlyout from './StudentProfileFlyout';
-import AddStudentModal from './AddStudentModal'; // Import the new modal
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
 
 // Lazy load the 3D component
 const TennisCourt3D = lazy(() => import('./TennisCourt3D'));
@@ -200,138 +207,638 @@ export const VideoAnalysisView = () => (
     </div>
 );
 
-export const StudentsView: React.FC<{ user: User }> = ({ user }) => {
-    const [activeView, setActiveView] = useState<'schedule' | 'list'>('list');
-    const [crmStats, setCrmStats] = useState<CrmStats | null>(null);
-    const [students, setStudents] = useState<Student[]>([]);
-    const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+const DAYS_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+const HOURS = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'];
 
-    const fetchAllData = () => {
-        if (user && user.id) {
-            api.crm.getStats(user.id).then(setCrmStats).catch(console.error);
-            api.students.getAll(user.id).then(setStudents).catch(console.error);
+const CANNON_PRICE = 500;
+const RACKET_RENTAL_PRICE = 300;
+
+const BADGE_CONFIG: Record<string, { label: string, icon: string, color: string }> = {
+    'marathon': { label: 'Марафонец', icon: '🏃‍♂️', color: 'bg-orange-100 text-orange-600' },
+    'early_bird': { label: 'Утренний атлет', icon: '🌅', color: 'bg-sky-100 text-sky-600' },
+    'pro_mindset': { label: 'Pro Mindset', icon: '🧠', color: 'bg-purple-100 text-purple-600' },
+    'sharp_shooter': { label: 'Снайпер', icon: '🎯', color: 'bg-emerald-100 text-emerald-600' }
+};
+
+export const StudentsView = ({ user }: { user: User }) => {
+    const [viewMode, setViewMode] = useState<'schedule' | 'list'>('schedule');
+    const [students, setStudents] = useState<Student[]>([]);
+    const [lessons, setLessons] = useState<ScheduledLesson[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState('');
+    const [filterDebtOnly, setFilterDebtOnly] = useState(false);
+    
+    // UI states
+    const [showFinances, setShowFinances] = useState(false);
+    const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+    const [profileTab, setProfileTab] = useState<'overview' | 'gear' | 'diary' | 'goals' | 'video'>('overview');
+    const [showStudentDetails, setShowStudentDetails] = useState(false);
+    const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+    const [showBookLessonModal, setShowBookLessonModal] = useState(false);
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [selectedSlot, setSelectedSlot] = useState<{dayIndex: number, time: string, date: string} | null>(null);
+    
+    // Booking specific states
+    const [bookingStudentId, setBookingStudentId] = useState<string>('');
+    const [bookingSearch, setBookingSearch] = useState('');
+    const [useCannon, setUseCannon] = useState(false);
+    const [useRacketRental, setUseRacketRental] = useState(false);
+    const [courtRentPrice, setCourtRentPrice] = useState<number>(2000); 
+    const [lessonPrice, setLessonPrice] = useState<number>(2500); 
+
+    // CRM states
+    const [customAmount, setCustomAmount] = useState<string>('1000');
+    const [newGoalText, setNewGoalText] = useState('');
+    const [newGoalDate, setNewGoalDate] = '';
+    const [newNote, setNewNote] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const videoInputRef = useRef<HTMLInputElement>(null);
+    const [newStudent, setNewStudent] = useState({
+        name: '', age: 18, level: 'NTRP 3.5', phone: '', isPro: false, rttRank: 0
+    });
+
+    const weekDates = useMemo(() => {
+        const now = new Date();
+        const startOfWeek = now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1);
+        return DAYS_SHORT.map((day, i) => {
+            const d = new Date(now.setDate(startOfWeek + i));
+            return {
+                dayName: day,
+                dateNum: d.getDate(),
+                monthName: d.toLocaleString('ru', { month: 'short' }),
+                fullDate: d.toISOString().split('T')[0]
+            };
+        });
+    }, []);
+
+    const finances = useMemo(() => {
+        const totalRevenue = lessons.reduce((sum, l) => {
+            const lPrice = (l as any).lessonPrice || 2500;
+            const cPrice = (l as any).courtCost || 0;
+            let lessonTotal = lPrice + cPrice;
+            if (l.useCannon) lessonTotal += CANNON_PRICE;
+            if (l.useRacketRental) lessonTotal += RACKET_RENTAL_PRICE;
+            return sum + lessonTotal;
+        }, 0);
+        const totalCourtRent = lessons.reduce((sum, l) => sum + ((l as any).courtCost || 0), 0); 
+        return { totalRevenue, totalCourtRent, netProfit: totalRevenue - totalCourtRent };
+    }, [lessons]);
+
+    const lessonsLookup = useMemo(() => {
+        const map = new Map<string, ScheduledLesson>();
+        lessons.forEach(lesson => {
+            map.set(`${lesson.dayIndex}-${lesson.startTime}`, lesson);
+        });
+        return map;
+    }, [lessons]);
+
+    const filteredStudents = useMemo(() => {
+        const query = search.toLowerCase().trim();
+        return students.filter(s => {
+            const matchesSearch = !query || s.name.toLowerCase().includes(query);
+            const matchesDebt = filterDebtOnly ? s.balance < 0 : true;
+            return matchesSearch && matchesDebt;
+        });
+    }, [students, search, filterDebtOnly]);
+
+    useEffect(() => {
+        const loadInitialData = async () => {
+            setLoading(true);
+            try {
+                const [studentsData, lessonsData] = await Promise.all([
+                    api.students.getAll(user.id),
+                    api.lessons.getAll(user.id)
+                ]);
+                setStudents(studentsData);
+                setLessons(lessonsData);
+            } catch (e) {
+                console.error("Load error:", e);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadInitialData();
+    }, [user.id]);
+
+    // HANDLERS
+    const handleAddStudent = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newStudent.name) return;
+        setIsSubmitting(true);
+        try {
+            const added = await api.students.add({
+                coachId: user.id,
+                ...newStudent,
+                avatar: `https://ui-avatars.com/api/?name=${newStudent.name.replace(' ', '+')}&background=random&color=fff`,
+                notes: [], goals: [], videos: [], racketHours: 0, trainingFrequency: 2, xp: 0, badges: []
+            });
+            setStudents(prev => [added, ...prev]);
+            setShowAddStudentModal(false);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
-    useEffect(() => {
-        fetchAllData();
-    }, [user]);
-
-    const handleStudentClick = (studentId: string) => {
-        setSelectedStudentId(studentId);
+    const updateSkill = async (skillKey: keyof SkillSet, delta: number) => {
+        if (!selectedStudent) return;
+        const currentVal = selectedStudent.skills[skillKey];
+        const newVal = Math.max(0, Math.min(100, currentVal + delta));
+        const xpGain = delta > 0 ? 50 : 0;
+        const updatedSkills = { ...selectedStudent.skills, [skillKey]: newVal };
+        const updated = await api.students.update(selectedStudent.id, { 
+            skills: updatedSkills,
+            xp: selectedStudent.xp + xpGain
+        });
+        setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updated : s));
+        setSelectedStudent(updated);
     };
 
-    const handleCloseStudentProfile = () => {
-        setSelectedStudentId(null);
+    const handleUpdateBalance = async (studentId: string, isAddition: boolean) => {
+        const student = students.find(s => s.id === studentId);
+        if (!student) return;
+        const amount = parseInt(customAmount) || 0;
+        const newBalance = isAddition ? student.balance + amount : student.balance - amount;
+        const updated = await api.students.update(studentId, { balance: newBalance });
+        setStudents(prev => prev.map(s => s.id === student.id ? updated : s));
+        setSelectedStudent(updated);
     };
 
-    const handleStudentAdded = (newStudent: Student) => {
-        setStudents(prev => [newStudent, ...prev]);
-        fetchAllData(); // Re-fetch stats after adding a student
+    const handleAddNote = async () => {
+        if (!newNote.trim() || !selectedStudent) return;
+        setIsSubmitting(true);
+        try {
+            const addedNote: TrainingNote = {
+                id: Date.now().toString(),
+                date: new Date().toLocaleDateString('ru-RU'),
+                text: newNote,
+                coachId: user.id
+            };
+            const updatedNotes = [addedNote, ...(selectedStudent.notes || [])];
+            const updated = await api.students.update(selectedStudent.id, { 
+                notes: updatedNotes 
+            });
+            setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updated : s));
+            setSelectedStudent(updated);
+            setNewNote('');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
-    const today = new Date();
+    const handleAddGoal = async () => {
+        if (!newGoalText || !selectedStudent) return;
+        const newGoal: PlayerGoal = {
+            id: Date.now().toString(),
+            text: newGoalText,
+            targetDate: newGoalDate || 'Без срока',
+            isCompleted: false
+        };
+        const updatedGoals = [...(selectedStudent.goals || []), newGoal];
+        const updated = await api.students.update(selectedStudent.id, { goals: updatedGoals, xp: selectedStudent.xp + 100 });
+        setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updated : s));
+        setSelectedStudent(updated);
+        setNewGoalText('');
+    };
+
+    const toggleGoal = async (goalId: string) => {
+        if (!selectedStudent) return;
+        const goalToToggle = selectedStudent.goals?.find(g => g.id === goalId);
+        const xpReward = (!goalToToggle?.isCompleted) ? 100 : 0; 
+        const updatedGoals = (selectedStudent.goals || []).map(g => 
+            g.id === goalId ? { ...g, isCompleted: !g.isCompleted } : g
+        );
+        const updated = await api.students.update(selectedStudent.id, { 
+            goals: updatedGoals,
+            xp: selectedStudent.xp + xpReward
+        });
+        setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updated : s));
+        setSelectedStudent(updated);
+    };
+
+    const handleRestring = async () => {
+        if (!selectedStudent) return;
+        const updated = await api.students.update(selectedStudent.id, { 
+            racketHours: 0, 
+            lastRestringDate: new Date().toLocaleDateString('ru') 
+        });
+        setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updated : s));
+        setSelectedStudent(updated);
+        alert('Струны обновлены!');
+    };
+
+    const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file && selectedStudent) {
+            setIsSubmitting(true);
+            try {
+                const newVideo = {
+                    id: Date.now().toString(),
+                    title: file.name.split('.')[0] || 'Новое видео',
+                    date: new Date().toLocaleDateString('ru'),
+                    thumbnail: 'https://images.unsplash.com/photo-1599586120429-48281b6f0ece?q=80&w=400'
+                };
+                const updatedVideos = [newVideo, ...(selectedStudent.videos || [])];
+                const updated = await api.students.update(selectedStudent.id, { videos: updatedVideos });
+                setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updated : s));
+                setSelectedStudent(updated);
+            } finally {
+                setIsSubmitting(false);
+            }
+        }
+    };
+
+    const handleBookLesson = async () => {
+        if (!selectedSlot || !bookingStudentId) return;
+        setIsSubmitting(true);
+        try {
+            const student = students.find(s => s.id === bookingStudentId);
+            if (!student) return;
+
+            const totalCharge = lessonPrice + courtRentPrice + (useCannon ? CANNON_PRICE : 0) + (useRacketRental ? RACKET_RENTAL_PRICE : 0);
+            let newBadges = [...(student.badges || [])];
+            if (selectedSlot.time === '08:00' && !newBadges.includes('early_bird')) newBadges.push('early_bird');
+
+            const newLesson = await api.lessons.add({
+                coachId: user.id, studentId: student.id, studentName: student.name, type: 'indiv', startTime: selectedSlot.time, dayIndex: selectedSlot.dayIndex, duration: 60, status: 'confirmed', courtName: 'ТК Спартак', useCannon, useRacketRental, courtCost: courtRentPrice, lessonPrice: lessonPrice 
+            });
+
+            const updated = await api.students.update(student.id, {
+                racketHours: student.racketHours + 1,
+                balance: student.balance - totalCharge,
+                xp: student.xp + 20,
+                badges: newBadges
+            });
+            
+            setStudents(prev => prev.map(s => s.id === student.id ? updated : s));
+            setLessons(prev => [...prev, newLesson]);
+            setShowBookLessonModal(false);
+            
+            // Reset modal states
+            setBookingStudentId('');
+            setUseCannon(false);
+            setUseRacketRental(false);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const getLevel = (xp: number) => Math.floor(xp / 1000) + 1;
+    const getLevelProgress = (xp: number) => (xp % 1000) / 10; 
+
+    // CALCULATED TOTAL FOR MODAL
+    const currentBookingTotal = useMemo(() => {
+        return lessonPrice + courtRentPrice + (useCannon ? CANNON_PRICE : 0) + (useRacketRental ? RACKET_RENTAL_PRICE : 0);
+    }, [lessonPrice, courtRentPrice, useCannon, useRacketRental]);
+
+    if (loading) return <div className="h-96 flex flex-col items-center justify-center text-slate-400 gap-4"><Loader2 className="animate-spin" size={48}/><p className="font-bold animate-pulse uppercase tracking-widest text-xs">Загрузка CRM...</p></div>;
 
     return (
-        <div className="p-8 text-gray-900 min-h-screen bg-[#F7F8FA]">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                {/* Active Players Card */}
-                <div className="bg-slate-900 text-white rounded-3xl p-6 flex flex-col justify-between shadow-lg relative overflow-hidden">
-                    <div className="flex justify-between items-start">
-                        <span className="text-sm font-semibold text-lime-300 uppercase">АКТИВНЫЕ ИГРОКИ</span>
-                        <Users size={40} className="absolute -right-2 -top-2 text-white/10" />
+        <div className="space-y-8 animate-fade-in-up pb-20">
+            {/* HUD & FINANCIALS */}
+            <div className="space-y-4">
+                <button onClick={() => setShowFinances(!showFinances)} className="flex items-center gap-3 bg-white px-6 py-3 rounded-2xl border shadow-sm hover:border-indigo-400 transition-all group">
+                    <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">{showFinances ? <EyeOff size={16}/> : <Eye size={16}/>}</div>
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Финансовая аналитика</span>
+                    {showFinances ? <ChevronUp size={16} className="text-slate-300"/> : <ChevronDown size={16} className="text-slate-300"/>}
+                </button>
+                {showFinances && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in-up">
+                        <div className="bg-emerald-50 border border-emerald-100 rounded-[24px] p-5">
+                            <div className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-600 mb-1">Выручка</div>
+                            <div className="text-2xl font-black text-emerald-900">{finances.totalRevenue.toLocaleString()} ₽</div>
+                        </div>
+                        <div className="bg-rose-50 border border-rose-100 rounded-[24px] p-5">
+                            <div className="text-[9px] font-black uppercase tracking-[0.2em] text-rose-600 mb-1">Аренда кортов</div>
+                            <div className="text-2xl font-black text-rose-900">{finances.totalCourtRent.toLocaleString()} ₽</div>
+                        </div>
+                        <div className="bg-indigo-600 rounded-[24px] p-5 text-white shadow-lg">
+                            <div className="text-[9px] font-black uppercase tracking-[0.2em] text-indigo-200 mb-1">Чистая прибыль</div>
+                            <div className="text-3xl font-black">{finances.netProfit.toLocaleString()} ₽</div>
+                        </div>
                     </div>
-                    <div className="text-5xl font-bold my-4">{crmStats?.activePlayers || 0}</div>
-                    <button 
-                        onClick={() => setIsAddModalOpen(true)}
-                        className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white font-semibold text-sm py-2 rounded-lg transition-colors"
-                    >
-                        <Plus size={16} /> Добавить
-                    </button>
-                </div>
+                )}
+            </div>
 
-                {/* Accounts Receivable Card */}
-                <div className="bg-white text-gray-900 rounded-3xl p-6 flex flex-col justify-between shadow-lg">
-                     <div>
-                        <span className="text-sm font-semibold text-gray-400 uppercase">ДЕБИТОРСКАЯ ЗАДОЛЖЕННОСТЬ</span>
-                        <div className="text-4xl font-bold text-red-500 my-4">{Math.abs(crmStats?.totalDebt || 0)} ₽</div>
-                    </div>
-                    <div className="flex items-center text-xs text-gray-500">
-                       <Clock size={14} className="mr-2 text-yellow-500" />
-                        <span>{crmStats?.playersInDebt || 0} игрока имеют минус</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="lg:col-span-1 bg-slate-900 rounded-[40px] p-8 text-white relative overflow-hidden group shadow-2xl transition-all hover:scale-[1.02]">
+                    <div className="text-[10px] font-black uppercase tracking-[0.3em] text-lime-400 mb-2">База учеников</div>
+                    <div className="text-5xl font-black">{students.length}</div>
+                    <Button size="sm" className="bg-lime-400 text-slate-900 mt-6 rounded-2xl h-11 px-6 font-black uppercase text-[10px] tracking-widest hover:bg-white" onClick={() => setShowAddStudentModal(true)}><Plus size={16} className="mr-1"/> Добавить</Button>
+                </div>
+                <div className="lg:col-span-1 bg-white rounded-[40px] p-8 border shadow-sm"><div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Активные абонементы</div><div className="text-4xl font-black text-slate-900">12</div></div>
+                <div className="lg:col-span-2 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[40px] p-8 text-white flex items-center justify-between shadow-xl">
+                    <div className="space-y-1"><div className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-200">Режим просмотра</div><h4 className="text-xl font-bold">Управление сеткой</h4></div>
+                    <div className="flex bg-black/20 p-1.5 rounded-2xl backdrop-blur-xl border border-white/10">
+                        <button onClick={() => setViewMode('list')} className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'list' ? 'bg-white text-indigo-900 shadow-lg' : 'text-white/60'}`}>Список</button>
+                        <button onClick={() => setViewMode('schedule')} className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'schedule' ? 'bg-white text-indigo-900 shadow-lg' : 'text-white/60'}`}>Сетка</button>
                     </div>
                 </div>
+            </div>
 
-                {/* View Toggles and Date */}
-                <div className="lg:col-span-2 bg-indigo-600 text-white rounded-3xl p-6 flex items-center justify-between shadow-lg">
-                    <div>
-                        <span className="text-sm font-semibold opacity-80 block mb-3 uppercase">Режим отображения</span>
-                        <div className="flex items-center bg-black/20 rounded-full p-1">
-                            <button
-                                onClick={() => setActiveView('list')}
-                                className={`px-5 py-1.5 rounded-full transition-all text-sm font-medium ${activeView === 'list' ? 'bg-white text-indigo-600' : 'bg-transparent text-white'}`}
+            {/* LIST / CALENDAR VIEW */}
+            {viewMode === 'list' ? (
+                <div className="space-y-6">
+                    <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-[30px] border shadow-sm">
+                        <div className="relative flex-1 w-full"><Search className="absolute left-4 top-3.5 text-slate-300" size={20}/><input className="w-full bg-slate-50 border-none rounded-2xl pl-12 pr-4 py-3.5 outline-none font-bold text-slate-900" placeholder="Поиск ученика..." value={search} onChange={e => setSearch(e.target.value)} /></div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        {filteredStudents.map(s => (
+                            <div key={s.id} onClick={() => { setSelectedStudent(s); setShowStudentDetails(true); setProfileTab('overview'); }} className={`bg-white rounded-[45px] p-8 border hover:shadow-2xl transition-all group cursor-pointer border-slate-100 hover:border-indigo-100`}>
+                                <div className="flex items-center gap-6 mb-8">
+                                    <img src={s.avatar} className="w-20 h-20 rounded-[28px] object-cover shadow-xl border-4 border-white group-hover:scale-105 transition-transform" />
+                                    <div className="flex-1 overflow-hidden">
+                                        <h3 className="text-xl font-black text-slate-900 truncate mb-1">{s.name}</h3>
+                                        <div className="flex items-center gap-2"><span className="text-[9px] font-black text-slate-400 uppercase bg-slate-100 px-2 py-1 rounded-lg">Level {getLevel(s.xp)}</span><span className="text-[9px] font-black text-amber-600 uppercase bg-amber-50 px-2 py-1 rounded-lg">{s.xp} XP</span></div>
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100"><span className="text-[10px] font-black text-slate-400 uppercase">Баланс</span><span className={`text-lg font-black ${s.balance < 0 ? 'text-red-500' : 'text-emerald-600'}`}>{s.balance.toLocaleString()} ₽</span></div>
+                                    <div className="flex justify-between items-center px-2">
+                                        <div className="flex flex-col"><span className="text-[9px] font-black text-slate-300 uppercase">Достижения</span><div className="flex gap-1 mt-1">{(s.badges || []).slice(0, 3).map(b => <span key={b} title={BADGE_CONFIG[b]?.label} className="text-xs">{BADGE_CONFIG[b]?.icon}</span>)}{!(s.badges?.length) && <span className="text-[10px] text-slate-200 uppercase font-black italic">Нет наград</span>}</div></div>
+                                        <ChevronRight size={18} className="text-slate-200 group-hover:text-indigo-500 transition-all"/>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : (
+                <div className="bg-white rounded-[50px] border shadow-2xl overflow-hidden relative">
+                    <div className="overflow-x-auto custom-scrollbar max-h-[700px]">
+                        <div className="grid grid-cols-[100px_repeat(7,1fr)] min-w-[1200px]">
+                            <div className="h-20 sticky top-0 bg-white z-30 border-b border-r flex items-center justify-center"><Clock size={20} className="text-slate-300"/></div>
+                            {weekDates.map((dateObj, i) => (<div key={i} className={`h-20 sticky top-0 z-30 border-b flex flex-col items-center justify-center transition-colors ${new Date().getDate() === dateObj.dateNum ? 'bg-indigo-600 text-white' : 'bg-white text-slate-900'}`}><div className="font-black uppercase text-[10px] tracking-widest">{dateObj.dayName}</div><div className="text-2xl font-black">{dateObj.dateNum}</div></div>))}
+                            {HOURS.map(time => (
+                                <React.Fragment key={time}>
+                                    <div className="h-32 border-b border-r bg-slate-50/50 flex items-center justify-center text-xs font-black text-slate-400 sticky left-0 z-20">{time}</div>
+                                    {weekDates.map((dateObj, dayIdx) => {
+                                        const lesson = lessonsLookup.get(`${dayIdx}-${time}`);
+                                        return (
+                                            <div key={`${dayIdx}-${time}`} className="h-32 border-b border-r relative group transition-all hover:bg-slate-50/80">
+                                                {lesson ? (
+                                                    <div className="absolute inset-2 p-3 rounded-2xl shadow-xl z-10 bg-white border-l-4 border-lime-400 cursor-pointer" onClick={() => { const student = students.find(s => s.id === lesson.studentId); if(student) { setSelectedStudent(student); setShowStudentDetails(true); setProfileTab('overview'); } }}>
+                                                        <div className="text-[8px] font-black uppercase text-slate-400">{lesson.type}</div>
+                                                        <div className="text-xs font-black text-slate-900 truncate">{lesson.studentName}</div>
+                                                    </div>
+                                                ) : (
+                                                    <button onClick={() => { setSelectedSlot({dayIndex: dayIdx, time: time, date: dateObj.fullDate}); setShowBookLessonModal(true); }} className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center text-indigo-400 transition-opacity"><Plus size={24}/></button>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </React.Fragment>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* PLAYER PROFILE 360 MODAL */}
+            <Modal isOpen={showStudentDetails} onClose={() => setShowStudentDetails(false)} title="Профиль игрока 360" maxWidth="max-w-2xl">
+                {selectedStudent && (
+                    <div className="flex flex-col h-[750px] -m-6 overflow-hidden">
+                        <div className="bg-slate-900 p-10 text-white shrink-0">
+                            <div className="flex items-center gap-8">
+                                <img src={selectedStudent.avatar} className="w-24 h-24 rounded-[35px] border-4 border-white/20 shadow-2xl object-cover" />
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-3 mb-2"><h3 className="text-3xl font-black">{selectedStudent.name}</h3><span className="bg-lime-400 text-slate-900 text-[10px] font-black px-2 py-1 rounded-lg">LVL {getLevel(selectedStudent.xp)}</span></div>
+                                    <div className="flex items-center gap-6">
+                                        <div className="flex items-center gap-2 text-slate-400 text-sm font-bold uppercase tracking-widest"><Activity size={16} className="text-lime-400"/> {selectedStudent.level}</div>
+                                        <div className="flex items-center gap-2 text-slate-400 text-sm font-bold uppercase tracking-widest"><Zap size={16} className="text-amber-400"/> {selectedStudent.xp} XP</div>
+                                    </div>
+                                </div>
+                                <div className="text-right flex flex-col gap-3">
+                                    <div className={`text-3xl font-black ${selectedStudent.balance < 0 ? 'text-red-400' : 'text-lime-400'}`}>{selectedStudent.balance.toLocaleString()} ₽</div>
+                                    <button onClick={() => setShowReportModal(true)} className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2.5 rounded-xl border border-white/10 text-xs font-black uppercase tracking-widest transition-all"><FileText size={16}/> Отчет родителю</button>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-8 mt-10 border-b border-white/10">
+                                {[
+                                    { id: 'overview', label: 'Обзор & XP', icon: <Trophy size={16}/> },
+                                    { id: 'gear', label: 'Инвентарь', icon: <Layers size={16}/> },
+                                    { id: 'diary', label: 'Дневник', icon: <Notebook size={16}/> },
+                                    { id: 'goals', label: 'Цели', icon: <Target size={16}/> },
+                                    { id: 'video', label: 'Видео', icon: <Video size={16}/> },
+                                ].map(tab => (
+                                    <button key={tab.id} onClick={() => setProfileTab(tab.id as any)} className={`pb-4 text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all relative ${profileTab === tab.id ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}>{tab.icon} {tab.label}{profileTab === tab.id && <div className="absolute bottom-0 left-0 w-full h-1 bg-lime-400 rounded-t-full"></div>}</button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-10 bg-slate-50/50 custom-scrollbar">
+                            {profileTab === 'overview' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 animate-fade-in-up">
+                                    <div className="space-y-10">
+                                        <div className="space-y-4">
+                                            <h4 className="font-black text-xs uppercase text-slate-400 tracking-widest">Прогресс уровня</h4>
+                                            <div className="p-6 bg-white rounded-[32px] border border-slate-100 shadow-sm space-y-4">
+                                                <div className="flex justify-between items-end"><span className="text-3xl font-black text-slate-900">{getLevel(selectedStudent.xp)} <span className="text-sm text-slate-400 font-bold uppercase">Lvl</span></span><span className="text-xs font-black text-slate-400">{selectedStudent.xp % 1000} / 1000 XP</span></div>
+                                                <div className="h-4 bg-slate-100 rounded-full overflow-hidden border p-0.5"><div className="h-full bg-gradient-to-r from-lime-400 to-emerald-500 rounded-full transition-all duration-1000" style={{ width: `${getLevelProgress(selectedStudent.xp)}%` }}></div></div>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-4">
+                                            <h4 className="font-black text-xs uppercase text-slate-400 tracking-widest">Бейджи достижений</h4>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                {Object.entries(BADGE_CONFIG).map(([id, cfg]) => {
+                                                    const isLocked = !selectedStudent.badges?.includes(id);
+                                                    return (<div key={id} className={`p-4 rounded-3xl border flex items-center gap-3 transition-all ${isLocked ? 'opacity-40 grayscale bg-slate-100 border-slate-200' : `${cfg.color} border-current shadow-sm`}`}><div className="text-2xl">{cfg.icon}</div><div className="font-black text-[10px] uppercase tracking-widest">{cfg.label}</div></div>);
+                                                })}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-6">
+                                            <h4 className="font-black text-xs uppercase text-slate-400 tracking-widest">Навыки (+XP за рост)</h4>
+                                            {(['serve', 'forehand', 'backhand', 'stamina', 'tactics'] as const).map(skill => (
+                                                <div key={skill} className="space-y-3">
+                                                    <div className="flex justify-between items-end"><span className="text-[10px] font-black text-slate-600 uppercase">{skill}</span><span className="text-xs font-black text-indigo-600">{selectedStudent.skills[skill]}%</span></div>
+                                                    <div className="flex items-center gap-4">
+                                                        <button onClick={() => updateSkill(skill, -5)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-red-500 transition-all"><Minus size={14}/></button>
+                                                        <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden shadow-inner"><div className="h-full bg-indigo-500 transition-all duration-500" style={{ width: `${selectedStudent.skills[skill]}%` }}></div></div>
+                                                        <button onClick={() => updateSkill(skill, 5)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-emerald-500 transition-all"><Plus size={14}/></button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-xl space-y-6 h-fit sticky top-0">
+                                        <h4 className="font-black text-xs uppercase text-slate-400 tracking-widest">Транзакции баланса</h4>
+                                        <input type="number" className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 outline-none font-bold text-lg shadow-inner" value={customAmount} onChange={e => setCustomAmount(e.target.value)} />
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <button onClick={() => handleUpdateBalance(selectedStudent.id, true)} className="bg-emerald-500 text-white font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 hover:scale-[1.03] transition-all"><Plus size={18}/> +{customAmount}</button>
+                                            <button onClick={() => handleUpdateBalance(selectedStudent.id, false)} className="bg-slate-900 text-white font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 hover:scale-[1.03] transition-all"><Minus size={18}/> -{customAmount}</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {profileTab === 'gear' && (
+                                <div className="space-y-8 animate-fade-in-up">
+                                    <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6">
+                                        <div className="flex items-center gap-4"><div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center"><Layers size={24}/></div><div><h4 className="font-black text-lg text-slate-900">Износ струн</h4><p className="text-xs font-bold text-slate-400 uppercase">Порог: 20 часов игры</p></div></div>
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between text-xs font-black"><span className="text-slate-500 uppercase">Наработка</span><span className={selectedStudent.racketHours >= 20 ? 'text-red-500' : 'text-slate-900'}>{selectedStudent.racketHours} / 20 ч</span></div>
+                                            <div className="h-4 bg-slate-100 rounded-full overflow-hidden border"><div className={`h-full transition-all duration-1000 ${selectedStudent.racketHours >= 20 ? 'bg-red-500' : 'bg-orange-400'}`} style={{ width: `${Math.min(100, (selectedStudent.racketHours / 20) * 100)}%` }}></div></div>
+                                            <button onClick={handleRestring} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2"><RefreshCw size={14}/> Сбросить (Перетяжка)</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {profileTab === 'diary' && (
+                                <div className="space-y-6 animate-fade-in-up">
+                                    <div className="bg-white p-6 rounded-[32px] border shadow-sm space-y-4">
+                                        <textarea className="w-full bg-slate-50 rounded-2xl p-4 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500 border-none min-h-[100px] resize-none" placeholder="Заметка о тренировке..." value={newNote} onChange={e => setNewNote(e.target.value)} /><Button className="w-full h-12 gap-2" onClick={handleAddNote} disabled={!newNote.trim()}><Edit3 size={18}/> Сохранить заметку</Button>
+                                    </div>
+                                    <div className="space-y-4">{(selectedStudent.notes || []).map(note => (<div key={note.id} className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm relative"><div className="absolute top-6 right-6 text-[10px] font-black text-slate-300">{note.date}</div><p className="text-sm text-slate-700 font-medium">{note.text}</p></div>))}</div>
+                                </div>
+                            )}
+
+                            {profileTab === 'goals' && (
+                                <div className="space-y-8 animate-fade-in-up">
+                                    <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6">
+                                        <h4 className="font-black text-xs uppercase text-slate-400 tracking-widest">Поставить новую цель</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><input className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 outline-none font-bold shadow-inner" placeholder="Напр: Стабильный форхенд" value={newGoalText} onChange={e => setNewGoalText(e.target.value)} /><button onClick={handleAddGoal} disabled={!newGoalText.trim()} className="w-full bg-indigo-600 text-white rounded-2xl py-4 font-black uppercase text-xs tracking-widest transition-all hover:bg-indigo-700 active:scale-95">Создать цель (+100 XP)</button></div>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-4">
+                                        {(selectedStudent.goals || []).map(goal => (
+                                            <div key={goal.id} className={`p-6 rounded-[30px] border-2 transition-all flex items-center justify-between group ${goal.isCompleted ? 'bg-emerald-50 border-emerald-500/30' : 'bg-white border-slate-100'}`}><div className="flex items-center gap-6 cursor-pointer flex-1" onClick={() => toggleGoal(goal.id)}>{goal.isCompleted ? <CheckCircle className="text-emerald-500" size={28}/> : <Circle className="text-slate-200" size={28}/>}<div><div className={`text-lg font-black ${goal.isCompleted ? 'text-emerald-900 line-through opacity-40' : 'text-slate-900'}`}>{goal.text}</div><div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Срок: {goal.targetDate}</div></div></div></div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {profileTab === 'video' && (
+                                <div className="space-y-6 animate-fade-in-up">
+                                    <div className="bg-slate-900 p-8 rounded-[40px] text-white flex justify-between items-center relative overflow-hidden">
+                                        <div className="relative z-10"><h4 className="text-xl font-black mb-2">Технический разбор</h4><p className="text-white/40 text-xs font-medium">Видео-материалы с последних тренировок.</p></div>
+                                        <input type="file" className="hidden" ref={videoInputRef} accept="video/*" onChange={handleVideoUpload} /><Button variant="secondary" size="sm" className="gap-2 relative z-10" onClick={() => videoInputRef.current?.click()} disabled={isSubmitting}><Upload size={16}/> Добавить видео</Button>
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                                        {(selectedStudent.videos || []).map(vid => (
+                                            <div key={vid.id} className="bg-white p-3 rounded-3xl border border-slate-100 shadow-sm group cursor-pointer hover:border-indigo-200 transition-all"><div className="aspect-video bg-slate-200 rounded-2xl mb-3 relative overflow-hidden"><img src={vid.thumbnail} className="w-full h-full object-cover group-hover:scale-105 transition-transform" /><div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-900 shadow-xl"><Play size={18} fill="currentColor"/></div></div></div><div className="px-2"><div className="font-bold text-xs truncate">{vid.title}</div><div className="text-[9px] font-black text-slate-400 uppercase">{vid.date}</div></div></div>
+                                        ))}
+                                        {!(selectedStudent.videos?.length) && <div className="col-span-full py-10 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest border-2 border-dashed rounded-[32px]">Нет загруженных видео</div>}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
+            {/* MONTHLY REPORT MODAL */}
+            <Modal isOpen={showReportModal} onClose={() => setShowReportModal(false)} title="Аналитический отчет за месяц" maxWidth="max-w-xl">
+                {selectedStudent && (
+                    <div className="space-y-8 py-4">
+                        <div className="bg-slate-50 p-10 rounded-[40px] border-2 border-dashed border-slate-200 relative overflow-hidden" id="report-content">
+                            <div className="flex justify-between items-start mb-12"><div><div className="flex items-center gap-2 mb-2"><div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white"><Zap size={18} fill="currentColor"/></div><span className="font-black tracking-tighter uppercase italic">TENNIS<span className="text-lime-600">PRO</span></span></div><h2 className="text-3xl font-black text-slate-900 leading-none">Октябрь 2024</h2><p className="text-slate-400 text-sm font-bold uppercase tracking-widest mt-2">Индивидуальный прогресс-репорт</p></div><div className="text-right"><div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Игрок</div><div className="text-xl font-black text-slate-900">{selectedStudent.name}</div><div className="text-xs font-bold text-indigo-600 uppercase mt-1">Тренер: {user.name}</div></div></div>
+                            <div className="grid grid-cols-3 gap-6 mb-12"><div className="bg-white p-5 rounded-3xl border shadow-sm text-center"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">Посещаемость</div><div className="text-2xl font-black text-slate-900">100%</div><div className="text-[8px] font-bold text-emerald-500 uppercase">12 из 12 занятий</div></div><div className="bg-white p-5 rounded-3xl border shadow-sm text-center"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">Набрано XP</div><div className="text-2xl font-black text-amber-500">+850</div><div className="text-[8px] font-bold text-amber-500 uppercase">Прогресс активен</div></div><div className="bg-white p-5 rounded-3xl border shadow-sm text-center"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">Средняя оценка</div><div className="text-2xl font-black text-indigo-600">4.9 / 5.0</div><div className="text-[8px] font-bold text-indigo-400 uppercase">Стабильный рост</div></div></div>
+                            <div className="space-y-6 mb-12"><h4 className="font-black text-xs uppercase text-slate-400 tracking-widest flex items-center gap-2"><Award size={16} className="text-lime-500"/> Комментарий тренера</h4><p className="text-sm text-slate-700 leading-relaxed italic">"{selectedStudent.name} показывает отличную дисциплину. В этом месяце мы сделали большой упор на стабильность подачи. Получен бейдж «Марафонец» — гордимся!"</p></div>
+                        </div>
+                        <div className="flex gap-4"><Button variant="outline" className="flex-1 gap-2 h-14 rounded-2xl" onClick={() => window.print()}><Printer size={18}/> Печать</Button><Button className="flex-1 gap-2 h-14 rounded-2xl" onClick={() => alert('PDF файл сформирован')}><Download size={18}/> Скачать PDF</Button></div>
+                    </div>
+                )}
+            </Modal>
+
+            {/* FULLY RESTORED BOOKING MODAL WITH PAYMENT LOGIC */}
+            <Modal isOpen={showBookLessonModal} onClose={() => { setShowBookLessonModal(false); setBookingStudentId(''); }} title="Записать на тренировку" maxWidth="max-w-3xl">
+                <div className="space-y-8 py-2">
+                    <div className="bg-[#0f172a] p-8 rounded-[40px] text-white relative overflow-hidden shadow-2xl">
+                        <div className="relative z-10"><div className="text-xs font-black text-lime-400 uppercase tracking-[0.3em] mb-2">{selectedSlot ? `${weekDates[selectedSlot.dayIndex].dayName}, ${selectedSlot.date}` : ''} • {selectedSlot?.time}</div><div className="text-3xl font-black italic uppercase tracking-tighter text-glow">Бронирование и оплата</div></div>
+                    </div>
+                    
+                    <div className="space-y-8">
+                        {/* 1. STUDENT SELECTION */}
+                        <div className="space-y-4">
+                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest px-1">1. Выберите ученика</label>
+                            {!bookingStudentId ? (
+                                <div className="space-y-4 animate-fade-in-up">
+                                    <div className="relative"><Search className="absolute left-4 top-3.5 text-slate-300" size={18}/><input className="w-full bg-slate-50 border border-slate-100 rounded-[20px] pl-12 pr-4 py-3.5 outline-none font-bold text-sm" placeholder="Поиск по базе..." value={bookingSearch} onChange={e => setBookingSearch(e.target.value)}/></div>
+                                    <div className="grid grid-cols-1 gap-2 max-h-[200px] overflow-y-auto custom-scrollbar pr-2">
+                                        {students.filter(s => s.name.toLowerCase().includes(bookingSearch.toLowerCase())).map(s => (
+                                            <button key={s.id} onClick={() => setBookingStudentId(s.id)} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:border-lime-400 transition-all group"><div className="flex items-center gap-4 text-left"><img src={s.avatar} className="w-10 h-10 rounded-xl object-cover" /><div><div className="font-black text-indigo-900 text-lg">{students.find(s => s.id === bookingStudentId)?.name}</div><div className="text-[9px] font-black text-indigo-400 uppercase">Баланс: {s.balance.toLocaleString()} ₽</div></div></div><ChevronRight size={18} className="text-slate-200 group-hover:text-lime-500 transition-all"/></button>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-5 p-5 bg-indigo-50 border-2 border-indigo-200 rounded-[30px]"><img src={students.find(s => s.id === bookingStudentId)?.avatar} className="w-14 h-14 rounded-2xl object-cover shadow-lg border-2 border-white" /><div className="flex-1"><div className="font-black text-indigo-900 text-lg">{students.find(s => s.id === bookingStudentId)?.name}</div><div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Ученик выбран</div></div><button onClick={() => setBookingStudentId('')} className="bg-white p-2 rounded-xl text-slate-400 hover:text-red-500 transition-all shadow-sm"><X size={20}/></button></div>
+                            )}
+                        </div>
+
+                        {/* 2. PAYMENT DETAILS & EQUIPMENT */}
+                        {bookingStudentId && (
+                            <div className="space-y-6 animate-fade-in-up">
+                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest px-1">2. Параметры оплаты</label>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100 space-y-3">
+                                        <div className="flex items-center gap-2 text-slate-500"><MapPin size={14}/><span className="text-[10px] font-black uppercase">Аренда корта</span></div>
+                                        <input type="number" className="w-full bg-white border-none rounded-2xl px-4 py-3 outline-none font-black text-lg shadow-sm" value={courtRentPrice} onChange={e => setCourtRentPrice(Number(e.target.value))} />
+                                    </div>
+                                    <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100 space-y-3">
+                                        <div className="flex items-center gap-2 text-slate-500"><UserIcon size={14}/><span className="text-[10px] font-black uppercase">Стоимость урока</span></div>
+                                        <input type="number" className="w-full bg-white border-none rounded-2xl px-4 py-3 outline-none font-black text-lg shadow-sm" value={lessonPrice} onChange={e => setLessonPrice(Number(e.target.value))} />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <button 
+                                        onClick={() => setUseCannon(!useCannon)}
+                                        className={`flex items-center justify-between p-5 rounded-[28px] border-2 transition-all ${useCannon ? 'bg-orange-50 border-orange-400 shadow-md' : 'bg-white border-slate-100'}`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-xl ${useCannon ? 'bg-orange-400 text-white' : 'bg-slate-100 text-slate-400'}`}><Dribbble size={20}/></div>
+                                            <div className="text-left">
+                                                <div className="font-black text-slate-900 text-sm">Теннисная пушка</div>
+                                                <div className="text-[10px] font-bold text-slate-400 uppercase">+{CANNON_PRICE} ₽</div>
+                                            </div>
+                                        </div>
+                                        {useCannon ? <CheckCircle2 className="text-orange-500" size={24}/> : <Circle className="text-slate-200" size={24}/>}
+                                    </button>
+
+                                    <button 
+                                        onClick={() => setUseRacketRental(!useRacketRental)}
+                                        className={`flex items-center justify-between p-5 rounded-[28px] border-2 transition-all ${useRacketRental ? 'bg-sky-50 border-sky-400 shadow-md' : 'bg-white border-slate-100'}`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-xl ${useRacketRental ? 'bg-sky-400 text-white' : 'bg-slate-100 text-slate-400'}`}><Layers size={20}/></div>
+                                            <div className="text-left">
+                                                <div className="font-black text-slate-900 text-sm">Аренда ракетки</div>
+                                                <div className="text-[10px] font-bold text-slate-400 uppercase">+{RACKET_RENTAL_PRICE} ₽</div>
+                                            </div>
+                                        </div>
+                                        {useRacketRental ? <CheckCircle2 className="text-sky-500" size={24}/> : <Circle className="text-slate-200" size={24}/>}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 3. TOTAL & CONFIRM */}
+                        <div className="p-8 bg-[#0f172a] rounded-[45px] text-white flex flex-col sm:flex-row justify-between items-center gap-6 shadow-2xl relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-8 opacity-5"><DollarSign size={100}/></div>
+                            <div className="text-center sm:text-left relative z-10">
+                                <div className="text-[10px] font-black text-lime-400 uppercase tracking-[0.2em] mb-1">Итого к списанию (+20 XP)</div>
+                                <div className="text-5xl font-black tracking-tighter text-white">{currentBookingTotal.toLocaleString()} ₽</div>
+                            </div>
+                            <button 
+                                onClick={handleBookLesson} 
+                                disabled={isSubmitting || !bookingStudentId} 
+                                className="h-20 px-14 bg-lime-400 text-slate-900 rounded-[28px] font-black uppercase tracking-[0.2em] text-sm shadow-[0_20px_40px_rgba(163,230,53,0.3)] hover:bg-white transition-all active:scale-95 disabled:opacity-30 relative z-10"
                             >
-                                Список
-                            </button>
-                            <button
-                                onClick={() => setActiveView('schedule')}
-                                className={`px-5 py-1.5 rounded-full transition-all text-sm font-medium ${activeView === 'schedule' ? 'bg-white text-indigo-600' : 'bg-transparent text-white'}`}
-                            >
-                                Календарь
+                                {isSubmitting ? <Loader2 className="animate-spin"/> : 'Подтвердить'}
                             </button>
                         </div>
                     </div>
-                    <div className="text-right">
-                        <div className="text-4xl font-bold">{format(today, 'dd')}</div>
-                        <div className="text-sm opacity-80 uppercase">{format(today, 'MMM', { locale: ru })}</div>
-                        <div className="text-xs opacity-60 uppercase">{format(today, 'EEEE', { locale: ru })}</div>
-                    </div>
                 </div>
-            </div>
+            </Modal>
 
-            {/* Search and Filter (Placeholder for now) */}
-            <div className="flex items-center gap-4 mb-8">
-                <div className="relative flex-grow">
-                    <input
-                        type="text"
-                        placeholder="Поиск по фамилии или уровню..."
-                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-white border-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
-                    />
-                    <Users size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                </div>
-                <button className="p-3 bg-white rounded-xl border-transparent shadow-sm">
-                    {/* Filter Icon */}
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600">
-                        <line x1="4" y1="21" x2="4" y2="14"></line>
-                        <line x1="4" y1="10" x2="4" y2="3"></line>
-                        <line x1="12" y1="21" x2="12" y2="12"></line>
-                        <line x1="12" y1="8" x2="12" y2="3"></line>
-                        <line x1="20" y1="21" x2="20" y2="16"></line>
-                        <line x1="20" y1="12" x2="20" y2="3"></line>
-                        <line x1="1" y1="14" x2="7" y2="14"></line>
-                        <line x1="9" y1="8" x2="15" y2="8"></line>
-                        <line x1="17" y1="16" x2="23" y2="16"></line>
-                    </svg>
-                </button>
-            </div>
-            
-            {/* Conditional View */}
-            {activeView === 'schedule' ? <SmartScheduleView user={user} /> : <StudentListView students={students} onStudentClick={handleStudentClick} />}
-
-            {/* Student Profile Flyout */}
-            {selectedStudentId && (
-                <StudentProfileFlyout studentId={selectedStudentId} onClose={handleCloseStudentProfile} />
-            )}
-
-            {/* Add Student Modal */}
-            {isAddModalOpen && (
-                <AddStudentModal
-                    user={user}
-                    onClose={() => setIsAddModalOpen(false)}
-                    onStudentAdded={handleStudentAdded}
-                />
-            )}
+            <Modal isOpen={showAddStudentModal} onClose={() => setShowAddStudentModal(false)} title="Новая анкета ученика">
+                <form onSubmit={handleAddStudent} className="space-y-6">
+                    <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200"><button type="button" onClick={() => setNewStudent({...newStudent, isPro: false})} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${!newStudent.isPro ? 'bg-white text-slate-900 shadow-md' : 'text-slate-500'}`}>Любитель</button><button type="button" onClick={() => setNewStudent({...newStudent, isPro: true})} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${newStudent.isPro ? 'bg-amber-400 text-slate-900 shadow-md' : 'text-slate-500'}`}>PRO (РТТ)</button></div>
+                    <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">ФИО Ученика</label><input required className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 outline-none font-bold shadow-inner" placeholder="Напр: Михаил Сафонов" value={newStudent.name} onChange={e => setNewStudent({...newStudent, name: e.target.value})} /></div>
+                    <Button type="submit" disabled={isSubmitting} className="w-full h-16 rounded-[25px] font-black shadow-2xl uppercase tracking-widest text-xs">{isSubmitting ? <Loader2 className="animate-spin"/> : 'Создать карточку'}</Button>
+                </form>
+            </Modal>
         </div>
     );
 };

@@ -532,6 +532,31 @@ export const api = {
         }
     },
 
+    lessons: {
+        getAll: async (coachId: string): Promise<Lesson[]> => {
+            try {
+                const res = await fetch(`${API_URL}/lessons?coachId=${coachId}`);
+                if (!res.ok) throw new Error('Failed to fetch lessons');
+                return await res.json();
+            } catch (e) {
+                console.error("Fetch Lessons Error:", e);
+                return [];
+            }
+        },
+        add: async (lessonData: any): Promise<Lesson> => {
+            try {
+                const res = await fetch(`${API_URL}/lessons`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(lessonData)
+                });
+                const json = await res.json();
+                if (!res.ok) throw new Error(json.error || 'Error');
+                return json;
+            } catch (e) { throw e; }
+        }
+    },
+
     crm: {
         getStats: async (coachId: string): Promise<CrmStats> => {
             try {

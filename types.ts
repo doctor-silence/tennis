@@ -81,17 +81,50 @@ export interface Conversation {
   isPro: boolean;
 }
 
-export interface Skill {
-    name: string;
-    value: number;
+export interface SkillSet {
+  serve: number;
+  forehand: number;
+  backhand: number;
+  stamina: number;
+  tactics: number;
 }
 
-export interface Lesson {
+export interface PlayerGoal {
     id: string;
-    date: string;
-    description: string;
-    amount: number;
-    location: string;
+    text: string;
+    targetDate: string;
+    isCompleted: boolean;
+}
+
+export interface TrainingNote {
+    id: string;
+    date: string; // Date string
+    text: string;
+    coachId: string;
+}
+
+export interface Video {
+    id: string;
+    title: string;
+    date: string; // Date string
+    thumbnail: string;
+}
+
+export interface ScheduledLesson {
+    id?: string; // Optional for new lessons
+    coachId: number;
+    studentId: number;
+    studentName: string;
+    type: string; // e.g., 'indiv'
+    startTime: string; // e.g., '08:00'
+    dayIndex: number; // 0 for Monday, 6 for Sunday
+    duration: number; // in minutes
+    status: string; // e.g., 'confirmed'
+    courtName: string;
+    useCannon: boolean;
+    useRacketRental: boolean;
+    courtCost: number;
+    lessonPrice: number;
 }
 
 export interface Student {
@@ -101,14 +134,17 @@ export interface Student {
   age: number;
   level: string;
   balance: number; // Positive = paid, Negative = debt
-  nextLesson: string;
+  nextLesson?: string; // Optional, can be null
   avatar: string;
   status: 'active' | 'vacation' | 'injured';
-  goals: string;
-  notes?: string;
-  skillLevelXp: number;
-  skills: Skill[];
-  lessonHistory: Lesson[];
+  goals: PlayerGoal[];
+  notes: TrainingNote[];
+  xp: number;
+  skills: SkillSet;
+  badges: string[]; // Array of badge IDs
+  racketHours: number;
+  videos: Video[];
+  lastRestringDate?: string; // ISO date string or null
 }
 
 export interface CrmStats {

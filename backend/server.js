@@ -1232,22 +1232,55 @@ app.get('/api/crm/stats/:coachId', async (req, res) => {
 
 app.get('/api/students', async (req, res) => {
     const { coachId } = req.query;
-    if (!coachId) return res.status(400).json({ error: 'coachId required' });
+    if (!coachId) return res.status(400).json({ error: 'coachId is required' });
 
-    const coachIdInt = parseInt(coachId);
+    const coachIdInt = parseInt(coachId, 10);
     if (isNaN(coachIdInt)) {
-        return res.json([]);
+        return res.status(400).json({ error: 'Invalid coachId' });
     }
 
     try {
-        const result = await pool.query('SELECT * FROM students WHERE coach_id = $1 ORDER BY id DESC', [coachIdInt]);
-        res.json(result.rows.map(row => ({
-            ...mapStudent(row),
-            skillLevelXp: row.skill_level_xp
-        })));
+        const query = `
+            SELECT 
+                s.*,
+                COALESCE(
+                    (
+                        SELECT jsonb_object_agg(sk.skill_name, sk.skill_value)
+                        FROM student_skills sk
+                        WHERE sk.student_id = s.id
+                    ),
+                    '{"serve": 0, "forehand": 0, "backhand": 0, "stamina": 0, "tactics": 0}'::jsonb
+                ) as skills
+            FROM students s
+            WHERE s.coach_id = $1
+            ORDER BY s.id DESC
+        `;
+        const result = await pool.query(query, [coachIdInt]);
+        
+        res.json(result.rows.map(row => {
+            return {
+                id: row.id.toString(),
+                coachId: row.coach_id,
+                name: row.name,
+                age: row.age,
+                level: row.level,
+                balance: row.balance,
+                nextLesson: row.next_lesson,
+                avatar: row.avatar,
+                status: row.status,
+                xp: row.skill_level_xp || 0,
+                skills: row.skills,
+                goals: row.goals || [],
+                notes: row.notes || [],
+                videos: row.videos || [],
+                badges: row.badges || [],
+                racketHours: row.racket_hours || 0,
+                lastRestringDate: row.last_restring_date || null
+            };
+        }));
     } catch (err) {
         console.error("Get Students Error:", err);
-        res.status(500).json({ error: 'Db error' });
+        res.status(500).json({ error: 'Database error while fetching students' });
     }
 });
 
@@ -1342,6 +1375,83 @@ app.put('/api/students/:id', async (req, res) => {
         res.json(mapStudent(result.rows[0]));
     } catch (err) {
         res.status(500).json({ error: 'Db error' });
+    }
+});
+
+// --- SCHEDULED LESSONS ROUTES ---
+
+app.get('/api/lessons', async (req, res) => {
+    const { coachId } = req.query;
+    if (!coachId) return res.status(400).json({ error: 'coachId required' });
+
+    try {
+        const result = await pool.query('SELECT * FROM scheduled_lessons WHERE coach_id = $1', [coachId]);
+        res.json(result.rows.map(row => ({
+            id: row.id.toString(),
+            coachId: row.coach_id,
+            studentId: row.student_id,
+            studentName: row.student_name,
+            type: row.type,
+            startTime: row.start_time,
+            dayIndex: row.day_index,
+            duration: row.duration,
+            status: row.status,
+            courtName: row.court_name,
+            useCannon: row.use_cannon,
+            useRacketRental: row.use_racket_rental,
+            courtCost: row.court_cost,
+            lessonPrice: row.lesson_price,
+        })));
+    } catch (err) {
+        console.error("Get Lessons Error:", err);
+        res.status(500).json({ error: 'Database error while fetching lessons' });
+    }
+});
+
+app.post('/api/lessons', async (req, res) => {
+    const { 
+        coachId, studentId, studentName, type, startTime, dayIndex, 
+        duration, status, courtName, useCannon, useRacketRental, 
+        courtCost, lessonPrice 
+    } = req.body;
+
+    try {
+        const result = await pool.query(
+            `INSERT INTO scheduled_lessons (
+                coach_id, student_id, student_name, type, start_time, day_index, 
+                duration, status, court_name, use_cannon, use_racket_rental, 
+                court_cost, lesson_price
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+             RETURNING *`,
+            [
+                coachId, studentId, studentName, type, startTime, dayIndex, 
+                duration, status, courtName, useCannon, useRacketRental, 
+                courtCost, lessonPrice
+            ]
+        );
+        
+        const newLesson = result.rows[0];
+        await logSystemEvent('info', `Coach ${coachId} booked lesson for student ${studentId}`, 'CRM');
+
+        res.status(201).json({
+            id: newLesson.id.toString(),
+            coachId: newLesson.coach_id,
+            studentId: newLesson.student_id,
+            studentName: newLesson.student_name,
+            type: newLesson.type,
+            startTime: newLesson.start_time,
+            dayIndex: newLesson.day_index,
+            duration: newLesson.duration,
+            status: newLesson.status,
+            courtName: newLesson.court_name,
+            useCannon: newLesson.use_cannon,
+            useRacketRental: newLesson.use_racket_rental,
+            courtCost: newLesson.court_cost,
+            lessonPrice: newLesson.lesson_price,
+        });
+    } catch (err) {
+        console.error("Create Lesson Error:", err);
+        res.status(500).json({ error: 'Database error while creating lesson' });
     }
 });
 

@@ -91,7 +91,28 @@ const initDb = async () => {
       );
     `);
     await client.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS skill_level_xp INTEGER DEFAULT 0;`);
-    console.log('✅ Table "students" checked.');
+    await client.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS videos JSONB DEFAULT '[]';`);
+    await client.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS badges JSONB DEFAULT '[]';`);
+    await client.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS racket_hours INTEGER DEFAULT 0;`);
+    await client.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS last_restring_date DATE;`);
+    
+    // --- Data Migration for goals/notes columns ---
+    // 1. Clean up existing invalid data
+    await client.query(`UPDATE students SET goals = '[]' WHERE goals IS NULL OR goals = '' OR goals = '""';`);
+    await client.query(`UPDATE students SET notes = '[]' WHERE notes IS NULL OR notes = '' OR notes = '""';`);
+    
+    // 2. Now, safely alter the column type
+    try {
+        await client.query(`ALTER TABLE students ALTER COLUMN goals SET DEFAULT '[]', ALTER goals TYPE JSONB USING goals::jsonb;`);
+        await client.query(`ALTER TABLE students ALTER COLUMN notes SET DEFAULT '[]', ALTER notes TYPE JSONB USING notes::jsonb;`);
+    } catch (e) {
+        // Ignore error if columns are already JSONB
+        if (e.code !== '42804') { // 42804 is 'Datatype Mismatch'
+            throw e;
+        }
+    }
+
+    console.log('✅ Table "students" checked and updated.');
 
     // Create student_skills table
     await client.query(`
@@ -117,6 +138,27 @@ const initDb = async () => {
       );
     `);
     console.log('✅ Table "lesson_history" checked.');
+
+    // Create scheduled_lessons table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS scheduled_lessons (
+        id SERIAL PRIMARY KEY,
+        coach_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
+        student_name VARCHAR(100),
+        type VARCHAR(50),
+        start_time VARCHAR(10),
+        day_index INTEGER,
+        duration INTEGER,
+        status VARCHAR(20),
+        court_name VARCHAR(100),
+        use_cannon BOOLEAN,
+        use_racket_rental BOOLEAN,
+        court_cost INTEGER,
+        lesson_price INTEGER
+      );
+    `);
+    console.log('✅ Table "scheduled_lessons" checked.');
 
     // 5. Create Matches Table (Statistics)
     await client.query(`
@@ -416,7 +458,7 @@ const initDb = async () => {
             const student1Id = student1Res.rows[0].id;
             await pool.query(
                 `INSERT INTO student_skills (student_id, skill_name, skill_value) VALUES 
-                 ($1, 'Подача', 75), ($1, 'Форхенд', 85), ($1, 'Бэкхенд', 60), ($1, 'Выносливость', 90), ($1, 'Тактика', 70)`,
+                 ($1, 'serve', 75), ($1, 'forehand', 85), ($1, 'backhand', 60), ($1, 'stamina', 90), ($1, 'tactics', 70)`,
                 [student1Id]
             );
             await pool.query(
@@ -437,7 +479,7 @@ const initDb = async () => {
             const student2Id = student2Res.rows[0].id;
             await pool.query(
                 `INSERT INTO student_skills (student_id, skill_name, skill_value) VALUES 
-                 ($1, 'Подача', 80), ($1, 'Форхенд', 90), ($1, 'Бэкхенд', 85), ($1, 'Выносливость', 75), ($1, 'Тактика', 88)`,
+                 ($1, 'serve', 80), ($1, 'forehand', 90), ($1, 'backhand', 85), ($1, 'stamina', 75), ($1, 'tactics', 88)`,
                 [student2Id]
             );
 
@@ -451,7 +493,7 @@ const initDb = async () => {
             const student3Id = student3Res.rows[0].id;
             await pool.query(
                 `INSERT INTO student_skills (student_id, skill_name, skill_value) VALUES 
-                 ($1, 'Подача', 95), ($1, 'Форхенд', 92), ($1, 'Бэкхенд', 88), ($1, 'Выносливость', 94), ($1, 'Тактика', 91)`,
+                 ($1, 'serve', 95), ($1, 'forehand', 92), ($1, 'backhand', 88), ($1, 'stamina', 94), ($1, 'tactics', 91)`,
                 [student3Id]
             );
         }
