@@ -539,7 +539,7 @@ const GroupsWidget = ({ onGroupClick }: { onGroupClick: (group: Group) => void }
                     Группы
                 </h3>
             </div>
-            <div className="space-y-3 max-h-44 overflow-y-auto">
+            <div className="space-y-3 max-h-[132px] overflow-y-auto pr-2">
                 {loading && <Loader2 className="animate-spin text-slate-400 mx-auto" />}
                 {!loading && groups.map(g => (
                     <div key={g.id} className="flex justify-between items-center">
