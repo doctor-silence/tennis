@@ -234,7 +234,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                                         <div className="text-[10px] text-slate-400 font-medium">{convo.timestamp}</div>
                                     </div>
                                     <div className="flex justify-between items-start">
-                                        <p className="text-xs text-slate-500 truncate">{convo.lastMessage.startsWith('::sticker:') ? '[Стикер]' : convo.lastMessage}</p>
+                                        <p className="text-xs text-slate-500 truncate">{(convo.lastMessage || '').startsWith('::sticker:') ? '[Стикер]' : (convo.lastMessage || '')}</p>
                                         {convo.unread > 0 && <span className="bg-lime-500 text-slate-900 text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full ml-2">{convo.unread}</span>}
                                     </div>
                                 </div>
