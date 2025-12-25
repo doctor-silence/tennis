@@ -294,12 +294,14 @@ const initDb = async () => {
       CREATE TABLE IF NOT EXISTS posts (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        group_id INTEGER REFERENCES groups(id) ON DELETE CASCADE,
         type VARCHAR(50) NOT NULL,
         content JSONB NOT NULL,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
     `);
     console.log('✅ "posts" table created or already exists.');
+    await client.query(`ALTER TABLE posts ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id) ON DELETE CASCADE;`);
     
     await client.query(`
       CREATE TABLE IF NOT EXISTS post_likes (

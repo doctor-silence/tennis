@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
+import {
     Plus, Trophy, Users, Calendar, ChevronRight, Dices, ChevronLeft,
     ListChecks, CheckCircle2, Play, RefreshCw, UserPlus, Check, User as UserIcon, Zap,
     ChevronDown
@@ -16,7 +16,7 @@ export const TournamentsView = ({ user }: { user: User }) => {
     const [tournaments, setTournaments] = useState<Tournament[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
-    const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null);
+    const [selectedTournament, setSelectedTournament] = useState<any | null>(null);
     
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isMatchModalOpen, setIsMatchModalOpen] = useState(false);
@@ -35,7 +35,7 @@ export const TournamentsView = ({ user }: { user: User }) => {
         date: new Date().toISOString().split('T')[0],
         prizePool: '50 000 ₽',
         bracketSize: 16 as BracketSize,
-        targetGroupId: ''
+        target_group_id: ''
     });
 
     useEffect(() => {
@@ -83,8 +83,10 @@ export const TournamentsView = ({ user }: { user: User }) => {
         setIsSubmitting(true);
         try {
             const rounds = generateEmptyRounds(createForm.bracketSize);
-            const newTournament = await api.tournaments.create({ 
+            console.log('Creating tournament with target_group_id:', createForm.target_group_id);
+            const newTournament = await api.tournaments.create({
                 ...createForm,
+                targetGroupId: createForm.target_group_id, // map to camelCase for API
                 userId: user.id,
                 rounds, 
                 status: 'draft',
@@ -105,7 +107,7 @@ export const TournamentsView = ({ user }: { user: User }) => {
 
     const handleRandomize = async () => {
         if (!selectedTournament || !bulkNames.trim()) return;
-        const names = bulkNames.split(/[\n,]+/).map(n => n.trim()).filter(n => n.length > 0);
+        const names = bulkNames.split(/[,\n]+/).map(n => n.trim()).filter(n => n.length > 0);
         const shuffled = [...names].sort(() => Math.random() - 0.5);
         const updated = { ...selectedTournament };
         const firstRound = updated.rounds[0];
@@ -162,6 +164,7 @@ export const TournamentsView = ({ user }: { user: User }) => {
              await api.posts.create({
                 userId: user.id,
                 type: 'match',
+                groupId: selectedTournament.target_group_id,
                 content: {
                     title: selectedTournament.name,
                     author: user.name,
@@ -334,7 +337,7 @@ export const TournamentsView = ({ user }: { user: User }) => {
                                 value={createForm.groupName} 
                                 onChange={e => {
                                     const group = groups.find(g => g.name === e.target.value);
-                                    setCreateForm({...createForm, groupName: e.target.value, targetGroupId: group?.id || ''});
+                                    setCreateForm({...createForm, groupName: e.target.value, target_group_id: group?.id || ''});
                                 }}
                             >
                                 <option value="" disabled>Выберите группу из существующих</option>

@@ -148,6 +148,117 @@ const PartnerSearchPost = ({ post }: { post: any }) => (
     </div>
 );
 
+const TournamentMatchPost = ({ post, user, onUpdate }: { post: any, user: User, onUpdate: () => void }) => {
+    const { content, author: organizer } = post;
+    const { title: tournamentName, matchData } = content;
+    const { winner, loser, score, groupName } = matchData;
+
+    const [isLiked, setIsLiked] = useState(post.liked_by_user);
+    const [currentLikes, setCurrentLikes] = useState(parseInt(post.likes_count) || 0);
+    const [showCommentInput, setShowCommentInput] = useState(false);
+    const [newCommentText, setNewCommentText] = useState('');
+    const [comments, setComments] = useState(post.comments || []);
+
+    const handleLikeClick = async () => {
+        const originalIsLiked = isLiked;
+        const originalLikes = currentLikes;
+        
+        setIsLiked(!originalIsLiked);
+        setCurrentLikes(originalIsLiked ? originalLikes - 1 : originalLikes + 1);
+
+        try {
+            await api.posts.toggleLike(post.id, user.id);
+        } catch (error) {
+            console.error("Failed to toggle like", error);
+            setIsLiked(originalIsLiked);
+            setCurrentLikes(originalLikes);
+        }
+    };
+
+    const handleCommentClick = () => setShowCommentInput(!showCommentInput);
+
+    const handleAddComment = async () => {
+        if (newCommentText.trim()) {
+            try {
+                await api.posts.addComment(post.id, user.id, newCommentText);
+                setNewCommentText('');
+                onUpdate();
+            } catch (error) {
+                console.error("Failed to add comment", error);
+            }
+        }
+    };
+
+    return (
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+            <div className="flex justify-between items-center text-xs text-slate-400 mb-2">
+                <span className="font-bold flex items-center gap-2"><Trophy size={14} className="text-amber-500"/>РЕЗУЛЬТАТ ТУРНИРА</span>
+                <span>{new Date(post.created_at).toLocaleString()}</span>
+            </div>
+            <div className="text-center my-3">
+                <p className="font-bold text-lg">{tournamentName}</p>
+                <p className="text-xs text-indigo-500 font-bold uppercase">{groupName}</p>
+            </div>
+            <div className="flex items-center justify-between">
+                <div className="flex flex-col items-center text-center">
+                    <img src={`https://ui-avatars.com/api/?name=${winner.replace(' ', '+')}&background=84cc16&color=fff`} alt={winner} className="w-12 h-12 rounded-full border-2 border-lime-400 p-0.5" />
+                    <p className="font-bold text-sm mt-1">{winner}</p>
+                    <p className="text-xs text-lime-600 font-bold">Победитель</p>
+                </div>
+                <div className="text-center">
+                    <p className="font-black text-2xl text-slate-800">{score}</p>
+                </div>
+                <div className="flex flex-col items-center text-center">
+                    <img src={`https://ui-avatars.com/api/?name=${loser.replace(' ', '+')}&background=94a3b8&color=fff`} alt={loser} className="w-12 h-12 rounded-full filter grayscale" />
+                    <p className="font-bold text-sm mt-1">{loser}</p>
+                    <p className="text-xs text-slate-500">Проигравший</p>
+                </div>
+            </div>
+            <div className="text-xs text-slate-400 mt-3 text-center">
+                Опубликовал: {organizer.name}
+            </div>
+
+            <div className="flex items-center gap-4 text-slate-500 text-sm mt-4 pt-4 border-t border-slate-100">
+                <button onClick={handleLikeClick} className="flex items-center gap-1">
+                    <Heart size={16} className={`transition-colors ${isLiked ? "text-red-500 fill-current" : "hover:text-red-500"}`}/> {currentLikes}
+                </button>
+                <button onClick={handleCommentClick} className="flex items-center gap-1">
+                    <MessageCircle size={16} /> {comments.length}
+                </button>
+            </div>
+
+            {showCommentInput && (
+                 <div className="mt-4">
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="text"
+                            placeholder="Написать комментарий..."
+                            value={newCommentText}
+                            onChange={(e) => setNewCommentText(e.target.value)}
+                            className="flex-1 bg-slate-100 p-2 rounded-lg outline-none border border-slate-200"
+                        />
+                        <Button onClick={handleAddComment} disabled={!newCommentText.trim()}>Отправить</Button>
+                    </div>
+                     {comments.length > 0 && (
+                        <div className="mt-4 space-y-3 pt-3 border-t border-slate-100">
+                            {comments.map((comment: any) => (
+                                <div key={comment.id} className="flex gap-2 text-xs text-slate-600">
+                                    <img src={comment.author.avatar} alt={comment.author.name} className="w-5 h-5 rounded-full" />
+                                    <div>
+                                        <span className="font-bold">{comment.author.name}</span>
+                                        <p className="text-slate-500">{comment.text}</p>
+                                    </div>
+                                    <span className="text-slate-400 ml-auto text-[10px]">{new Date(comment.created_at).toLocaleString()}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const MatchResultPost = ({ post, user, onUpdate }: { post: any, user: User, onUpdate: () => void }) => {
     const { author, content } = post;
     const { opponent, score, isWinner } = content;
@@ -362,9 +473,14 @@ const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate, onSta
 
      const MatchResultsFeed = () => (
          <div className="space-y-4">
-            {feedItems.filter(item => item.type === 'match_result').map(item => (
-                <MatchResultPost key={item.id} post={item} user={user} onUpdate={onUpdate} />
-            ))}
+            {feedItems.filter(item => item.type === 'match_result' || item.type === 'match').map(item => {
+                if (item.type === 'match_result') {
+                    return <MatchResultPost key={item.id} post={item} user={user} onUpdate={onUpdate} />;
+                } else if (item.type === 'match') {
+                    return <TournamentMatchPost key={item.id} post={item} user={user} onUpdate={onUpdate} />;
+                }
+                return null;
+            })}
         </div>
     );
 
@@ -387,7 +503,7 @@ const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate, onSta
     }
 };
 
-const GroupsView = forwardRef(({ user }: { user: User }, ref) => {
+const GroupsView = forwardRef(({ user, onGroupSelect }: { user: User, onGroupSelect: (group: Group) => void }, ref) => {
     const [groups, setGroups] = useState<Group[]>([]);
     
     const fetchGroups = () => {
@@ -406,7 +522,7 @@ const GroupsView = forwardRef(({ user }: { user: User }, ref) => {
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {groups.map(group => (
-                    <div key={group.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <div key={group.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 cursor-pointer" onClick={() => onGroupSelect(group)}>
                         <h3 className="font-bold text-lg">{group.name}</h3>
                         <p className="text-sm text-slate-500">{group.location}</p>
                         <p className="text-sm text-slate-600 mt-2">{group.description}</p>
@@ -520,7 +636,7 @@ const TopPlayersWidget = ({ onNavigate }: { onNavigate: (tab: string) => void })
     );
 };
 
-const GroupsWidget = ({ onGroupClick }: { onGroupClick: (group: Group) => void }) => {
+const GroupsWidget = ({ onGroupClickForModal }: { onGroupClickForModal: (group: Group) => void }) => {
     const [groups, setGroups] = useState<Group[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -552,7 +668,7 @@ const GroupsWidget = ({ onGroupClick }: { onGroupClick: (group: Group) => void }
                                 <p className="text-xs text-slate-400">{g.members_count || 0} уч.</p>
                              </div>
                         </div>
-                        <Button size="sm" variant="outline" className="w-8 h-8 p-0 text-xl font-normal" onClick={() => onGroupClick(g)}>+</Button>
+                        <Button size="sm" variant="outline" className="w-8 h-8 p-0 text-xl font-normal" onClick={() => onGroupClickForModal(g)}>+</Button>
                     </div>
                 ))}
             </div>
@@ -779,13 +895,13 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated 
     const [postType, setPostType] = useState<'text' | 'partner_search' | 'match_result' | 'event' | 'marketplace' | 'group'>('text');
     const [loadingFeed, setLoadingFeed] = useState(true);
     const groupsViewRef = useRef<{ fetchGroups: () => void }>(null);
-    const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+    const [selectedGroupForModal, setSelectedGroupForModal] = useState<Group | null>(null);
 
     const handleJoinGroup = async (groupId: string) => {
         try {
             await api.groups.join(groupId, user.id);
             // You might want to update the UI to show the user is a member
-            setSelectedGroup(null); // Close modal on success
+            setSelectedGroupForModal(null); // Close modal on success
         } catch (error) {
             console.error("Failed to join group:", error);
         }
@@ -940,30 +1056,30 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated 
                      {postType === 'event' && <div className="text-center p-4 text-slate-500 mt-4">Форма для событий скоро появится!</div>}
                 </div>}
 
-                { activeTab === 'Группы' ? <GroupsView user={user} ref={groupsViewRef} /> : (loadingFeed ? <Loader2 className="animate-spin text-slate-400 mx-auto" /> : <Feed activeTab={activeTab} feedItems={feedItems} user={user} onUpdate={fetchFeed} onStartConversation={onStartConversation} />) }
+                { activeTab === 'Группы' ? <GroupsView user={user} ref={groupsViewRef} onGroupSelect={setSelectedGroupForModal} /> : (loadingFeed ? <Loader2 className="animate-spin text-slate-400 mx-auto" /> : <Feed activeTab={activeTab} feedItems={feedItems} user={user} onUpdate={fetchFeed} onStartConversation={onStartConversation} />) }
             </div>
             <div className="space-y-6">
                 <TournamentsWidget />
                 <TopPlayersWidget onNavigate={onNavigate} />
-                <GroupsWidget onGroupClick={setSelectedGroup} />
+                <GroupsWidget onGroupClickForModal={setSelectedGroupForModal} />
                 <MarketplaceWidget />
-                 {selectedGroup && (
-                <Modal isOpen={!!selectedGroup} onClose={() => setSelectedGroup(null)} title={selectedGroup.name}>
+                 {selectedGroupForModal && (
+                <Modal isOpen={!!selectedGroupForModal} onClose={() => setSelectedGroupForModal(null)} title={selectedGroupForModal.name}>
                     <div className="p-6">
                         <div className="flex items-center gap-4 mb-4">
                             <div className="w-16 h-16 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-slate-500 text-2xl">
-                                {selectedGroup.name.charAt(0)}
+                                {selectedGroupForModal.name.charAt(0)}
                             </div>
                             <div>
-                                <h3 className="font-bold text-xl">{selectedGroup.name}</h3>
-                                <p className="text-sm text-slate-500">{selectedGroup.location}</p>
+                                <h3 className="font-bold text-xl">{selectedGroupForModal.name}</h3>
+                                <p className="text-sm text-slate-500">{selectedGroupForModal.location}</p>
                             </div>
                         </div>
-                        <p className="text-sm text-slate-600 mb-4">{selectedGroup.description || 'Нет описания.'}</p>
-                        {selectedGroup.contact && (
-                             <p className="text-sm text-slate-600 mb-4"><b>Контакты:</b> {selectedGroup.contact}</p>
+                        <p className="text-sm text-slate-600 mb-4">{selectedGroupForModal.description || 'Нет описания.'}</p>
+                        {selectedGroupForModal.contact && (
+                             <p className="text-sm text-slate-600 mb-4"><b>Контакты:</b> {selectedGroupForModal.contact}</p>
                         )}
-                        <Button onClick={() => handleJoinGroup(selectedGroup.id)} className="w-full">
+                        <Button onClick={() => handleJoinGroup(selectedGroupForModal.id)} className="w-full">
                             Вступить в группу
                         </Button>
                     </div>

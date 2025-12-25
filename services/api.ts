@@ -671,6 +671,17 @@ export const api = {
             }
             return await res.json();
         },
+        join: async (groupId: string, userId: string): Promise<void> => {
+            const res = await fetch(`${API_URL}/groups/${groupId}/join`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId })
+            });
+            if (!res.ok) {
+                 const err = await res.json();
+                 throw new Error(err.error || 'Failed to join group');
+            }
+        },
         leave: async (groupId: string, userId: string): Promise<void> => {
             const res = await fetch(`${API_URL}/groups/${groupId}/leave`, {
                 method: 'POST',

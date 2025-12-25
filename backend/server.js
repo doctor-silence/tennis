@@ -1128,6 +1128,7 @@ app.get('/api/posts', async (req, res) => {
                 ) ORDER BY c.created_at ASC) FROM post_comments c JOIN users cu ON c.user_id = cu.id WHERE c.post_id = p.id) as comments
             FROM posts p
             JOIN users u ON p.user_id = u.id
+            WHERE (p.type = 'match' AND p.group_id IS NOT NULL AND p.group_id IN (SELECT group_id FROM group_members WHERE user_id = $1)) OR (p.type != 'match' AND (p.group_id IS NULL OR p.group_id IN (SELECT group_id FROM group_members WHERE user_id = $1)))
             ORDER BY p.created_at DESC
             LIMIT 50
         `, [userId || null]);
@@ -1139,15 +1140,15 @@ app.get('/api/posts', async (req, res) => {
 });
 
 app.post('/api/posts', async (req, res) => {
-    const { userId, type, content } = req.body;
+    const { userId, type, content, groupId } = req.body;
     if (!userId || !type || !content) {
         return res.status(400).json({ error: 'userId, type, and content are required' });
     }
 
     try {
         const result = await pool.query(
-            'INSERT INTO posts (user_id, type, content) VALUES ($1, $2, $3) RETURNING id',
-            [userId, type, content]
+            'INSERT INTO posts (user_id, type, content, group_id) VALUES ($1, $2, $3, $4) RETURNING id',
+            [userId, type, content, groupId]
         );
         res.status(201).json({ success: true, postId: result.rows[0].id });
     } catch (err) {
