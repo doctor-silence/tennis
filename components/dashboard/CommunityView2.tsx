@@ -201,7 +201,7 @@ const TournamentMatchPost = ({ post, user, onUpdate }: { post: any, user: User, 
             </div>
             <div className="flex items-center justify-between">
                 <div className="flex flex-col items-center text-center">
-                    <img src={`https://ui-avatars.com/api/?name=${winner.replace(' ', '+')}&background=84cc16&color=fff`} alt={winner} className="w-12 h-12 rounded-full border-2 border-lime-400 p-0.5" />
+                    <img src={winner ? `https://ui-avatars.com/api/?name=${winner.replace(' ', '+')}&background=84cc16&color=fff` : 'https://ui-avatars.com/api/?name=Unknown&background=84cc16&color=fff'} alt={winner || 'Unknown'} className="w-12 h-12 rounded-full border-2 border-lime-400 p-0.5" />
                     <p className="font-bold text-sm mt-1">{winner}</p>
                     <p className="text-xs text-lime-600 font-bold">Победитель</p>
                 </div>
@@ -209,7 +209,7 @@ const TournamentMatchPost = ({ post, user, onUpdate }: { post: any, user: User, 
                     <p className="font-black text-2xl text-slate-800">{score}</p>
                 </div>
                 <div className="flex flex-col items-center text-center">
-                    <img src={`https://ui-avatars.com/api/?name=${loser.replace(' ', '+')}&background=94a3b8&color=fff`} alt={loser} className="w-12 h-12 rounded-full filter grayscale" />
+                    <img src={loser ? `https://ui-avatars.com/api/?name=${loser.replace(' ', '+')}&background=94a3b8&color=fff` : 'https://ui-avatars.com/api/?name=Unknown&background=94a3b8&color=fff'} alt={loser || 'Unknown'} className="w-12 h-12 rounded-full filter grayscale" />
                     <p className="font-bold text-sm mt-1">{loser}</p>
                     <p className="text-xs text-slate-500">Проигравший</p>
                 </div>
