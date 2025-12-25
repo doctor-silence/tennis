@@ -329,10 +329,12 @@ const initDb = async () => {
         description TEXT,
         avatar TEXT,
         location VARCHAR(255),
+        contact VARCHAR(255),
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
     await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS location VARCHAR(255);`);
+    await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS contact VARCHAR(255);`);
     await client.query(`ALTER TABLE groups ALTER COLUMN type DROP NOT NULL;`);
     console.log('✅ Table "groups" checked.');
     

@@ -738,20 +738,23 @@ const GroupForm = ({ onPublish, user }: { onPublish: (data: any) => void, user: 
     const [name, setName] = useState('');
     const [location, setLocation] = useState('');
     const [description, setDescription] = useState('');
+    const [contact, setContact] = useState('');
 
     const handlePublish = () => {
         if (!name.trim()) return;
-        onPublish({ name, location, description });
+        onPublish({ name, location, description, contact });
         setName('');
         setLocation('');
         setDescription('');
+        setContact('');
     };
 
     return (
         <div className="space-y-3 p-4 bg-slate-50 rounded-xl mt-4">
             <input type="text" placeholder="Название группы" value={name} onChange={e => setName(e.target.value)} className="w-full bg-white p-2 rounded-lg outline-none border border-slate-200" />
             <input type="text" placeholder="Город" value={location} onChange={e => setLocation(e.target.value)} className="w-full bg-white p-2 rounded-lg outline-none border border-slate-200" />
-            <textarea placeholder="Описание группы..." value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-white p-2 rounded-lg outline-none border border-slate-200 h-20" />
+            <textarea placeholder="Описание группы..." value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-white p-2 rounded-lg outline-none border border-slate-200 h-24" />
+            <input type="text" placeholder="Контакты для связи (Telegram, телефон)" value={contact} onChange={e => setContact(e.target.value)} className="w-full bg-white p-2 rounded-lg outline-none border border-slate-200" />
             <Button onClick={handlePublish} className="w-full">Создать группу</Button>
         </div>
     );

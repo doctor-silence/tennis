@@ -1210,7 +1210,7 @@ app.post('/api/posts/:id/comments', async (req, res) => {
 // --- TOURNAMENT AND GROUPS ROUTES ---
 
 app.post('/api/groups', async (req, res) => {
-    const { name, description, location, avatar, userId } = req.body;
+    const { name, description, location, avatar, userId, contact } = req.body;
 
     if (!name || !userId) {
         return res.status(400).json({ error: 'Name and userId are required to create a group.' });
@@ -1222,8 +1222,8 @@ app.post('/api/groups', async (req, res) => {
 
         // Insert the new group
         const groupResult = await client.query(
-            'INSERT INTO groups (name, description, location, avatar) VALUES ($1, $2, $3, $4) RETURNING *',
-            [name, description, location, avatar]
+            'INSERT INTO groups (name, description, location, avatar, contact) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [name, description, location, avatar, contact]
         );
         const newGroup = groupResult.rows[0];
 
