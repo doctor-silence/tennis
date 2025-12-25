@@ -1221,10 +1221,10 @@ app.post('/api/groups', async (req, res) => {
     try {
         await client.query('BEGIN');
 
-        // Insert the new group
+        // Insert the new group with creator_id
         const groupResult = await client.query(
-            'INSERT INTO groups (name, description, location, avatar, contact) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [name, description, location, avatar, contact]
+            'INSERT INTO groups (name, description, location, avatar, contact, creator_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [name, description, location, avatar, contact, userId]
         );
         const newGroup = groupResult.rows[0];
 
@@ -1249,8 +1249,8 @@ app.post('/api/groups', async (req, res) => {
 
 app.get('/api/groups', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM groups ORDER BY name ASC');
-        res.json(result.rows.map(g => ({ ...g, id: g.id.toString() })));
+        const result = await pool.query('SELECT *, creator_id FROM groups ORDER BY name ASC'); // Include creator_id
+        res.json(result.rows.map(g => ({ ...g, id: g.id.toString(), creatorId: g.creator_id.toString() }))); // Map creator_id to creatorId
     } catch (err) {
         console.error("Fetch Groups Error:", err);
         res.status(500).json({ error: 'Failed to fetch groups' });

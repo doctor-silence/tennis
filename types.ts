@@ -272,6 +272,7 @@ export interface Group {
   name: string;
   location: string;
   description: string;
+  creatorId?: string; // New field
 }
 
 export interface TournamentPlayer {

@@ -332,12 +332,14 @@ const initDb = async () => {
         avatar TEXT,
         location VARCHAR(255),
         contact VARCHAR(255),
+        creator_id INTEGER REFERENCES users(id) ON DELETE SET NULL, -- New column
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
     await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS location VARCHAR(255);`);
     await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS contact VARCHAR(255);`);
     await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS members_count INTEGER DEFAULT 0;`);
+    await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS creator_id INTEGER REFERENCES users(id) ON DELETE SET NULL;`); // New migration
     console.log('✅ Table "groups" checked.');
     
     // Create group_members table
