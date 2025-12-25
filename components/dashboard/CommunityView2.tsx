@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } f
 import { Heart, MessageCircle, Calendar, Globe, Swords, Trophy, Users, ShoppingCart, Share2, Loader2, X, PlusCircle } from 'lucide-react';
 import { api } from '../../services/api';
 import Button from '../Button';
+import Tooltip from '../Tooltip';
 import { MarketplaceItem, LadderPlayer, User, Group } from '../../types';
 
 const mockGroups = [
@@ -891,11 +892,21 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated 
                              onFocus={() => setPostType('text')}
                         />
                         <div className="flex items-center gap-4 text-slate-400">
-                             <button onClick={() => setPostType('partner_search')} className={`p-2 rounded-full transition-colors ${postType === 'partner_search' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Swords size={20}/></button>
-                             <button onClick={() => setPostType('match_result')} className={`p-2 rounded-full transition-colors ${postType === 'match_result' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Trophy size={20}/></button>
-                             <button onClick={() => setPostType('group')} className={`p-2 rounded-full transition-colors ${postType === 'group' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Users size={20}/></button>
-                             <button onClick={() => setPostType('event')} className={`p-2 rounded-full transition-colors ${postType === 'event' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Calendar size={20}/></button>
-                             <button onClick={() => setPostType('marketplace')} className={`p-2 rounded-full transition-colors ${postType === 'marketplace' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><ShoppingCart size={20}/></button>
+                             <Tooltip text="Поиск партнера">
+                                 <button onClick={() => setPostType('partner_search')} className={`p-2 rounded-full transition-colors ${postType === 'partner_search' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Swords size={20}/></button>
+                             </Tooltip>
+                             <Tooltip text="Результат матча">
+                                 <button onClick={() => setPostType('match_result')} className={`p-2 rounded-full transition-colors ${postType === 'match_result' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Trophy size={20}/></button>
+                             </Tooltip>
+                             <Tooltip text="Создать группу">
+                                <button onClick={() => setPostType('group')} className={`p-2 rounded-full transition-colors ${postType === 'group' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Users size={20}/></button>
+                             </Tooltip>
+                            <Tooltip text="Создать событие">
+                               <button onClick={() => setPostType('event')} className={`p-2 rounded-full transition-colors ${postType === 'event' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Calendar size={20}/></button>
+                            </Tooltip>
+                             <Tooltip text="Продать вещь">
+                                <button onClick={() => setPostType('marketplace')} className={`p-2 rounded-full transition-colors ${postType === 'marketplace' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><ShoppingCart size={20}/></button>
+                             </Tooltip>
                         </div>
                         <Button onClick={() => handlePublishPost({text: postText})} disabled={!postText.trim()}>Опубликовать</Button>
                     </div>

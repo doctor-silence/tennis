@@ -65,6 +65,7 @@ const initDb = async () => {
     // Ensure new columns exist even if table was created previously
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS rtt_rank INTEGER DEFAULT 0;`);
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS rtt_category VARCHAR(50);`);
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS level VARCHAR(50);`);
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`);
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS xp INTEGER DEFAULT 0;`);
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_private BOOLEAN DEFAULT FALSE;`);

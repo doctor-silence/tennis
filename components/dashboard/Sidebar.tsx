@@ -15,11 +15,11 @@ interface SidebarProps {
   ladderNotifications: number;
 }
 
-const SidebarItem = ({ icon, label, active, onClick, isSpecial = false, badge }: any) => (
+const SidebarItem = ({ icon, label, active, onClick, isSpecial = false, badge, title }: any) => (
   <button
     onClick={onClick}
-    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 group relative ${
-      active 
+    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 group relative
+      ${active 
         ? isSpecial 
           ? 'bg-gradient-to-r from-lime-400 to-lime-500 text-slate-900 font-bold shadow-lg shadow-lime-900/20' 
           : 'bg-slate-800 text-white font-medium border-l-4 border-lime-400' 
@@ -33,6 +33,12 @@ const SidebarItem = ({ icon, label, active, onClick, isSpecial = false, badge }:
       <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">
         {badge}
       </span>
+    )}
+    {/* Tooltip */}
+    {title && (
+      <div className="absolute left-full ml-4 px-3 py-2 bg-slate-700 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50">
+        {title}
+      </div>
     )}
   </button>
 );

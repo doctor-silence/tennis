@@ -700,6 +700,18 @@ export const api = {
                  throw new Error(err.error || 'Failed to get group members');
             }
             return await res.json();
+        },
+        getOne: async (groupId: string): Promise<Group> => {
+            try {
+                const res = await fetch(`${API_URL}/groups/${groupId}`);
+                if (!res.ok) throw new Error('Failed to fetch group');
+                return await res.json();
+            } catch (e) {
+                console.warn(`Backend offline, returning mock group for id: ${groupId}`, e);
+                const group = MOCK_GROUPS.find(g => g.id === groupId);
+                if (group) return group;
+                throw new Error("Mock group not found");
+            }
         }
     },
 
