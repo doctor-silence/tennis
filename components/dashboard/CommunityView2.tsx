@@ -4,12 +4,7 @@ import { api } from '../../services/api';
 import Button from '../Button';
 import Tooltip from '../Tooltip';
 import { MarketplaceItem, LadderPlayer, User, Group } from '../../types';
-
-const mockGroups = [
-    { id: 1, avatar: 'Т', name: 'Теннис Хамовники', members: 1240 },
-    { id: 2, avatar: 'И', name: 'Игроки Севера', members: 856 },
-    { id: 3, avatar: 'С', name: 'Спарринг Москва', members: 3400 },
-];
+import { Modal } from '../Shared';
 
 // --- Modal Component ---
 const ImageModal = ({ src, onClose }: { src: string, onClose: () => void }) => {
@@ -347,7 +342,7 @@ const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate, onSta
                     case 'partner_search':
                         return <PartnerSearchPost key={item.id} post={item} />;
                     case 'match_result':
-                        return <MatchResultPost key={item.id} post={item} />;
+                        return <MatchResultPost key={item.id} post={item} user={user} onUpdate={onUpdate} />;
                     case 'marketplace':
                         return <MarketplacePost key={item.id} post={item} onStartConversation={onStartConversation} />;
                     default:
@@ -469,7 +464,7 @@ const TopPlayersWidget = ({ onNavigate }: { onNavigate: (tab: string) => void })
         const fetchPlayers = async () => {
             try {
                 setLoading(true);
-                const rankings = await api.ladder.getRankings();
+                const rankings = await api.ladder.getRankings('club_elo');
                 setPlayers(rankings);
                 setError(null);
             } catch (err) {
@@ -483,7 +478,7 @@ const TopPlayersWidget = ({ onNavigate }: { onNavigate: (tab: string) => void })
         fetchPlayers();
     }, []);
     
-    const currentUserRanking = players.find(p => p.name.includes('Вы'));
+    const currentUserRanking = players.find(p => p.userId === 'mock-user-1');
 
     return (
         <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-sm">
@@ -525,32 +520,45 @@ const TopPlayersWidget = ({ onNavigate }: { onNavigate: (tab: string) => void })
     );
 };
 
-const GroupsWidget = () => (
-     <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-        <div className="flex justify-between items-center mb-4">
-            <h3 className="font-bold text-lg flex items-center gap-2">
-                <Users size={20} className="text-slate-400"/>
-                Группы
-            </h3>
-        </div>
-        <div className="space-y-3">
-            {mockGroups.map(g => (
-                <div key={g.id} className="flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                         <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-slate-500">
-                             {g.avatar}
-                         </div>
-                         <div>
-                            <p className="font-bold text-sm">{g.name}</p>
-                            <p className="text-xs text-slate-400">{g.members} уч.</p>
-                         </div>
+const GroupsWidget = ({ onGroupClick }: { onGroupClick: (group: Group) => void }) => {
+    const [groups, setGroups] = useState<Group[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        api.groups.getAll().then(data => {
+            setGroups(data);
+            setLoading(false);
+        });
+    }, []);
+
+    return (
+         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                    <Users size={20} className="text-slate-400"/>
+                    Группы
+                </h3>
+            </div>
+            <div className="space-y-3 max-h-44 overflow-y-auto">
+                {loading && <Loader2 className="animate-spin text-slate-400 mx-auto" />}
+                {!loading && groups.map(g => (
+                    <div key={g.id} className="flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                             <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-slate-500">
+                                 {g.name.charAt(0)}
+                             </div>
+                             <div>
+                                <p className="font-bold text-sm">{g.name}</p>
+                                <p className="text-xs text-slate-400">{g.members_count || 0} уч.</p>
+                             </div>
+                        </div>
+                        <Button size="sm" variant="outline" className="w-8 h-8 p-0 text-xl font-normal" onClick={() => onGroupClick(g)}>+</Button>
                     </div>
-                    <Button size="sm" variant="outline" className="w-8 h-8 p-0 text-xl font-normal">+</Button>
-                </div>
-            ))}
+                ))}
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 const MarketplaceWidget = () => {
     const [items, setItems] = useState<MarketplaceItem[]>([]);
@@ -771,6 +779,17 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated 
     const [postType, setPostType] = useState<'text' | 'partner_search' | 'match_result' | 'event' | 'marketplace' | 'group'>('text');
     const [loadingFeed, setLoadingFeed] = useState(true);
     const groupsViewRef = useRef<{ fetchGroups: () => void }>(null);
+    const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+
+    const handleJoinGroup = async (groupId: string) => {
+        try {
+            await api.groups.join(groupId, user.id);
+            // You might want to update the UI to show the user is a member
+            setSelectedGroup(null); // Close modal on success
+        } catch (error) {
+            console.error("Failed to join group:", error);
+        }
+    };
 
 
     const fetchFeed = async () => {
@@ -846,6 +865,7 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated 
                 name: data.name,
                 location: data.location,
                 description: data.description,
+                contact: data.contact,
                 userId: user.id
             });
             onGroupCreated();
@@ -925,8 +945,30 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated 
             <div className="space-y-6">
                 <TournamentsWidget />
                 <TopPlayersWidget onNavigate={onNavigate} />
-                <GroupsWidget />
+                <GroupsWidget onGroupClick={setSelectedGroup} />
                 <MarketplaceWidget />
+                 {selectedGroup && (
+                <Modal isOpen={!!selectedGroup} onClose={() => setSelectedGroup(null)} title={selectedGroup.name}>
+                    <div className="p-6">
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="w-16 h-16 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-slate-500 text-2xl">
+                                {selectedGroup.name.charAt(0)}
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-xl">{selectedGroup.name}</h3>
+                                <p className="text-sm text-slate-500">{selectedGroup.location}</p>
+                            </div>
+                        </div>
+                        <p className="text-sm text-slate-600 mb-4">{selectedGroup.description || 'Нет описания.'}</p>
+                        {selectedGroup.contact && (
+                             <p className="text-sm text-slate-600 mb-4"><b>Контакты:</b> {selectedGroup.contact}</p>
+                        )}
+                        <Button onClick={() => handleJoinGroup(selectedGroup.id)} className="w-full">
+                            Вступить в группу
+                        </Button>
+                    </div>
+                </Modal>
+            )}
             </div>
         </div>
     );
