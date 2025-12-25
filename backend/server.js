@@ -1210,10 +1210,13 @@ app.post('/api/posts/:id/comments', async (req, res) => {
 
 // --- TOURNAMENT AND GROUPS ROUTES ---
 
+
 app.post('/api/groups', async (req, res) => {
     const { name, description, location, avatar, userId, contact } = req.body;
+    console.log('Received request to create group:', { name, description, location, avatar, userId, contact });
 
     if (!name || !userId) {
+        console.error('Validation failed: Name or userId missing.');
         return res.status(400).json({ error: 'Name and userId are required to create a group.' });
     }
 
@@ -1221,22 +1224,29 @@ app.post('/api/groups', async (req, res) => {
     try {
         await client.query('BEGIN');
 
+        // Parse userId to integer
+        const parsedUserId = parseInt(userId, 10);
+        if (isNaN(parsedUserId)) {
+            console.error('Validation failed: Invalid userId provided:', userId);
+            return res.status(400).json({ error: 'Invalid userId provided.' });
+        }
+
         // Insert the new group with creator_id
         const groupResult = await client.query(
             'INSERT INTO groups (name, description, location, avatar, contact, creator_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [name, description, location, avatar, contact, userId]
+            [name, description, location, avatar, contact, parsedUserId]
         );
         const newGroup = groupResult.rows[0];
 
         // Add the creator as an admin member
         await client.query(
             'INSERT INTO group_members (group_id, user_id, role) VALUES ($1, $2, $3)',
-            [newGroup.id, userId, 'admin']
+            [newGroup.id, parsedUserId, 'admin']
         );
 
         await client.query('COMMIT');
         
-        await logSystemEvent('info', `User ${userId} created new group: ${name}`, 'Groups');
+        await logSystemEvent('info', `User ${parsedUserId} created new group: ${name}`, 'Groups');
         res.status(201).json(newGroup);
     } catch (err) {
         await client.query('ROLLBACK');
@@ -1250,7 +1260,7 @@ app.post('/api/groups', async (req, res) => {
 app.get('/api/groups', async (req, res) => {
     try {
         const result = await pool.query('SELECT *, creator_id FROM groups ORDER BY name ASC'); // Include creator_id
-        res.json(result.rows.map(g => ({ ...g, id: g.id.toString(), creatorId: g.creator_id.toString() }))); // Map creator_id to creatorId
+        res.json(result.rows.map(g => ({ ...g, id: g.id.toString(), creatorId: g.creator_id ? g.creator_id.toString() : null }))); // Map creator_id to creatorId
     } catch (err) {
         console.error("Fetch Groups Error:", err);
         res.status(500).json({ error: 'Failed to fetch groups' });
@@ -1282,11 +1292,18 @@ app.post('/api/groups/:groupId/join', async (req, res) => {
         return res.status(400).json({ error: 'User ID is required.' });
     }
 
+    const parsedUserId = parseInt(userId, 10);
+    const parsedGroupId = parseInt(groupId, 10);
+
+    if (isNaN(parsedUserId) || isNaN(parsedGroupId)) {
+        return res.status(400).json({ error: 'Invalid user ID or group ID' });
+    }
+
     try {
         // Check if user is already a member
         const memberCheck = await pool.query(
             'SELECT * FROM group_members WHERE group_id = $1 AND user_id = $2',
-            [groupId, userId]
+            [parsedGroupId, parsedUserId]
         );
 
         if (memberCheck.rows.length > 0) {
@@ -1296,10 +1313,10 @@ app.post('/api/groups/:groupId/join', async (req, res) => {
         // Add user to the group with 'member' role
         await pool.query(
             'INSERT INTO group_members (group_id, user_id, role) VALUES ($1, $2, $3)',
-            [groupId, userId, 'member']
+            [parsedGroupId, parsedUserId, 'member']
         );
 
-        await logSystemEvent('info', `User ${userId} joined group ${groupId}`, 'Groups');
+        await logSystemEvent('info', `User ${parsedUserId} joined group ${parsedGroupId}`, 'Groups');
         res.status(200).json({ success: true, message: 'Successfully joined group.' });
     } catch (err) {
         console.error("Join Group Error:", err);
@@ -2085,20 +2102,6 @@ app.listen(PORT, async () => {
     await initDb();
 });
 
-app.post('/api/groups/:groupId/join', async (req, res) => {
-    const { groupId } = req.params;
-    const { userId } = req.body;
-    try {
-        await pool.query(
-            'INSERT INTO group_members (group_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-            [groupId, userId]
-        );
-        res.status(200).json({ success: true });
-    } catch (err) {
-        console.error("Join Group Error:", err);
-        res.status(500).json({ error: 'Failed to join group.' });
-    }
-});
 
 app.post('/api/groups/:groupId/leave', async (req, res) => {
     const { groupId } = req.params;
