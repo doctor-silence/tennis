@@ -1256,6 +1256,23 @@ app.get('/api/groups', async (req, res) => {
     }
 });
 
+app.get('/api/users/:userId/groups', async (req, res) => {
+    const { userId } = req.params;
+    try {
+        const result = await pool.query(
+            `SELECT g.*, gm.role FROM groups g
+             JOIN group_members gm ON g.id = gm.group_id
+             WHERE gm.user_id = $1
+             ORDER BY g.name ASC`,
+            [userId]
+        );
+        res.json(result.rows.map(g => ({ ...g, id: g.id.toString() })));
+    } catch (err) {
+        console.error("Fetch User Groups Error:", err);
+        res.status(500).json({ error: 'Failed to fetch user groups' });
+    }
+});
+
 app.post('/api/groups/:groupId/join', async (req, res) => {
     const { groupId } = req.params;
     const { userId } = req.body;
