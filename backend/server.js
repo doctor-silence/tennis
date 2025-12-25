@@ -1256,6 +1256,39 @@ app.get('/api/groups', async (req, res) => {
     }
 });
 
+app.post('/api/groups/:groupId/join', async (req, res) => {
+    const { groupId } = req.params;
+    const { userId } = req.body;
+
+    if (!userId) {
+        return res.status(400).json({ error: 'User ID is required.' });
+    }
+
+    try {
+        // Check if user is already a member
+        const memberCheck = await pool.query(
+            'SELECT * FROM group_members WHERE group_id = $1 AND user_id = $2',
+            [groupId, userId]
+        );
+
+        if (memberCheck.rows.length > 0) {
+            return res.status(409).json({ error: 'User is already a member of this group.' });
+        }
+
+        // Add user to the group with 'member' role
+        await pool.query(
+            'INSERT INTO group_members (group_id, user_id, role) VALUES ($1, $2, $3)',
+            [groupId, userId, 'member']
+        );
+
+        await logSystemEvent('info', `User ${userId} joined group ${groupId}`, 'Groups');
+        res.status(200).json({ success: true, message: 'Successfully joined group.' });
+    } catch (err) {
+        console.error("Join Group Error:", err);
+        res.status(500).json({ error: 'Failed to join group.' });
+    }
+});
+
 app.get('/api/tournaments', async (req, res) => {
     const { userId } = req.query;
     if (!userId) {

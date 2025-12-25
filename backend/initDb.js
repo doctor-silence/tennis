@@ -335,7 +335,7 @@ const initDb = async () => {
     `);
     await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS location VARCHAR(255);`);
     await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS contact VARCHAR(255);`);
-    await client.query(`ALTER TABLE groups ALTER COLUMN type DROP NOT NULL;`);
+    await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS members_count INTEGER DEFAULT 0;`);
     console.log('✅ Table "groups" checked.');
     
     // Create group_members table
