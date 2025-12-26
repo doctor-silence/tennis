@@ -1030,6 +1030,68 @@ export const api = {
                 console.warn("Backend offline. Deleting from in-memory mocks.");
                 MOCK_COURTS = MOCK_COURTS.filter(c => c.id !== id);
             }
+        },
+        getGroups: async (userId: string): Promise<Group[]> => {
+            try {
+                const res = await fetch(`${API_URL}/admin/groups?userId=${userId}`);
+                if (!res.ok) return [];
+                return await res.json();
+            } catch (e) {
+                return [];
+            }
+        },
+        createGroup: async (group: Partial<Group>, userId: string): Promise<Group> => {
+            try {
+                const res = await fetch(`${API_URL}/admin/groups`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...group, creatorId: userId })
+                });
+        
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.error || 'Failed to create group');
+                }
+        
+                return await res.json();
+            } catch (e) {
+                console.error(e);
+                throw e;
+            }
+        },
+        updateGroup: async (id: string, group: Partial<Group>, userId: string): Promise<void> => {
+            try {
+                const res = await fetch(`${API_URL}/admin/groups/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...group, userId })
+                });
+        
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.error || 'Failed to update group');
+                }
+            } catch (e) {
+                console.error(e);
+                throw e;
+            }
+        },
+        deleteGroup: async (id: string, userId: string): Promise<void> => {
+            try {
+                const res = await fetch(`${API_URL}/admin/groups/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId })
+                });
+        
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.error || 'Failed to delete group');
+                }
+            } catch (e) {
+                console.error(e);
+                throw e;
+            }
         }
     },
 

@@ -21,10 +21,11 @@ import {
     Info,
     Image as ImageIcon,
     Map,
-    ChevronDown
+    ChevronDown,
+    Shield
 } from 'lucide-react';
 import Button from './Button';
-import { User, Product, SystemLog, Court } from '../types';
+import { User, Product, SystemLog, Court, Group } from '../types';
 import { api } from '../services/api';
 
 interface AdminPanelProps {
@@ -62,14 +63,17 @@ const CITIES = [
     'Калининград'
 ];
 
+type AdminGroup = Group & { creator_name: string; members_count: number };
+
 const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups'>('overview');
     
     // Data State
     const [stats, setStats] = useState({ revenue: 0, activeUsers: 0, newSignups: 0, serverLoad: 0 });
     const [users, setUsers] = useState<User[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
     const [courts, setCourts] = useState<Court[]>([]);
+    const [groups, setGroups] = useState<AdminGroup[]>([]);
     const [logs, setLogs] = useState<SystemLog[]>([]);
     
     // Modals
@@ -78,19 +82,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
     const [isCourtModalOpen, setIsCourtModalOpen] = useState(false);
     const [editingCourt, setEditingCourt] = useState<Partial<Court> & { surface: string[] } | null>(null);
+    const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+    const [editingGroup, setEditingGroup] = useState<Partial<Group> | null>(null);
     
     // User Edit State
-    // We extend User to include 'password' for creation logic, though it's not in the base User type
     const [editingUser, setEditingUser] = useState<(Partial<User> & { password?: string }) | null>(null);
 
-    // Court Search Filters
+    // Search Filters
     const [courtSearchName, setCourtSearchName] = useState<string>('');
     const [courtSearchCity, setCourtSearchCity] = useState<string>('Все города');
 
     // Confirmation Modal State
     const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState<boolean>(false);
     const [itemToDeleteId, setItemToDeleteId] = useState<string | null>(null);
-    const [deleteActionType, setDeleteActionType] = useState<'court' | 'user' | 'product' | null>(null);
+    const [deleteActionType, setDeleteActionType] = useState<'court' | 'user' | 'product' | 'group' | null>(null);
 
     // Initial Data Load
     useEffect(() => {
@@ -118,6 +123,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             const c = await api.getCourts(courtSearchName, courtSearchCity === 'Все города' ? '' : courtSearchCity);
             if (Array.isArray(c)) setCourts(c);
         }
+        if (activeTab === 'groups') {
+            const g = await api.admin.getGroups(user.id);
+            if(Array.isArray(g)) setGroups(g);
+        }
     };
 
 
@@ -126,13 +135,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
         if (!itemToDeleteId || !deleteActionType) return;
 
         try {
-            if (deleteActionType === 'product') {
-                await api.admin.deleteProduct(itemToDeleteId);
-            } else if (deleteActionType === 'court') {
-                await api.admin.deleteCourt(itemToDeleteId);
-            } else if (deleteActionType === 'user') {
-                await api.admin.deleteUser(itemToDeleteId);
-            }
+            if (deleteActionType === 'product') await api.admin.deleteProduct(itemToDeleteId);
+            else if (deleteActionType === 'court') await api.admin.deleteCourt(itemToDeleteId);
+            else if (deleteActionType === 'user') await api.admin.deleteUser(itemToDeleteId);
+            else if (deleteActionType === 'group') await api.admin.deleteGroup(itemToDeleteId, user.id);
+            
             await loadData(); // Reload data after deletion
         } catch (e: any) {
             alert('Ошибка удаления: ' + e.message);
@@ -166,12 +173,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
         e.preventDefault();
         if (editingCourt) {
             try {
-                // Auto-fill image logic: if empty, pick a random one
                 const courtData = { ...editingCourt };
                 if (!courtData.image || courtData.image.trim() === '') {
                     courtData.image = COURT_IMAGES[Math.floor(Math.random() * COURT_IMAGES.length)];
                 }
-
                 await api.admin.saveCourt(courtData);
                 await loadData();
                 setIsCourtModalOpen(false);
@@ -201,15 +206,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     // User Handlers
     const handleAddUser = () => {
         setEditingUser({
-            name: '',
-            email: '',
-            password: '123',
-            role: 'amateur',
-            city: 'Москва',
-            level: 'NTRP 3.0',
-            rating: 0,
-            rttRank: 0,
-            rttCategory: 'Взрослые'
+            name: '', email: '', password: '123', role: 'amateur',
+            city: 'Москва', level: 'NTRP 3.0', rating: 0, rttRank: 0, rttCategory: 'Взрослые'
         });
         setIsUserModalOpen(true);
     };
@@ -217,13 +215,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const handleSaveUser = async (e: React.FormEvent) => {
         e.preventDefault();
         if (editingUser) {
-             if (editingUser.id) {
-                 // Update existing
-                 await api.admin.updateUser(editingUser.id, editingUser);
-             } else {
-                 // Create new
-                 await api.admin.createUser(editingUser);
-             }
+             if (editingUser.id) await api.admin.updateUser(editingUser.id, editingUser);
+             else await api.admin.createUser(editingUser);
              await loadData();
         }
         setIsUserModalOpen(false);
@@ -232,6 +225,35 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
 
     const handleDeleteUser = (id: string) => {
         setDeleteActionType('user');
+        setItemToDeleteId(id);
+        setShowConfirmDeleteModal(true);
+    };
+    
+    // Group Handlers
+    const handleAddGroup = () => {
+        setEditingGroup({ name: '', location: 'Москва', description: '', contact: '' });
+        setIsGroupModalOpen(true);
+    };
+
+    const handleSaveGroup = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingGroup) return;
+        try {
+            if (editingGroup.id) {
+                await api.admin.updateGroup(editingGroup.id, editingGroup, user.id);
+            } else {
+                await api.admin.createGroup(editingGroup, user.id);
+            }
+            await loadData();
+            setIsGroupModalOpen(false);
+            setEditingGroup(null);
+        } catch (e: any) {
+            alert('Ошибка сохранения: ' + e.message);
+        }
+    };
+
+    const handleDeleteGroup = (id: string) => {
+        setDeleteActionType('group');
         setItemToDeleteId(id);
         setShowConfirmDeleteModal(true);
     };
@@ -252,36 +274,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                 </div>
 
                 <nav className="flex-1 p-4 space-y-2">
-                    <SidebarLink 
-                        icon={<LayoutDashboard size={20}/>} 
-                        label="Обзор" 
-                        active={activeTab === 'overview'} 
-                        onClick={() => setActiveTab('overview')} 
-                    />
-                    <SidebarLink 
-                        icon={<Users size={20}/>} 
-                        label="Пользователи" 
-                        active={activeTab === 'users'} 
-                        onClick={() => setActiveTab('users')} 
-                    />
-                    <SidebarLink 
-                        icon={<Map size={20}/>} 
-                        label="Корты" 
-                        active={activeTab === 'courts'} 
-                        onClick={() => setActiveTab('courts')} 
-                    />
-                    <SidebarLink 
-                        icon={<ShoppingBag size={20}/>} 
-                        label="Магазин" 
-                        active={activeTab === 'shop'} 
-                        onClick={() => setActiveTab('shop')} 
-                    />
-                    <SidebarLink 
-                        icon={<Terminal size={20}/>} 
-                        label="Системные логи" 
-                        active={activeTab === 'logs'} 
-                        onClick={() => setActiveTab('logs')} 
-                    />
+                    <SidebarLink icon={<LayoutDashboard size={20}/>} label="Обзор" active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} />
+                    <SidebarLink icon={<Users size={20}/>} label="Пользователи" active={activeTab === 'users'} onClick={() => setActiveTab('users')} />
+                    <SidebarLink icon={<Shield size={20}/>} label="Группы" active={activeTab === 'groups'} onClick={() => setActiveTab('groups')} />
+                    <SidebarLink icon={<Map size={20}/>} label="Корты" active={activeTab === 'courts'} onClick={() => setActiveTab('courts')} />
+                    <SidebarLink icon={<ShoppingBag size={20}/>} label="Магазин" active={activeTab === 'shop'} onClick={() => setActiveTab('shop')} />
+                    <SidebarLink icon={<Terminal size={20}/>} label="Системные логи" active={activeTab === 'logs'} onClick={() => setActiveTab('logs')} />
                 </nav>
 
                 <div className="p-4 border-t border-slate-800">
@@ -304,6 +302,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                     <h2 className="text-xl font-bold text-slate-800">
                         {activeTab === 'overview' && 'Экономика приложения'}
                         {activeTab === 'users' && 'Управление пользователями'}
+                        {activeTab === 'groups' && 'Управление группами'}
                         {activeTab === 'shop' && 'Управление товарами'}
                         {activeTab === 'courts' && 'Управление кортами'}
                         {activeTab === 'logs' && 'Системный мониторинг'}
@@ -320,87 +319,56 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         <div className="space-y-8 animate-fade-in-up">
                             {/* Stats Cards */}
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                <StatCard 
-                                    title="Общая выручка" 
-                                    value={`${((stats?.revenue || 0) / 1000).toFixed(0)}k ₽`} 
-                                    change="+12.5%" 
-                                    icon={<DollarSign className="text-lime-600"/>}
-                                    color="lime"
-                                />
-                                <StatCard 
-                                    title="Активные пользователи" 
-                                    value={(stats?.activeUsers || 0).toLocaleString()} 
-                                    change="+5.2%" 
-                                    icon={<Users className="text-blue-600"/>}
-                                    color="blue"
-                                />
-                                <StatCard 
-                                    title="Новые регистрации" 
-                                    value={(stats?.newSignups || 0).toString()} 
-                                    change="+18%" 
-                                    icon={<TrendingUp className="text-purple-600"/>}
-                                    color="purple"
-                                />
-                                <StatCard 
-                                    title="Нагрузка сервера" 
-                                    value={`${stats?.serverLoad || 0}%`} 
-                                    change="-2%" 
-                                    icon={<Server className="text-amber-600"/>}
-                                    color="amber"
-                                />
+                                <StatCard title="Общая выручка" value={`${((stats?.revenue || 0) / 1000).toFixed(0)}k ₽`} change="+12.5%" icon={<DollarSign className="text-lime-600"/>} color="lime"/>
+                                <StatCard title="Активные пользователи" value={(stats?.activeUsers || 0).toLocaleString()} change="+5.2%" icon={<Users className="text-blue-600"/>} color="blue"/>
+                                <StatCard title="Новые регистрации" value={(stats?.newSignups || 0).toString()} change="+18%" icon={<TrendingUp className="text-purple-600"/>} color="purple"/>
+                                <StatCard title="Нагрузка сервера" value={`${stats?.serverLoad || 0}%`} change="-2%" icon={<Server className="text-amber-600"/>} color="amber"/>
                             </div>
 
                             {/* Charts Area (Mocked with CSS) */}
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                                    <h3 className="font-bold text-lg mb-6">Динамика продаж</h3>
-                                    <div className="h-64 flex items-end justify-between gap-2">
-                                        {[40, 65, 45, 80, 55, 90, 70, 85, 60, 75, 95, 100].map((h, i) => (
-                                            <div key={i} className="w-full bg-slate-100 rounded-t-lg relative group overflow-hidden">
-                                                <div 
-                                                    className="absolute bottom-0 w-full bg-slate-900 group-hover:bg-lime-500 transition-colors duration-300" 
-                                                    style={{ height: `${h}%` }}
-                                                ></div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div className="flex justify-between mt-4 text-xs text-slate-400 font-bold uppercase">
-                                        <span>Янв</span><span>Май</span><span>Дек</span>
-                                    </div>
-                                </div>
+                                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><h3 className="font-bold text-lg mb-6">Динамика продаж</h3><div className="h-64 flex items-end justify-between gap-2">{[40, 65, 45, 80, 55, 90, 70, 85, 60, 75, 95, 100].map((h, i) => (<div key={i} className="w-full bg-slate-100 rounded-t-lg relative group overflow-hidden"><div className="absolute bottom-0 w-full bg-slate-900 group-hover:bg-lime-500 transition-colors duration-300" style={{ height: `${h}%` }}></div></div>))}< /div><div className="flex justify-between mt-4 text-xs text-slate-400 font-bold uppercase"><span>Янв</span><span>Май</span><span>Дек</span></div></div>
+                                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><h3 className="font-bold text-lg mb-6">Распределение подписок</h3><div className="space-y-4"><div className="space-y-2"><div className="flex justify-between text-sm font-medium"><span>Amateur (Free)</span><span className="text-slate-500">65%</span></div><div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-slate-300 w-[65%]"></div></div></div><div className="space-y-2"><div className="flex justify-between text-sm font-medium"><span>PRO Player</span><span className="text-slate-500">25%</span></div><div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-lime-400 w-[25%]"></div></div></div><div className="space-y-2"><div className="flex justify-between text-sm font-medium"><span>Coach PRO</span><span className="text-slate-500">10%</span></div><div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-slate-900 w-[10%]"></div></div></div></div></div>
+                            </div>
+                        </div>
+                    )}
 
-                                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                                    <h3 className="font-bold text-lg mb-6">Распределение подписок</h3>
-                                    <div className="space-y-4">
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between text-sm font-medium">
-                                                <span>Amateur (Free)</span>
-                                                <span className="text-slate-500">65%</span>
-                                            </div>
-                                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                                                <div className="h-full bg-slate-300 w-[65%]"></div>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between text-sm font-medium">
-                                                <span>PRO Player</span>
-                                                <span className="text-slate-500">25%</span>
-                                            </div>
-                                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                                                <div className="h-full bg-lime-400 w-[25%]"></div>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between text-sm font-medium">
-                                                <span>Coach PRO</span>
-                                                <span className="text-slate-500">10%</span>
-                                            </div>
-                                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                                                <div className="h-full bg-slate-900 w-[10%]"></div>
-                                            </div>
-                                        </div>
-                                    </div>
+                    {activeTab === 'groups' && (
+                        <div className="animate-fade-in-up">
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                <div className="p-4 border-b border-slate-200 flex justify-between items-center">
+                                    <h3 className="font-bold">Всего групп: {groups.length}</h3>
+                                    <Button size="sm" onClick={handleAddGroup} className="gap-2">
+                                        <Plus size={16}/> Добавить группу
+                                    </Button>
                                 </div>
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs">
+                                        <tr>
+                                            <th className="px-6 py-4">Название</th>
+                                            <th className="px-6 py-4">Город</th>
+                                            <th className="px-6 py-4 text-center">Участники</th>
+                                            <th className="px-6 py-4">Создатель</th>
+                                            <th className="px-6 py-4 text-right">Действия</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {(groups || []).map(g => (
+                                            <tr key={g.id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="px-6 py-4 font-bold">{g.name}</td>
+                                                <td className="px-6 py-4 text-slate-600">{g.location}</td>
+                                                <td className="px-6 py-4 text-center font-medium">{g.members_count}</td>
+                                                <td className="px-6 py-4 text-slate-600">{g.creator_name || 'N/A'}</td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <div className="flex justify-end gap-2">
+                                                        <button onClick={() => { setEditingGroup(g); setIsGroupModalOpen(true); }} className="p-2 hover:bg-slate-200 rounded-lg text-slate-600"><Edit size={16}/></button>
+                                                        <button onClick={() => handleDeleteGroup(g.id)} className="p-2 hover:bg-red-50 rounded-lg text-red-500"><Trash2 size={16}/></button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     )}
@@ -612,6 +580,30 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                     )}
                 </div>
             </main>
+
+            <Modal isOpen={isGroupModalOpen} onClose={() => setIsGroupModalOpen(false)} title={editingGroup?.id ? 'Редактировать группу' : 'Новая группа'}>
+                {editingGroup && (
+                    <form onSubmit={handleSaveGroup} className="space-y-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Название</label>
+                            <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingGroup.name || ''} onChange={e => setEditingGroup({...editingGroup, name: e.target.value})} />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Город</label>
+                            <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingGroup.location || ''} onChange={e => setEditingGroup({...editingGroup, location: e.target.value})} />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Описание</label>
+                            <textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingGroup.description || ''} onChange={e => setEditingGroup({...editingGroup, description: e.target.value})} />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Контакты</label>
+                            <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingGroup.contact || ''} onChange={e => setEditingGroup({...editingGroup, contact: e.target.value})} />
+                        </div>
+                        <Button type="submit" className="w-full mt-4">Сохранить</Button>
+                    </form>
+                )}
+            </Modal>
 
             {/* Product Modal */}
             <Modal isOpen={isProductModalOpen} onClose={() => setIsProductModalOpen(false)} title={editingProduct?.id ? 'Редактировать товар' : 'Новый товар'}>

@@ -348,6 +348,97 @@ app.delete('/api/admin/users/:id', async (req, res) => {
     }
 });
 
+app.get('/api/admin/groups', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT 
+                g.*, 
+                u.name as creator_name, 
+                (SELECT COUNT(*) FROM group_members gm WHERE gm.group_id = g.id) as members_count
+            FROM groups g
+            LEFT JOIN users u ON g.creator_id = u.id
+            ORDER BY g.id DESC
+        `);
+        res.json(result.rows.map(row => ({
+            ...row,
+            id: row.id.toString(),
+            creator_id: row.creator_id ? row.creator_id.toString() : null,
+            members_count: parseInt(row.members_count, 10)
+        })));
+    } catch (err) {
+        console.error("Admin Get Groups Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/admin/groups', async (req, res) => {
+    const { name, description, location, contact, creatorId } = req.body;
+    if (!name || !creatorId) {
+        return res.status(400).json({ error: 'Name and creatorId are required' });
+    }
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const groupResult = await client.query(
+            'INSERT INTO groups (name, description, location, contact, creator_id) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [name, description, location, contact, creatorId]
+        );
+        const newGroup = groupResult.rows[0];
+        await client.query(
+            'INSERT INTO group_members (group_id, user_id, role) VALUES ($1, $2, $3)',
+            [newGroup.id, creatorId, 'admin']
+        );
+        await client.query('COMMIT');
+        await logSystemEvent('info', `Admin ${creatorId} created group: ${name}`, 'Admin');
+        res.status(201).json({ ...newGroup, id: newGroup.id.toString() });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error("Admin Create Group Error:", err);
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
+    }
+});
+
+app.put('/api/admin/groups/:id', async (req, res) => {
+    const { id } = req.params;
+    const { name, description, location, contact } = req.body;
+    try {
+        const result = await pool.query(
+            'UPDATE groups SET name = $1, description = $2, location = $3, contact = $4 WHERE id = $5 RETURNING *',
+            [name, description, location, contact, id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Group not found' });
+        }
+        await logSystemEvent('info', `Admin updated group ${id}`, 'Admin');
+        res.json({ ...result.rows[0], id: result.rows[0].id.toString() });
+    } catch (err) {
+        console.error("Admin Update Group Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/admin/groups/:id', async (req, res) => {
+    const { id } = req.params;
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        await client.query('DELETE FROM group_members WHERE group_id = $1', [id]);
+        await client.query('DELETE FROM posts WHERE group_id = $1', [id]);
+        await client.query('DELETE FROM groups WHERE id = $1', [id]);
+        await client.query('COMMIT');
+        await logSystemEvent('warning', `Admin deleted group ${id}`, 'Admin');
+        res.json({ success: true });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error("Admin Delete Group Error:", err);
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
+    }
+});
+
 // --- COURTS ROUTES (Public & Admin) ---
 
 app.get('/api/courts', async (req, res) => {
