@@ -432,6 +432,29 @@ const MarketplacePost = ({ post, onStartConversation }: { post: any, onStartConv
     );
 };
 
+const TournamentAnnouncementPost = ({ post }: { post: any }) => (
+    <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-200">
+        <div className="flex justify-between items-start mb-4">
+            <div className="flex gap-3 items-center">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <Trophy size={20} className="text-blue-500" />
+                </div>
+                <div>
+                    <p className="font-bold text-blue-600">Начался новый турнир!</p>
+                    <p className="text-xs text-slate-400">Опубликовал: {post.content.authorName}</p>
+                </div>
+            </div>
+            <div className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded">ТУРНИР</div>
+        </div>
+        <h3 className="text-xl font-black text-slate-900 mb-2">{post.content.title}</h3>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
+            {post.content.groupName && <p><strong>Группа:</strong> {post.content.groupName}</p>}
+            <p><strong>Призовой фонд:</strong> {post.content.prizePool}</p>
+            <p><strong>Дата:</strong> {new Date(post.content.date).toLocaleDateString('ru-RU')}</p>
+        </div>
+    </div>
+);
+
 
 // --- Feed Component ---
 
@@ -456,6 +479,8 @@ const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate, onSta
                         return <MatchResultPost key={item.id} post={item} user={user} onUpdate={onUpdate} />;
                     case 'marketplace':
                         return <MarketplacePost key={item.id} post={item} onStartConversation={onStartConversation} />;
+                    case 'tournament_announcement':
+                        return <TournamentAnnouncementPost key={item.id} post={item} />;
                     default:
                         return null;
                 }

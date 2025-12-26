@@ -108,6 +108,22 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
         const updated = { ...selectedTournament, status: 'live' as const };
         const returnedTournament = await syncTournament(updated);
         setSelectedTournament(returnedTournament);
+
+        if (returnedTournament) {
+            await api.posts.create({
+                userId: user.id,
+                type: 'tournament_announcement',
+                groupId: returnedTournament.target_group_id,
+                content: {
+                    title: returnedTournament.name,
+                    groupName: returnedTournament.groupName,
+                    prizePool: returnedTournament.prizePool,
+                    date: returnedTournament.date,
+                    authorName: user.name,
+                }
+            });
+            onTournamentUpdate();
+        }
     };
 
     const handleRandomize = async () => {

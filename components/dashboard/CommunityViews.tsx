@@ -380,8 +380,8 @@ export const CommunityView = ({ user, onNavigate, onStartConversation, feedVersi
     const [groupsCount, setGroupsCount] = useState(0);
 
     useEffect(() => {
-        api.getPartners().then(partners => {
-            setGroupsCount(partners.length);
+        api.groups.getAll().then(groups => {
+            setGroupsCount(groups.length);
         });
     }, []);
 
