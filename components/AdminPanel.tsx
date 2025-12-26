@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
     LayoutDashboard, 
@@ -23,9 +22,11 @@ import {
     Map,
     ChevronDown,
     Shield,
-    Trophy
+    Trophy,
+    MessageSquare
 } from 'lucide-react';
 import AdminTournamentsView from './dashboard/AdminTournamentsView';
+import AdminSupportChat from './dashboard/AdminSupportChat';
 import Button from './Button';
 import { User, Product, SystemLog, Court, Group, Tournament } from '../types';
 import { api } from '../services/api';
@@ -68,7 +69,7 @@ const CITIES = [
 type AdminGroup = Group & { creator_name: string; members_count: number };
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups' | 'tournaments'>('tournaments');
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups' | 'tournaments' | 'support'>('support');
     
     // Data State
     const [stats, setStats] = useState({ revenue: 0, activeUsers: 0, newSignups: 0, serverLoad: 0 });
@@ -313,6 +314,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                     <SidebarLink icon={<Users size={20}/>} label="Пользователи" active={activeTab === 'users'} onClick={() => setActiveTab('users')} />
                     <SidebarLink icon={<Shield size={20}/>} label="Группы" active={activeTab === 'groups'} onClick={() => setActiveTab('groups')} />
                     <SidebarLink icon={<Trophy size={20}/>} label="Турниры" active={activeTab === 'tournaments'} onClick={() => setActiveTab('tournaments')} />
+                    <SidebarLink icon={<MessageSquare size={20}/>} label="Поддержка" active={activeTab === 'support'} onClick={() => setActiveTab('support')} />
                     <SidebarLink icon={<Map size={20}/>} label="Корты" active={activeTab === 'courts'} onClick={() => setActiveTab('courts')} />
                     <SidebarLink icon={<ShoppingBag size={20}/>} label="Магазин" active={activeTab === 'shop'} onClick={() => setActiveTab('shop')} />
                     <SidebarLink icon={<Terminal size={20}/>} label="Системные логи" active={activeTab === 'logs'} onClick={() => setActiveTab('logs')} />
@@ -340,6 +342,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         {activeTab === 'users' && 'Управление пользователями'}
                         {activeTab === 'groups' && 'Управление группами'}
                         {activeTab === 'tournaments' && 'Управление турнирами'}
+                        {activeTab === 'support' && 'Чат с пользователями'}
                         {activeTab === 'shop' && 'Управление товарами'}
                         {activeTab === 'courts' && 'Управление кортами'}
                         {activeTab === 'logs' && 'Системный мониторинг'}
@@ -375,6 +378,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                             const group = groups.find(g => g.id === t.target_group_id);
                             return { ...t, groupName: group ? group.name : t.groupName };
                         })} onDelete={handleDeleteTournament} onEdit={handleEditTournament} />
+                    )}
+
+                    {activeTab === 'support' && (
+                        <AdminSupportChat user={user} />
                     )}
 
                     {activeTab === 'groups' && (

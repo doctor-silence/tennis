@@ -4,6 +4,7 @@ import Dashboard from './components/Dashboard';
 import Button from './components/Button';
 import Shop from './components/Shop';
 import AdminPanel from './components/AdminPanel';
+import SupportChatWidget from './components/SupportChatWidget'; // Import the new component
 import { api } from './services/api';
 import { 
   ArrowRight, 
@@ -126,11 +127,14 @@ const App = () => {
       )}
 
       {view === 'dashboard' && currentUser && (
-        <Dashboard
-            user={currentUser}
-            onLogout={handleLogout}
-            onUserUpdate={handleUserUpdate}
-        />
+        <>
+          <Dashboard
+              user={currentUser}
+              onLogout={handleLogout}
+              onUserUpdate={handleUserUpdate}
+          />
+          <SupportChatWidget user={currentUser} />
+        </>
       )}
 
       {view === 'admin' && currentUser && (

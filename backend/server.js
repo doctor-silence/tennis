@@ -1,22 +1,32 @@
-
 require('dotenv').config({ path: __dirname + '/.env' });
 const express = require('express');
 const cors = require('cors');
+const http = require('http');
+const { Server } = require("socket.io");
 const { GoogleGenAI } = require('@google/genai');
 const bcrypt = require('bcryptjs');
 const pool = require('./db');
 const initDb = require('./initDb');
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*", // Allow all origins for simplicity
+    methods: ["GET", "POST"]
+  }
+});
+
 const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
-// Increased limit to 50mb to allow base64 image uploads
 app.use(express.json({ limit: '50mb' }));
 
+// Constants
+const SUPPORT_ADMIN_ID = 1; // Assuming user with ID 1 is the super admin for support
+
 // Initialize Google GenAI
-// CRITICAL: API Key must come from environment variables
 if (!process.env.API_KEY) {
   console.error("❌ FATAL: API_KEY is missing in .env file");
   process.exit(1);
@@ -29,83 +39,153 @@ if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD) {
 }
 
 // --- HELPERS ---
-
-// Helper to log system events to DB
 const logSystemEvent = async (level, message, moduleName) => {
     try {
-        await pool.query(
-            'INSERT INTO system_logs (level, message, module) VALUES ($1, $2, $3)',
-            [level, message, moduleName]
-        );
+        await pool.query('INSERT INTO system_logs (level, message, module) VALUES ($1, $2, $3)', [level, message, moduleName]);
     } catch (e) {
         console.error("Failed to write log to DB", e);
     }
 };
 
-const mapStudent = (row) => ({
-    id: row.id.toString(),
-    coachId: row.coach_id,
-    name: row.name,
-    age: row.age,
-    level: row.level,
-    balance: row.balance,
-    nextLesson: row.next_lesson,
-    avatar: row.avatar,
-    status: row.status,
-    goals: row.goals,
-    notes: row.notes
-});
+// --- REAL-TIME CHAT LOGIC ---
 
+io.on('connection', (socket) => {
+    console.log('🔌 A user connected:', socket.id);
+    const userId = socket.handshake.query.userId;
+    const userRole = socket.handshake.query.userRole;
 
-const calculateEloPoints = (winner, loser, score, eventType) => {
-    // 1. Базовый расчет
-    const ratingDifference = loser.xp - winner.xp;
-    let winnerPoints = 15 + Math.max(0, ratingDifference / 10); // +1 очко за каждые 10 очков разницы
-    let loserPoints = -5 - Math.max(0, -ratingDifference / 10);
-
-    // Ограничения
-    winnerPoints = Math.min(winnerPoints, 50);
-    loserPoints = Math.max(loserPoints, -25);
-
-    // 2. Бонусы за доминирование
-    const scoreParts = score.split(',').map(s => s.trim().split(':').map(Number));
-    let winnerSets = 0;
-    let loserSets = 0;
-    let isDryWin = false;
-
-    scoreParts.forEach(set => {
-        if (set[0] > set[1]) winnerSets++;
-        else loserSets++;
-        if (set[1] === 0 && set[0] >= 6) isDryWin = true; // Check for a 6:0 set or similar
-    });
-
-    if (isDryWin && scoreParts.length >= 2) { // 6:0, 6:0
-        winnerPoints += 15;
-    }
-    if (loserSets > 0 && winnerSets > loserSets) { // Волевая победа
-        winnerPoints += 10;
+    if (!userId) {
+        console.log('🚫 User disconnected: No userId provided.');
+        return socket.disconnect();
     }
     
-    // 3. Коэффициент турнира
-    const multipliers = {
-        'friendly': 1.0,
-        'cup': 1.5,
-        'masters': 2.0
-    };
-    const multiplier = multipliers[eventType] || 1.0;
+    // Join a room based on role
+    if (userRole === 'admin') {
+        socket.join('admins');
+        console.log(`🛡️  Admin ${userId} joined the 'admins' room.`);
+    } else {
+        const userRoom = `user_${userId}`;
+        socket.join(userRoom);
+        console.log(`👤 User ${userId} joined room: ${userRoom}`);
+    }
 
-    winnerPoints *= multiplier;
-    loserPoints *= multiplier;
+    // Admin fetches all support conversations
+    socket.on('support:admin_get_conversations', async (ack) => {
+        if (userRole !== 'admin') return;
+        try {
+            const result = await pool.query(`
+                SELECT 
+                    c.id,
+                    p.id AS "partnerId",
+                    p.name AS "partnerName",
+                    p.avatar AS "partnerAvatar",
+                    (SELECT text FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS "lastMessage",
+                    (SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS "timestamp",
+                    (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND is_read = FALSE AND sender_id != $1) AS "unread"
+                FROM conversations c
+                JOIN users p ON p.id = c.user1_id
+                WHERE c.user2_id = $1
+                ORDER BY (SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) DESC NULLS LAST
+            `, [SUPPORT_ADMIN_ID]);
+            ack(result.rows.map(r => ({ ...r, id: r.id.toString(), partnerId: r.partnerId.toString(), unread: parseInt(r.unread) })));
+        } catch (error) {
+            console.error('Error fetching admin conversations:', error);
+        }
+    });
 
-    return {
-        winnerXpGained: Math.round(winnerPoints),
-        loserXpLost: Math.round(loserPoints)
-    };
-};
+    // User or Admin fetches history for a specific conversation
+    socket.on('support:get_history', async (partnerId, ack) => {
+        try {
+            const conversation = await pool.query(
+                `SELECT id FROM conversations WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)`,
+                [userId, partnerId]
+            );
 
-// --- ROUTES ---
+            if (conversation.rows.length === 0) {
+                return ack([]);
+            }
+            const conversationId = conversation.rows[0].id;
 
-// Health Check
+            const messages = await pool.query(
+                `SELECT id, sender_id, text, created_at FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC`,
+                [conversationId]
+            );
+
+            // Mark messages as read
+            await pool.query(
+                `UPDATE messages SET is_read = TRUE WHERE conversation_id = $1 AND sender_id != $2`,
+                [conversationId, userId]
+            );
+
+            ack(messages.rows.map(m => ({ ...m, role: m.sender_id.toString() === userId.toString() ? 'user' : 'partner' })));
+
+        } catch (error) {
+            console.error('Error fetching message history:', error);
+        }
+    });
+
+    // Listen for a new message
+    socket.on('support:send_message', async ({ text, recipientId }, ack) => {
+        const senderId = userId;
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+            
+            // Find or create conversation
+            let convRes = await client.query(
+                `SELECT id FROM conversations WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)`,
+                [senderId, recipientId]
+            );
+
+            let conversationId;
+            if (convRes.rows.length > 0) {
+                conversationId = convRes.rows[0].id;
+                await client.query('UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [conversationId]);
+            } else {
+                const newConvRes = await client.query('INSERT INTO conversations (user1_id, user2_id) VALUES ($1, $2) RETURNING id', [senderId, recipientId]);
+                conversationId = newConvRes.rows[0].id;
+            }
+
+            // Insert message
+            const msgRes = await client.query(
+                'INSERT INTO messages (conversation_id, sender_id, text) VALUES ($1, $2, $3) RETURNING *',
+                [conversationId, senderId, text]
+            );
+            const newMessage = msgRes.rows[0];
+
+            await client.query('COMMIT');
+            
+            const messagePayload = {
+                id: newMessage.id,
+                conversation_id: newMessage.conversation_id,
+                sender_id: newMessage.sender_id,
+                text: newMessage.text,
+                created_at: newMessage.created_at,
+                is_read: newMessage.is_read
+            };
+
+            // Emit to recipient
+            const recipientRoom = userRole === 'admin' ? `user_${recipientId}` : 'admins';
+            socket.to(recipientRoom).emit('support:receive_message', messagePayload);
+            
+            // Acknowledge to sender
+            ack(messagePayload);
+
+        } catch (error) {
+            await client.query('ROLLBACK');
+            console.error('Error sending message:', error);
+        } finally {
+            client.release();
+        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log('🔌 User disconnected:', socket.id);
+    });
+});
+
+// --- API ROUTES ---
+
 app.get('/api/health', async (req, res) => {
     try {
         const result = await pool.query('SELECT NOW()');
@@ -116,7 +196,8 @@ app.get('/api/health', async (req, res) => {
     }
 });
 
-// --- AUTH ROUTES ---
+
+// --- AUTHROUTES ---
 
 // Register
 app.post('/api/auth/register', async (req, res) => {
@@ -157,12 +238,13 @@ app.post('/api/auth/register', async (req, res) => {
         const user = result.rows[0];
         await logSystemEvent('info', `New user registered: ${email}`, 'Auth');
         
-        res.json({ 
+        res.json( 
+            { 
             ...user, 
             id: user.id.toString(),
             rttRank: user.rtt_rank,
             rttCategory: user.rtt_category 
-        });
+        } );
     } catch (err) {
         // Detailed logging for debugging
         console.error("❌ Registration Error:", err);
@@ -499,7 +581,7 @@ app.delete('/api/admin/tournaments/:id', async (req, res) => {
     }
 });
 
-// --- COURTS ROUTES (Public & Admin) ---
+// --- COURTSROUTES (Public & Admin) ---
 
 app.get('/api/courts', async (req, res) => {
     const { name, city } = req.query;
@@ -701,7 +783,7 @@ app.get('/api/ladder/rankings', async (req, res) => {
 
     try {
         let orderByClause = '';
-        let whereClause = 'WHERE u.role != \'admin\'';
+        let whereClause = 'WHERE u.role != \'admin\'' ;
         const queryParams = [];
 
         if (type === 'rtt_rating') {
@@ -840,8 +922,7 @@ app.post('/api/ladder/challenges', async (req, res) => {
 
         // Create notification for the defender
         await pool.query(
-            `INSERT INTO notifications (user_id, type, message, reference_id)
-             VALUES ($1, 'new_challenge', $2, $3)`,
+            `INSERT INTO notifications (user_id, type, message, reference_id)`,
             [parsedDefenderId, `${challenger.rows[0].name} бросил(а) вам вызов!`, newChallenge.id]
         );
 
@@ -895,8 +976,7 @@ app.put('/api/ladder/challenges/:challengeId/accept', async (req, res) => {
         // Create a notification for the challenger.
         const defender = await pool.query('SELECT name FROM users WHERE id = $1', [challenge.defender_id]);
         await pool.query(
-            `INSERT INTO notifications (user_id, type, message, reference_id)
-             VALUES ($1, 'challenge_accepted', $2, $3)`,
+            `INSERT INTO notifications (user_id, type, message, reference_id)`,
             [challenge.challenger_id, `${defender.rows[0].name} принял(а) ваш вызов!`, updatedChallenge.id]
         );
 
@@ -942,7 +1022,7 @@ app.post('/api/ladder/challenges/:challengeId/result', async (req, res) => {
         
         // Check if both players are amateurs to apply the new ELO logic
         if (winner.role === 'amateur' && loser.role === 'amateur') {
-            const { winnerXpGained, loserXpLost } = calculateEloPoints(winner, loser, score, challenge.event_type);
+            const { winnerXpGained, loserXpLost } = calculateEloPoints(winner, loser, score, challenge.event_type); // Assuming calculateEloPoints is defined elsewhere
             
             // Update XP for both players
             await client.query('UPDATE users SET xp = xp + $1 WHERE id = $2', [winnerXpGained, winner.id]);
@@ -1110,8 +1190,7 @@ app.put('/api/ladder/challenges/:challengeId/accept', async (req, res) => {
         // Create a notification for the challenger.
         const defender = await pool.query('SELECT name FROM users WHERE id = $1', [challenge.defender_id]);
         await pool.query(
-            `INSERT INTO notifications (user_id, type, message, reference_id)
-             VALUES ($1, 'challenge_accepted', $2, $3)`,
+            `INSERT INTO notifications (user_id, type, message, reference_id)`,
             [challenge.challenger_id, `${defender.rows[0].name} принял(а) ваш вызов!`, updatedChallenge.id]
         );
 
@@ -1653,7 +1732,7 @@ app.get('/api/students/:id', async (req, res) => {
         const historyRes = await pool.query('SELECT * FROM lesson_history WHERE student_id = $1 ORDER BY date DESC', [studentId]);
 
         const student = {
-            ...mapStudent(studentRes.rows[0]),
+            ...mapStudent(studentRes.rows[0]), // Assuming mapStudent is defined elsewhere
             skillLevelXp: studentRes.rows[0].skill_level_xp,
             skills: skillsRes.rows.map(r => ({ name: r.skill_name, value: r.skill_value })),
             lessonHistory: historyRes.rows.map(r => ({
@@ -1979,7 +2058,7 @@ app.post('/api/matches', async (req, res) => {
 });
 
 
-// --- TACTICS ROUTES ---
+// --- TACTICSROUTES ---
 
 // GET a list of all tactic schemes for a user
 app.get('/api/tactics/list/:userId', async (req, res) => {
@@ -2070,14 +2149,13 @@ app.delete('/api/tactic/:tacticId', async (req, res) => {
 });
 
 
-
 // AI Coach Route (Actually using the Gemini API)
 app.post('/api/ai-coach', async (req, res) => {
     const { query } = req.body;
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: `Ты профессиональный теннисный тренер. Ответь кратко и по делу на вопрос: "${query}"`,
+            contents: `Ты профессиональный теннисный тренер. Ответь кратко и по делу на вопрос: "${query}" `,
         });
         res.json({ text: response.text });
     } catch (err) {
@@ -2264,13 +2342,6 @@ app.post('/api/conversations', async (req, res) => {
     }
 });
 
-// Start Server and Init DB
-app.listen(PORT, async () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`🔌 Attempting to connect to DB at ${process.env.DB_HOST || 'localhost'}...`);
-    // Run DB Init only after server starts to catch errors better
-    await initDb();
-});
 
 
 app.post('/api/groups/:groupId/leave', async (req, res) => {
@@ -2303,4 +2374,13 @@ app.get('/api/groups/:groupId/members', async (req, res) => {
         console.error("Fetch Group Members Error:", err);
         res.status(500).json({ error: 'Failed to fetch group members.' });
     }
+});
+
+
+// Start Server and Init DB
+server.listen(PORT, async () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`⚡️ Socket.IO server listening on port ${PORT}`);
+    console.log(`🔌 Attempting to connect to DB at ${process.env.DB_HOST || 'localhost'}...`);
+    await initDb();
 });
