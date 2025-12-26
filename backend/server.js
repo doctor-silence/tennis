@@ -1350,8 +1350,14 @@ app.post('/api/groups', async (req, res) => {
 
 app.get('/api/groups', async (req, res) => {
     try {
-        const result = await pool.query('SELECT *, creator_id FROM groups ORDER BY name ASC'); // Include creator_id
-        res.json(result.rows.map(g => ({ ...g, id: g.id.toString(), creatorId: g.creator_id ? g.creator_id.toString() : null }))); // Map creator_id to creatorId
+        const result = await pool.query(`
+            SELECT 
+                g.*, 
+                (SELECT COUNT(*) FROM group_members gm WHERE gm.group_id = g.id) as members_count
+            FROM groups g 
+            ORDER BY g.name ASC
+        `);
+        res.json(result.rows.map(g => ({ ...g, id: g.id.toString(), members_count: parseInt(g.members_count) })));
     } catch (err) {
         console.error("Fetch Groups Error:", err);
         res.status(500).json({ error: 'Failed to fetch groups' });
