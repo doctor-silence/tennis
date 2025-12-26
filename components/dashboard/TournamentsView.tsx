@@ -12,7 +12,7 @@ import TournamentBanner from './TournamentBanner';
 
 type BracketSize = 2 | 4 | 8 | 16 | 32 | 64;
 
-export const TournamentsView = ({ user }: { user: User }) => {
+export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTournamentUpdate: () => void }) => {
     const [tournaments, setTournaments] = useState<Tournament[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
@@ -40,21 +40,27 @@ export const TournamentsView = ({ user }: { user: User }) => {
 
     useEffect(() => {
         const load = async () => {
-            const [tData, sData, gData] = await Promise.all([
-                api.tournaments.getAll(user.id),
-                api.students.getAll(user.id),
-                api.groups.getAll()
-            ]);
-            setTournaments(tData);
-            setStudents(sData);
-            setGroups(gData);
+            try {
+                const [tData, sData, gData] = await Promise.all([
+                    api.tournaments.getAll(user.id),
+                    api.students.getAll(user.id),
+                    api.groups.getAll()
+                ]);
+                setTournaments(tData);
+                setStudents(sData);
+                setGroups(gData);
+            } catch (error) {
+                console.error("Failed to load tournament data:", error);
+                // Здесь можно было бы показать уведомление пользователю
+            }
         };
         load();
     }, [user.id]);
 
-    const syncTournament = async (tournament: Tournament) => {
-        await api.tournaments.update(tournament.id, tournament);
-        setTournaments(prev => prev.map(t => t.id === tournament.id ? tournament : t));
+    const syncTournament = async (tournament: Tournament): Promise<Tournament> => {
+        const updatedTournament = await api.tournaments.update(tournament.id, tournament);
+        setTournaments(prev => prev.map(t => t.id === updatedTournament.id ? updatedTournament : t));
+        return updatedTournament;
     };
 
     const generateEmptyRounds = (size: number) => {
@@ -86,7 +92,6 @@ export const TournamentsView = ({ user }: { user: User }) => {
             console.log('Creating tournament with target_group_id:', createForm.target_group_id);
             const newTournament = await api.tournaments.create({
                 ...createForm,
-                targetGroupId: createForm.target_group_id, // map to camelCase for API
                 userId: user.id,
                 rounds, 
                 status: 'draft',
@@ -101,8 +106,8 @@ export const TournamentsView = ({ user }: { user: User }) => {
     const handleStartTournament = async () => {
         if (!selectedTournament) return;
         const updated = { ...selectedTournament, status: 'live' as const };
-        setSelectedTournament(updated);
-        await syncTournament(updated);
+        const returnedTournament = await syncTournament(updated);
+        setSelectedTournament(returnedTournament);
     };
 
     const handleRandomize = async () => {
@@ -122,8 +127,8 @@ export const TournamentsView = ({ user }: { user: User }) => {
                 avatar: `https://ui-avatars.com/api/?name=${name.replace(' ', '+')}&background=random&color=fff`
             };
         });
-        setSelectedTournament(updated);
-        await syncTournament(updated);
+        const returnedTournament = await syncTournament(updated);
+        setSelectedTournament(returnedTournament);
         setIsBulkAddOpen(false);
     };
 
@@ -139,6 +144,7 @@ export const TournamentsView = ({ user }: { user: User }) => {
     };
 
     const setWinner = async (winnerId: string) => {
+        console.log('setWinner called with tournament:', selectedTournament);
         if (!activeMatch || !selectedTournament) return;
         const updated = { ...selectedTournament };
         let matchIdx = -1;
@@ -178,6 +184,7 @@ export const TournamentsView = ({ user }: { user: User }) => {
                     }
                 }
             });
+            onTournamentUpdate();
         }
 
         // Продвижение в следующий раунд
@@ -190,8 +197,8 @@ export const TournamentsView = ({ user }: { user: User }) => {
             updated.status = 'finished';
         }
 
-        setSelectedTournament(updated);
-        await syncTournament(updated);
+        const returnedTournament = await syncTournament(updated);
+        setSelectedTournament(returnedTournament);
         setIsScoreModalOpen(false);
     };
 
@@ -206,8 +213,8 @@ export const TournamentsView = ({ user }: { user: User }) => {
         updated.rounds[0].matches.forEach(m => {
             if (m.id === activeMatch.id) m[side === 1 ? 'player1' : 'player2'] = player;
         });
-        setSelectedTournament(updated);
-        await syncTournament(updated);
+        const returnedTournament = await syncTournament(updated);
+        setSelectedTournament(returnedTournament);
         setManualPlayerName('');
         setIsMatchModalOpen(false);
     };

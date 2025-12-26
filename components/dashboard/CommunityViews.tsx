@@ -376,7 +376,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({ user, onNo
     );
 };
 
-export const CommunityView = ({ user, onNavigate, onStartConversation }: { user: User, onNavigate: (tab: string) => void, onStartConversation: (partnerId: string) => void }) => {
+export const CommunityView = ({ user, onNavigate, onStartConversation, feedVersion }: { user: User, onNavigate: (tab: string) => void, onStartConversation: (partnerId: string) => void, feedVersion: number }) => {
     const [groupsCount, setGroupsCount] = useState(0);
 
     useEffect(() => {
@@ -388,7 +388,7 @@ export const CommunityView = ({ user, onNavigate, onStartConversation }: { user:
     return (
     <div className="max-w-7xl mx-auto space-y-6">
         <CommunityBanner groupsCount={groupsCount}/>
-        <CommunityView2 user={user} onNavigate={onNavigate} onStartConversation={onStartConversation} />
+        <CommunityView2 user={user} onNavigate={onNavigate} onStartConversation={onStartConversation} feedVersion={feedVersion} onGroupCreated={() => {}}/>
     </div>
 );
 }

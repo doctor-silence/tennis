@@ -1330,7 +1330,20 @@ app.get('/api/tournaments', async (req, res) => {
         return res.status(400).json({ error: 'userId is required' });
     }
     try {
-        const result = await pool.query('SELECT * FROM tournaments WHERE user_id = $1 ORDER BY date DESC', [userId]);
+        const userGroups = await pool.query('SELECT group_id FROM group_members WHERE user_id = $1', [userId]);
+        const groupIds = userGroups.rows.map(row => row.group_id);
+
+        let query = 'SELECT * FROM tournaments WHERE user_id = $1';
+        const params = [userId];
+
+        if (groupIds.length > 0) {
+            query += ` OR target_group_id IN (${groupIds.map((_, i) => `$${i + 2}`).join(', ')})`;
+            params.push(...groupIds);
+        }
+        
+        query += ' ORDER BY date DESC';
+
+        const result = await pool.query(query, params);
         res.json(result.rows.map(t => ({ ...t, id: t.id.toString() })));
     } catch (err) {
         console.error("Fetch Tournaments Error:", err);
@@ -1339,7 +1352,7 @@ app.get('/api/tournaments', async (req, res) => {
 });
 
 app.post('/api/tournaments', async (req, res) => {
-    const { userId, name, groupName, date, prizePool, status, type, targetGroupId, rounds } = req.body;
+    const { userId, name, groupName, date, prizePool, status, type, target_group_id, rounds } = req.body;
     if (!userId || !name) {
         return res.status(400).json({ error: 'userId and name are required' });
     }
@@ -1347,7 +1360,7 @@ app.post('/api/tournaments', async (req, res) => {
         const result = await pool.query(
             `INSERT INTO tournaments (user_id, name, group_name, date, prize_pool, status, type, target_group_id, rounds)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-            [userId, name, groupName, date, prizePool, status, type, targetGroupId, JSON.stringify(rounds)]
+            [userId, name, groupName, date, prizePool, status, type, target_group_id, JSON.stringify(rounds)]
         );
         const newTournament = result.rows[0];
         res.status(201).json({ ...newTournament, id: newTournament.id.toString() });
@@ -1359,14 +1372,14 @@ app.post('/api/tournaments', async (req, res) => {
 
 app.put('/api/tournaments/:id', async (req, res) => {
     const { id } = req.params;
-    const { name, groupName, date, prizePool, status, type, targetGroupId, rounds } = req.body;
+    const { name, groupName, date, prizePool, status, type, target_group_id, rounds } = req.body;
 
     try {
         const result = await pool.query(
             `UPDATE tournaments 
              SET name = $1, group_name = $2, date = $3, prize_pool = $4, status = $5, type = $6, target_group_id = $7, rounds = $8
              WHERE id = $9 RETURNING *`,
-            [name, groupName, date, prizePool, status, type, targetGroupId, JSON.stringify(rounds), id]
+            [name, groupName, date, prizePool, status, type, target_group_id, JSON.stringify(rounds), id]
         );
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Tournament not found' });

@@ -895,7 +895,7 @@ const GroupForm = ({ onPublish, user }: { onPublish: (data: any) => void, user: 
 
 // --- Main View Component ---
 
-const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated }: { user: User, onNavigate: (tab: string) => void, onStartConversation: (partnerId: string) => void, onGroupCreated: () => void }) => {
+const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated, feedVersion }: { user: User, onNavigate: (tab: string) => void, onStartConversation: (partnerId: string) => void, onGroupCreated: () => void, feedVersion: number }) => {
     const [activeTab, setActiveTab] = useState('Все события');
     const [postText, setPostText] = useState('');
     const [feedItems, setFeedItems] = useState<any[]>([]);
@@ -948,9 +948,10 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated 
     };
 
     useEffect(() => {
+        console.log('feedVersion changed, refetching feed:', feedVersion);
         fetchFeed();
         api.groups.getUserGroups(user.id).then(setMyGroups);
-    }, [user.id]);
+    }, [user.id, feedVersion]);
 
     const handleGroupCreated = () => {
         if (groupsViewRef.current) {

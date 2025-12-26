@@ -31,6 +31,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [unreadLadderNotifications, setUnreadLadderNotifications] = useState(0);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [feedVersion, setFeedVersion] = useState(0);
+
+  const incrementFeedVersion = () => setFeedVersion(v => v + 1);
 
   const fetchUnreadCount = () => {
     api.notifications.getUnreadCount(user.id).then(data => {
@@ -93,6 +96,40 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
       setUnreadLadderNotifications(0);
   };
 
+  const renderContent = () => {
+    const views: { [key in DashboardTab]?: React.ReactNode } = {
+        profile: <ProfileView user={user} onUserUpdate={onUserUpdate} />,
+        search: <PartnerSearchView onNavigate={handleNavigate} onStartConversation={handleStartConversation} onCreateChallenge={handleCreateChallenge} />,
+        courts: <CourtBookingView />,
+        ai_coach: <AiCoachView user={user} />,
+        messages: <MessagesView 
+            user={user} 
+            activeConversationId={activeConversationId} 
+            onConversationSelect={setActiveConversationId}
+            conversations={conversations}
+            loadingConversations={loadingConversations}
+            onConversationsUpdate={handleConversationsUpdate}
+        />,
+        notifications: <NotificationsView user={user} onNotificationsRead={handleNotificationsRead} />,
+        tactics: <TacticsView user={user} />,
+        students: <StudentsView user={user} />,
+        tournaments: <TournamentsView user={user} onTournamentUpdate={incrementFeedVersion} />,
+        video_analysis: <VideoAnalysisView />,
+        ladder: <LadderView user={user} challenges={challenges} setChallenges={setChallenges} />,
+        community: <CommunityView user={user} onNavigate={handleNavigate} onStartConversation={handleStartConversation} feedVersion={feedVersion} />,
+    };
+
+    return (
+        <div>
+            {Object.entries(views).map(([tab, view]) => (
+                <div key={tab} style={{ display: activeTab === tab ? 'block' : 'none' }}>
+                    {view}
+                </div>
+            ))}
+        </div>
+    );
+};
+
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden font-sans text-slate-900">
       {/* Sidebar Component */}
@@ -152,25 +189,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
            </header>
 
           <div className="animate-fade-in-up">
-            {activeTab === 'profile' && <ProfileView user={user} onUserUpdate={onUserUpdate} />}
-            {activeTab === 'search' && <PartnerSearchView onNavigate={handleNavigate} onStartConversation={handleStartConversation} onCreateChallenge={handleCreateChallenge} />}
-            {activeTab === 'courts' && <CourtBookingView />}
-            {activeTab === 'ai_coach' && <AiCoachView user={user} />}
-            {activeTab === 'messages' && <MessagesView 
-                user={user} 
-                activeConversationId={activeConversationId} 
-                onConversationSelect={setActiveConversationId}
-                conversations={conversations}
-                loadingConversations={loadingConversations}
-                onConversationsUpdate={handleConversationsUpdate}
-            />}
-            {activeTab === 'notifications' && <NotificationsView user={user} onNotificationsRead={handleNotificationsRead} />}
-            {activeTab === 'tactics' && <TacticsView user={user} />}
-            {activeTab === 'students' && <StudentsView user={user} />}
-            {activeTab === 'tournaments' && <TournamentsView user={user} />}
-            {activeTab === 'video_analysis' && <VideoAnalysisView />}
-            {activeTab === 'ladder' && <LadderView user={user} challenges={challenges} setChallenges={setChallenges} />}
-            {activeTab === 'community' && <CommunityView user={user} onNavigate={handleNavigate} onStartConversation={handleStartConversation} />}
+            {renderContent()}
           </div>
         </div>
       </main>
