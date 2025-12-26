@@ -22,10 +22,12 @@ import {
     Image as ImageIcon,
     Map,
     ChevronDown,
-    Shield
+    Shield,
+    Trophy
 } from 'lucide-react';
+import AdminTournamentsView from './dashboard/AdminTournamentsView';
 import Button from './Button';
-import { User, Product, SystemLog, Court, Group } from '../types';
+import { User, Product, SystemLog, Court, Group, Tournament } from '../types';
 import { api } from '../services/api';
 
 interface AdminPanelProps {
@@ -66,7 +68,7 @@ const CITIES = [
 type AdminGroup = Group & { creator_name: string; members_count: number };
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups' | 'tournaments'>('overview');
     
     // Data State
     const [stats, setStats] = useState({ revenue: 0, activeUsers: 0, newSignups: 0, serverLoad: 0 });
@@ -75,6 +77,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [courts, setCourts] = useState<Court[]>([]);
     const [groups, setGroups] = useState<AdminGroup[]>([]);
     const [logs, setLogs] = useState<SystemLog[]>([]);
+    const [tournaments, setTournaments] = useState<Tournament[]>([]);
     
     // Modals
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -95,7 +98,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     // Confirmation Modal State
     const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState<boolean>(false);
     const [itemToDeleteId, setItemToDeleteId] = useState<string | null>(null);
-    const [deleteActionType, setDeleteActionType] = useState<'court' | 'user' | 'product' | 'group' | null>(null);
+    const [deleteActionType, setDeleteActionType] = useState<'court' | 'user' | 'product' | 'group' | 'tournament' | null>(null);
 
     // Initial Data Load
     useEffect(() => {
@@ -127,6 +130,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             const g = await api.admin.getGroups(user.id);
             if(Array.isArray(g)) setGroups(g);
         }
+        if (activeTab === 'tournaments') {
+            const t = await api.admin.getTournaments();
+            if(Array.isArray(t)) setTournaments(t);
+        }
     };
 
 
@@ -139,6 +146,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             else if (deleteActionType === 'court') await api.admin.deleteCourt(itemToDeleteId);
             else if (deleteActionType === 'user') await api.admin.deleteUser(itemToDeleteId);
             else if (deleteActionType === 'group') await api.admin.deleteGroup(itemToDeleteId, user.id);
+            else if (deleteActionType === 'tournament') await api.admin.deleteTournament(itemToDeleteId);
             
             await loadData(); // Reload data after deletion
         } catch (e: any) {
@@ -258,6 +266,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
         setShowConfirmDeleteModal(true);
     };
 
+    // Tournament Handlers
+    const handleDeleteTournament = (id: string) => {
+        setDeleteActionType('tournament');
+        setItemToDeleteId(id);
+        setShowConfirmDeleteModal(true);
+    };
+
 
     return (
         <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
@@ -277,6 +292,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                     <SidebarLink icon={<LayoutDashboard size={20}/>} label="Обзор" active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} />
                     <SidebarLink icon={<Users size={20}/>} label="Пользователи" active={activeTab === 'users'} onClick={() => setActiveTab('users')} />
                     <SidebarLink icon={<Shield size={20}/>} label="Группы" active={activeTab === 'groups'} onClick={() => setActiveTab('groups')} />
+                    <SidebarLink icon={<Trophy size={20}/>} label="Турниры" active={activeTab === 'tournaments'} onClick={() => setActiveTab('tournaments')} />
                     <SidebarLink icon={<Map size={20}/>} label="Корты" active={activeTab === 'courts'} onClick={() => setActiveTab('courts')} />
                     <SidebarLink icon={<ShoppingBag size={20}/>} label="Магазин" active={activeTab === 'shop'} onClick={() => setActiveTab('shop')} />
                     <SidebarLink icon={<Terminal size={20}/>} label="Системные логи" active={activeTab === 'logs'} onClick={() => setActiveTab('logs')} />
@@ -303,6 +319,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         {activeTab === 'overview' && 'Экономика приложения'}
                         {activeTab === 'users' && 'Управление пользователями'}
                         {activeTab === 'groups' && 'Управление группами'}
+                        {activeTab === 'tournaments' && 'Управление турнирами'}
                         {activeTab === 'shop' && 'Управление товарами'}
                         {activeTab === 'courts' && 'Управление кортами'}
                         {activeTab === 'logs' && 'Системный мониторинг'}
@@ -331,6 +348,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><h3 className="font-bold text-lg mb-6">Распределение подписок</h3><div className="space-y-4"><div className="space-y-2"><div className="flex justify-between text-sm font-medium"><span>Amateur (Free)</span><span className="text-slate-500">65%</span></div><div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-slate-300 w-[65%]"></div></div></div><div className="space-y-2"><div className="flex justify-between text-sm font-medium"><span>PRO Player</span><span className="text-slate-500">25%</span></div><div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-lime-400 w-[25%]"></div></div></div><div className="space-y-2"><div className="flex justify-between text-sm font-medium"><span>Coach PRO</span><span className="text-slate-500">10%</span></div><div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-slate-900 w-[10%]"></div></div></div></div></div>
                             </div>
                         </div>
+                    )}
+
+                    {activeTab === 'tournaments' && (
+                        <AdminTournamentsView tournaments={tournaments} onDelete={handleDeleteTournament} />
                     )}
 
                     {activeTab === 'groups' && (

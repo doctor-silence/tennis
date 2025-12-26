@@ -1092,6 +1092,66 @@ export const api = {
                 console.error(e);
                 throw e;
             }
+        },
+        getTournaments: async (): Promise<Tournament[]> => {
+            try {
+                const res = await fetch(`${API_URL}/admin/tournaments`);
+                if (!res.ok) return [];
+                return await res.json();
+            } catch (e) {
+                return [];
+            }
+        },
+        createTournament: async (tournament: Partial<Tournament>): Promise<Tournament> => {
+            try {
+                const res = await fetch(`${API_URL}/admin/tournaments`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(tournament)
+                });
+        
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.error || 'Failed to create tournament');
+                }
+        
+                return await res.json();
+            } catch (e) {
+                console.error(e);
+                throw e;
+            }
+        },
+        updateTournament: async (id: string, tournament: Partial<Tournament>): Promise<void> => {
+            try {
+                const res = await fetch(`${API_URL}/admin/tournaments/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(tournament)
+                });
+        
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.error || 'Failed to update tournament');
+                }
+            } catch (e) {
+                console.error(e);
+                throw e;
+            }
+        },
+        deleteTournament: async (id: string): Promise<void> => {
+            try {
+                const res = await fetch(`${API_URL}/admin/tournaments/${id}`, {
+                    method: 'DELETE'
+                });
+        
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.error || 'Failed to delete tournament');
+                }
+            } catch (e) {
+                console.error(e);
+                throw e;
+            }
         }
     },
 

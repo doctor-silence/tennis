@@ -439,6 +439,66 @@ app.delete('/api/admin/groups/:id', async (req, res) => {
     }
 });
 
+app.get('/api/admin/tournaments', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM tournaments ORDER BY date DESC');
+        res.json(result.rows.map(t => ({ ...t, id: t.id.toString() })));
+    } catch (err) {
+        console.error("Admin Get Tournaments Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/admin/tournaments', async (req, res) => {
+    const { name, groupName, date, prizePool, status, type, target_group_id, rounds, userId } = req.body;
+    try {
+        const result = await pool.query(
+            `INSERT INTO tournaments (user_id, name, group_name, date, prize_pool, status, type, target_group_id, rounds)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+            [userId, name, groupName, date, prizePool, status, type, target_group_id, JSON.stringify(rounds)]
+        );
+        await logSystemEvent('info', `Admin created tournament: ${name}`, 'Admin');
+        const newTournament = result.rows[0];
+        res.status(201).json({ ...newTournament, id: newTournament.id.toString() });
+    } catch (err) {
+        console.error("Admin Create Tournament Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/admin/tournaments/:id', async (req, res) => {
+    const { id } = req.params;
+    const { name, groupName, date, prizePool, status, type, target_group_id, rounds } = req.body;
+    try {
+        const result = await pool.query(
+            `UPDATE tournaments 
+             SET name = $1, group_name = $2, date = $3, prize_pool = $4, status = $5, type = $6, target_group_id = $7, rounds = $8
+             WHERE id = $9 RETURNING *`,
+            [name, groupName, date, prizePool, status, type, target_group_id, JSON.stringify(rounds), id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Tournament not found' });
+        }
+        await logSystemEvent('info', `Admin updated tournament ${id}`, 'Admin');
+        res.json({ ...result.rows[0], id: result.rows[0].id.toString() });
+    } catch (err) {
+        console.error("Admin Update Tournament Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/admin/tournaments/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM tournaments WHERE id = $1', [id]);
+        await logSystemEvent('warning', `Admin deleted tournament ${id}`, 'Admin');
+        res.json({ success: true });
+    } catch (err) {
+        console.error("Admin Delete Tournament Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- COURTS ROUTES (Public & Admin) ---
 
 app.get('/api/courts', async (req, res) => {
