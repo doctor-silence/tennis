@@ -6,10 +6,10 @@ import { Trash2, Edit } from 'lucide-react';
 interface AdminTournamentsViewProps {
   tournaments: Tournament[];
   onDelete: (id: string) => void;
-  // onEdit: (tournament: Tournament) => void;
+  onEdit: (tournament: Tournament) => void;
 }
 
-const AdminTournamentsView: React.FC<AdminTournamentsViewProps> = ({ tournaments, onDelete }) => {
+const AdminTournamentsView: React.FC<AdminTournamentsViewProps> = ({ tournaments, onDelete, onEdit }) => {
   return (
     <div className="animate-fade-in-up">
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -46,7 +46,7 @@ const AdminTournamentsView: React.FC<AdminTournamentsViewProps> = ({ tournaments
                 <td className="px-6 py-4 font-bold text-slate-700">{t.prizePool}</td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex justify-end gap-2">
-                    <button disabled className="p-2 hover:bg-slate-200 rounded-lg text-slate-300 cursor-not-allowed"><Edit size={16}/></button>
+                    <button onClick={() => onEdit(t)} className="p-2 hover:bg-slate-200 rounded-lg text-slate-600"><Edit size={16}/></button>
                     <button onClick={() => onDelete(t.id)} className="p-2 hover:bg-red-50 rounded-lg text-red-500"><Trash2 size={16}/></button>
                   </div>
                 </td>

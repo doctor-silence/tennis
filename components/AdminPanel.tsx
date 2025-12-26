@@ -68,7 +68,7 @@ const CITIES = [
 type AdminGroup = Group & { creator_name: string; members_count: number };
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups' | 'tournaments'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups' | 'tournaments'>('tournaments');
     
     // Data State
     const [stats, setStats] = useState({ revenue: 0, activeUsers: 0, newSignups: 0, serverLoad: 0 });
@@ -87,6 +87,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [editingCourt, setEditingCourt] = useState<Partial<Court> & { surface: string[] } | null>(null);
     const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
     const [editingGroup, setEditingGroup] = useState<Partial<Group> | null>(null);
+    const [isTournamentModalOpen, setIsTournamentModalOpen] = useState(false);
+    const [editingTournament, setEditingTournament] = useState<Partial<Tournament> | null>(null);
     
     // User Edit State
     const [editingUser, setEditingUser] = useState<(Partial<User> & { password?: string }) | null>(null);
@@ -126,7 +128,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             const c = await api.getCourts(courtSearchName, courtSearchCity === 'Все города' ? '' : courtSearchCity);
             if (Array.isArray(c)) setCourts(c);
         }
-        if (activeTab === 'groups') {
+        if (activeTab === 'groups' || activeTab === 'tournaments') { // Also load groups for tournament editing
             const g = await api.admin.getGroups(user.id);
             if(Array.isArray(g)) setGroups(g);
         }
@@ -267,6 +269,24 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     };
 
     // Tournament Handlers
+    const handleEditTournament = (tournament: Tournament) => {
+        setEditingTournament(tournament);
+        setIsTournamentModalOpen(true);
+    };
+
+    const handleSaveTournament = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingTournament || !editingTournament.id) return;
+        try {
+            await api.admin.updateTournament(editingTournament.id, editingTournament);
+            await loadData();
+            setIsTournamentModalOpen(false);
+            setEditingTournament(null);
+        } catch (e: any) {
+            alert('Ошибка сохранения: ' + e.message);
+        }
+    };
+
     const handleDeleteTournament = (id: string) => {
         setDeleteActionType('tournament');
         setItemToDeleteId(id);
@@ -351,7 +371,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                     )}
 
                     {activeTab === 'tournaments' && (
-                        <AdminTournamentsView tournaments={tournaments} onDelete={handleDeleteTournament} />
+                        <AdminTournamentsView tournaments={tournaments.map(t => {
+                            const group = groups.find(g => g.id === t.target_group_id);
+                            return { ...t, groupName: group ? group.name : t.groupName };
+                        })} onDelete={handleDeleteTournament} onEdit={handleEditTournament} />
                     )}
 
                     {activeTab === 'groups' && (
@@ -601,6 +624,41 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                     )}
                 </div>
             </main>
+
+            <Modal isOpen={isTournamentModalOpen} onClose={() => setIsTournamentModalOpen(false)} title="Редактировать турнир">
+                {editingTournament && (
+                    <form onSubmit={handleSaveTournament} className="space-y-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Название</label>
+                            <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.name || ''} onChange={e => setEditingTournament({...editingTournament, name: e.target.value})} />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Приз</label>
+                            <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.prizePool || ''} onChange={e => setEditingTournament({...editingTournament, prizePool: e.target.value})} />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Группа</label>
+                            <select
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none"
+                                value={editingTournament.target_group_id || ''}
+                                onChange={e => setEditingTournament({ ...editingTournament, target_group_id: e.target.value, groupName: groups.find(g => g.id === e.target.value)?.name || '' })}
+                            >
+                                <option value="">Без группы</option>
+                                {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Статус</label>
+                            <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.status} onChange={e => setEditingTournament({...editingTournament, status: e.target.value as any})}>
+                                <option value="draft">Черновик</option>
+                                <option value="live">В игре</option>
+                                <option value="finished">Завершен</option>
+                            </select>
+                        </div>
+                        <Button type="submit" className="w-full mt-4">Сохранить</Button>
+                    </form>
+                )}
+            </Modal>
 
             <Modal isOpen={isGroupModalOpen} onClose={() => setIsGroupModalOpen(false)} title={editingGroup?.id ? 'Редактировать группу' : 'Новая группа'}>
                 {editingGroup && (
