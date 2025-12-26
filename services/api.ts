@@ -659,6 +659,16 @@ export const api = {
                 return MOCK_GROUPS;
             }
         },
+        getUserGroups: async (userId: string): Promise<Group[]> => {
+            try {
+                const res = await fetch(`${API_URL}/users/${userId}/groups`);
+                if (!res.ok) throw new Error('Failed to fetch user groups');
+                return await res.json();
+            } catch (e) {
+                console.warn("Backend offline, returning empty array for user groups", e);
+                return [];
+            }
+        },
         create: async (groupData: Partial<Group>): Promise<Group> => {
             const res = await fetch(`${API_URL}/groups`, {
                 method: 'POST',

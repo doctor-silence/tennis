@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
-import { Heart, MessageCircle, Calendar, Globe, Swords, Trophy, Users, ShoppingCart, Share2, Loader2, X, PlusCircle } from 'lucide-react';
+import { Heart, MessageCircle, Calendar, Globe, Swords, Trophy, Users, ShoppingCart, Share2, Loader2, X, PlusCircle, CheckCircle } from 'lucide-react';
 import { api } from '../../services/api';
 import Button from '../Button';
 import Tooltip from '../Tooltip';
@@ -636,7 +636,7 @@ const TopPlayersWidget = ({ onNavigate }: { onNavigate: (tab: string) => void })
     );
 };
 
-const GroupsWidget = ({ onGroupClickForModal }: { onGroupClickForModal: (group: Group) => void }) => {
+const GroupsWidget = ({ onGroupClickForModal, myGroups }: { onGroupClickForModal: (group: Group) => void, myGroups: Group[] }) => {
     const [groups, setGroups] = useState<Group[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -646,6 +646,8 @@ const GroupsWidget = ({ onGroupClickForModal }: { onGroupClickForModal: (group: 
             setLoading(false);
         });
     }, []);
+
+    const isMember = (groupId: string) => myGroups.some(g => g.id === groupId);
 
     return (
          <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
@@ -659,7 +661,7 @@ const GroupsWidget = ({ onGroupClickForModal }: { onGroupClickForModal: (group: 
                 {loading && <Loader2 className="animate-spin text-slate-400 mx-auto" />}
                 {!loading && groups.map(g => (
                     <div key={g.id} className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 cursor-pointer" onClick={() => onGroupClickForModal(g)}>
                              <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-slate-500">
                                  {g.name.charAt(0)}
                              </div>
@@ -668,7 +670,13 @@ const GroupsWidget = ({ onGroupClickForModal }: { onGroupClickForModal: (group: 
                                 <p className="text-xs text-slate-400">{g.members_count || 0} уч.</p>
                              </div>
                         </div>
-                        <Button size="sm" variant="outline" className="w-8 h-8 p-0 text-xl font-normal" onClick={() => onGroupClickForModal(g)}>+</Button>
+                        {isMember(g.id) ? (
+                            <div className="w-8 h-8 flex items-center justify-center">
+                                <CheckCircle size={20} className="text-lime-500" />
+                            </div>
+                        ) : (
+                            <Button size="sm" variant="outline" className="w-8 h-8 p-0 text-xl font-normal" onClick={() => onGroupClickForModal(g)}>+</Button>
+                        )}
                     </div>
                 ))}
             </div>
@@ -896,17 +904,23 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated 
     const [loadingFeed, setLoadingFeed] = useState(true);
     const groupsViewRef = useRef<{ fetchGroups: () => void }>(null);
     const [selectedGroupForModal, setSelectedGroupForModal] = useState<Group | null>(null);
+    const [myGroups, setMyGroups] = useState<Group[]>([]);
+    const [isJoining, setIsJoining] = useState(false);
 
     const handleJoinGroup = async (groupId: string) => {
+        setIsJoining(true);
         try {
             await api.groups.join(groupId, user.id);
-            // You might want to update the UI to show the user is a member
-            setSelectedGroupForModal(null); // Close modal on success
+            // Add the group to myGroups state to update the UI
+            if (selectedGroupForModal) {
+                setMyGroups([...myGroups, selectedGroupForModal]);
+            }
         } catch (error) {
             console.error("Failed to join group:", error);
+        } finally {
+            setIsJoining(false);
         }
     };
-
 
     const fetchFeed = async () => {
         try {
@@ -922,7 +936,8 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated 
 
     useEffect(() => {
         fetchFeed();
-    }, []);
+        api.groups.getUserGroups(user.id).then(setMyGroups);
+    }, [user.id]);
 
     const handleGroupCreated = () => {
         if (groupsViewRef.current) {
@@ -930,6 +945,8 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated 
         }
         setActiveTab('Группы');
     }
+    
+    const isMemberOfSelectedGroup = selectedGroupForModal ? myGroups.some(g => g.id === selectedGroupForModal.id) : false;
 
     const handlePublishPost = async (data: any) => {
         let postData;
@@ -1061,7 +1078,7 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated 
             <div className="space-y-6">
                 <TournamentsWidget />
                 <TopPlayersWidget onNavigate={onNavigate} />
-                <GroupsWidget onGroupClickForModal={setSelectedGroupForModal} />
+                <GroupsWidget onGroupClickForModal={setSelectedGroupForModal} myGroups={myGroups} />
                 <MarketplaceWidget />
                  {selectedGroupForModal && (
                 <Modal isOpen={!!selectedGroupForModal} onClose={() => setSelectedGroupForModal(null)} title={selectedGroupForModal.name}>
@@ -1079,9 +1096,16 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated 
                         {selectedGroupForModal.contact && (
                              <p className="text-sm text-slate-600 mb-4"><b>Контакты:</b> {selectedGroupForModal.contact}</p>
                         )}
-                        <Button onClick={() => handleJoinGroup(selectedGroupForModal.id)} className="w-full">
-                            Вступить в группу
-                        </Button>
+                        {isMemberOfSelectedGroup ? (
+                            <Button variant="secondary" disabled className="w-full flex items-center justify-center gap-2">
+                                <CheckCircle size={16} />
+                                Вы в группе
+                            </Button>
+                        ) : (
+                            <Button onClick={() => handleJoinGroup(selectedGroupForModal.id)} className="w-full" disabled={isJoining}>
+                                {isJoining ? <Loader2 className="animate-spin" /> : 'Вступить в группу'}
+                            </Button>
+                        )}
                     </div>
                 </Modal>
             )}
