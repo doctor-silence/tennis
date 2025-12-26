@@ -661,7 +661,7 @@ const GroupsWidget = ({ onGroupClickForModal, myGroups }: { onGroupClickForModal
                 {loading && <Loader2 className="animate-spin text-slate-400 mx-auto" />}
                 {!loading && groups.map(g => (
                     <div key={g.id} className="flex justify-between items-center">
-                        <div className="flex items-center gap-3 cursor-pointer" onClick={() => onGroupClickForModal(g)}>
+                        <div className="flex items-center gap-3">
                              <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-slate-500">
                                  {g.name.charAt(0)}
                              </div>
@@ -906,6 +906,19 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated 
     const [selectedGroupForModal, setSelectedGroupForModal] = useState<Group | null>(null);
     const [myGroups, setMyGroups] = useState<Group[]>([]);
     const [isJoining, setIsJoining] = useState(false);
+    const [isLeaving, setIsLeaving] = useState(false);
+
+    const handleLeaveGroup = async (groupId: string) => {
+        setIsLeaving(true);
+        try {
+            await api.groups.leave(groupId, user.id);
+            setMyGroups(myGroups.filter(g => g.id !== groupId));
+        } catch (error) {
+            console.error("Failed to leave group:", error);
+        } finally {
+            setIsLeaving(false);
+        }
+    };
 
     const handleJoinGroup = async (groupId: string) => {
         setIsJoining(true);
@@ -1097,10 +1110,15 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated 
                              <p className="text-sm text-slate-600 mb-4"><b>Контакты:</b> {selectedGroupForModal.contact}</p>
                         )}
                         {isMemberOfSelectedGroup ? (
-                            <Button variant="secondary" disabled className="w-full flex items-center justify-center gap-2">
-                                <CheckCircle size={16} />
-                                Вы в группе
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button variant="secondary" disabled className="w-full flex items-center justify-center gap-2">
+                                    <CheckCircle size={16} />
+                                    Вы в группе
+                                </Button>
+                                <Button variant="danger_outline" onClick={() => handleLeaveGroup(selectedGroupForModal.id)} className="w-full" disabled={isLeaving}>
+                                    {isLeaving ? <Loader2 className="animate-spin" /> : 'Покинуть группу'}
+                                </Button>
+                            </div>
                         ) : (
                             <Button onClick={() => handleJoinGroup(selectedGroupForModal.id)} className="w-full" disabled={isJoining}>
                                 {isJoining ? <Loader2 className="animate-spin" /> : 'Вступить в группу'}
