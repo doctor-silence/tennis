@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { io, Socket } from 'socket.io-client';
-import { User, Conversation, ChatMessage } from '../../types';
-import { Send, Search } from 'lucide-react';
+import { User } from '../../types';
+import { Send, Search, Loader2 } from 'lucide-react';
+import { api } from '../../services/api';
 
-const SOCKET_URL = 'http://localhost:3001';
+const SUPPORT_ADMIN_ID = 1;
 
 interface AdminSupportChatProps {
   user: User;
@@ -15,69 +15,86 @@ const AdminSupportChat: React.FC<AdminSupportChatProps> = ({ user }) => {
   const [selectedConversation, setSelectedConversation] = useState<any | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const socketRef = useRef<Socket | null>(null);
+  const [loading, setLoading] = useState({ convos: true, messages: false });
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
 
+  // Fetch conversations periodically
   useEffect(() => {
-    // Connect to socket server
-    socketRef.current = io(SOCKET_URL, {
-      query: { userId: user.id, userRole: user.role },
-    });
-    const socket = socketRef.current;
+    const fetchConversations = async () => {
+      try {
+        const convos = await api.support.getConversations();
+        setConversations(convos);
+      } catch (error) {
+        console.error("Failed to fetch support conversations", error);
+      } finally {
+        setLoading(convo => ({...convo, convos: false}));
+      }
+    };
 
-    // Get all conversations
-    socket.emit('support:admin_get_conversations', (allConversations: any[]) => {
-      setConversations(allConversations);
-    });
+    fetchConversations(); // Initial fetch
+    const interval = setInterval(fetchConversations, 3000); // Poll every 3 seconds
 
-    // Listen for incoming messages
-    socket.on('support:receive_message', (message) => {
-        // If it belongs to the currently open conversation, add it
-        if (selectedConversation && message.sender_id.toString() === selectedConversation.partnerId) {
-            setMessages(prev => [...prev, { ...message, role: 'partner' }]);
-        } else {
-            // Otherwise, update the conversation list with unread status
-            setConversations(prev => prev.map(c => 
-                c.partnerId === message.sender_id.toString() 
-                ? { ...c, lastMessage: message.text, timestamp: message.created_at, unread: (c.unread || 0) + 1 }
-                : c
-            ));
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch messages for the selected conversation periodically
+  useEffect(() => {
+    if (!selectedConversation) return;
+
+    let isActive = true;
+    const fetchMessages = async () => {
+      setLoading(l => ({ ...l, messages: true }));
+      try {
+        const history = await api.support.getHistory(SUPPORT_ADMIN_ID, selectedConversation.partnerId);
+        if (isActive) {
+          setMessages(history);
         }
-    });
+      } catch (error) {
+        console.error("Failed to fetch messages", error);
+      } finally {
+         if (isActive) {
+            setLoading(l => ({ ...l, messages: false }));
+         }
+      }
+    };
+
+    fetchMessages(); // Initial fetch
+    const interval = setInterval(fetchMessages, 2000); // Poll every 2 seconds
 
     return () => {
-      socket.disconnect();
+      isActive = false;
+      clearInterval(interval);
     };
-  }, [user.id, user.role, selectedConversation]);
+  }, [selectedConversation]);
+
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const selectConversation = (convo: any) => {
+    if (selectedConversation?.id === convo.id) return;
+    setMessages([]); // Clear previous messages immediately
     setSelectedConversation(convo);
-    // Reset unread count locally
+    // Reset unread count locally for instant UI feedback
     setConversations(prev => prev.map(c => c.id === convo.id ? { ...c, unread: 0 } : c));
-    
-    // Fetch message history
-    if (socketRef.current) {
-      socketRef.current.emit('support:get_history', convo.partnerId, (history: any[]) => {
-        setMessages(history);
-      });
-    }
   };
 
-  const handleSendMessage = () => {
-    if (newMessage.trim() && socketRef.current && selectedConversation) {
-      const messagePayload = {
-        text: newMessage,
-        recipientId: selectedConversation.partnerId,
-      };
-      
-      socketRef.current.emit('support:send_message', messagePayload, (sentMessage: any) => {
-        setMessages(prev => [...prev, { ...sentMessage, role: 'user' }]);
-      });
+  const handleSendMessage = async () => {
+    if (newMessage.trim() && selectedConversation) {
+      const text = newMessage;
       setNewMessage('');
+      try {
+        const sentMessage = await api.support.sendMessage({
+          senderId: user.id,
+          recipientId: selectedConversation.partnerId,
+          text: text,
+        });
+        setMessages(prev => [...prev, sentMessage]);
+      } catch (error) {
+        console.error("Failed to send message", error);
+        setNewMessage(text);
+      }
     }
   };
 
@@ -93,7 +110,8 @@ const AdminSupportChat: React.FC<AdminSupportChatProps> = ({ user }) => {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {conversations.map(convo => (
+          {loading.convo ? <div className="p-4 text-center text-slate-400">Загрузка...</div> : 
+          conversations.map(convo => (
             <div
               key={convo.id}
               onClick={() => selectConversation(convo)}
@@ -126,14 +144,15 @@ const AdminSupportChat: React.FC<AdminSupportChatProps> = ({ user }) => {
               <img src={selectedConversation.partnerAvatar} alt={selectedConversation.partnerName} className="w-10 h-10 rounded-full" />
               <div>
                 <h3 className="font-bold">{selectedConversation.partnerName}</h3>
-                <p className="text-sm text-green-600">Online</p>
+                {/* <p className="text-sm text-green-600">Online</p> */}
               </div>
             </header>
             <div className="flex-1 p-6 overflow-y-auto bg-slate-50">
+              {loading.messages ? <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-slate-400"/></div> :
               <div className="space-y-4">
                 {messages.map((msg, index) => (
-                  <div key={index} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    {msg.role !== 'user' && <img src={selectedConversation.partnerAvatar} className="w-6 h-6 rounded-full" alt="" />}
+                  <div key={msg.id || index} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    {msg.role === 'partner' && <img src={selectedConversation.partnerAvatar} className="w-6 h-6 rounded-full" alt="" />}
                     <div className={`max-w-md px-4 py-2 rounded-2xl ${
                         msg.role === 'user' ? 'bg-slate-900 text-white' : 'bg-white border border-slate-100 text-slate-800'
                       }`}
@@ -144,7 +163,7 @@ const AdminSupportChat: React.FC<AdminSupportChatProps> = ({ user }) => {
                   </div>
                 ))}
                 <div ref={messagesEndRef} />
-              </div>
+              </div>}
             </div>
             <footer className="p-4 border-t bg-white">
               <div className="flex items-center gap-3">

@@ -1,10 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, X, Send } from 'lucide-react';
-import { io, Socket } from 'socket.io-client';
+import { MessageSquare, X, Send, Loader2 } from 'lucide-react';
 import { User } from '../types';
+import { api } from '../services/api';
 
-const SOCKET_URL = 'http://localhost:3001';
 const SUPPORT_ADMIN_ID = 1; // The user ID of the admin to chat with
 
 interface SupportChatWidgetProps {
@@ -15,49 +14,59 @@ const SupportChatWidget: React.FC<SupportChatWidgetProps> = ({ user }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const socketRef = useRef<Socket | null>(null);
+  const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
 
+  // Fetch messages periodically when the widget is open
   useEffect(() => {
-    if (isOpen) {
-      // Connect to socket server
-      socketRef.current = io(SOCKET_URL, {
-        query: { userId: user.id, userRole: user.role },
-      });
+    if (!isOpen) return;
 
-      const socket = socketRef.current;
+    let isActive = true;
+    const fetchMessages = async () => {
+      setLoading(true);
+      try {
+        const history = await api.support.getHistory(user.id, SUPPORT_ADMIN_ID);
+        if (isActive) {
+          setMessages(history);
+        }
+      } catch (error) {
+        console.error("Failed to fetch support history", error);
+      } finally {
+        if (isActive) {
+          setLoading(false);
+        }
+      }
+    };
 
-      // Get message history
-      socket.emit('support:get_history', SUPPORT_ADMIN_ID, (history: any[]) => {
-        setMessages(history);
-      });
+    fetchMessages(); // Initial fetch
+    const interval = setInterval(fetchMessages, 3000); // Poll every 3 seconds
 
-      // Listen for incoming messages
-      socket.on('support:receive_message', (message) => {
-        setMessages((prevMessages) => [...prevMessages, { ...message, role: 'partner' }]);
-      });
-
-      return () => {
-        socket.disconnect();
-      };
-    }
-  }, [isOpen, user.id, user.role]);
+    return () => {
+      isActive = false;
+      clearInterval(interval);
+    };
+  }, [isOpen, user.id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSendMessage = () => {
-    if (newMessage.trim() && socketRef.current) {
-      const messagePayload = {
-        text: newMessage,
-        recipientId: SUPPORT_ADMIN_ID,
-      };
-      
-      socketRef.current.emit('support:send_message', messagePayload, (sentMessage: any) => {
-        setMessages((prevMessages) => [...prevMessages, { ...sentMessage, role: 'user' }]);
-      });
-      setNewMessage('');
+  const handleSendMessage = async () => {
+    if (newMessage.trim()) {
+      const text = newMessage;
+      setNewMessage(''); // Clear input immediately
+
+      try {
+        const sentMessage = await api.support.sendMessage({
+          senderId: user.id,
+          recipientId: SUPPORT_ADMIN_ID,
+          text: text,
+        });
+        setMessages(prev => [...prev, sentMessage]);
+      } catch (error) {
+        console.error("Failed to send message", error);
+        setNewMessage(text); // Restore message on error
+      }
     }
   };
 
@@ -83,6 +92,7 @@ const SupportChatWidget: React.FC<SupportChatWidgetProps> = ({ user }) => {
             <p className="text-sm text-slate-500">Обычно отвечаем в течении нескольких минут</p>
           </header>
           <div className="flex-1 p-4 overflow-y-auto">
+            {loading && messages.length === 0 ? <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-slate-400"/></div> :
             <div className="space-y-4">
               {messages.map((msg, index) => (
                 <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -95,7 +105,7 @@ const SupportChatWidget: React.FC<SupportChatWidgetProps> = ({ user }) => {
                 </div>
               ))}
               <div ref={messagesEndRef} />
-            </div>
+            </div>}
           </div>
           <footer className="p-4 border-t">
             <div className="flex items-center gap-2">

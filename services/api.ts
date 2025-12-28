@@ -433,6 +433,31 @@ export const api = {
         }
     },
 
+    support: {
+        getConversations: async (): Promise<Conversation[]> => {
+            const res = await fetch(`${API_URL}/support/conversations`);
+            if (!res.ok) throw new Error('Failed to fetch support conversations');
+            return await res.json();
+        },
+        getHistory: async (userId: string, partnerId: number): Promise<ChatMessage[]> => {
+            const res = await fetch(`${API_URL}/support/history/${userId}/${partnerId}`);
+            if (!res.ok) throw new Error('Failed to fetch support history');
+            return await res.json();
+        },
+        sendMessage: async (data: { senderId: string, recipientId: number, text: string }): Promise<ChatMessage> => {
+            const res = await fetch(`${API_URL}/support/messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Failed to send support message');
+            }
+            return await res.json();
+        }
+    },
+
     messages: {
         getConversations: async (userId: string): Promise<Conversation[]> => {
             try {

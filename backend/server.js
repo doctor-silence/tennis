@@ -2,7 +2,6 @@ require('dotenv').config({ path: __dirname + '/.env' });
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
-const { Server } = require("socket.io");
 const { GoogleGenAI } = require('@google/genai');
 const bcrypt = require('bcryptjs');
 const pool = require('./db');
@@ -10,12 +9,6 @@ const initDb = require('./initDb');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: "*", // Allow all origins for simplicity
-    methods: ["GET", "POST"]
-  }
-});
 
 const PORT = process.env.PORT || 3001;
 
@@ -24,7 +17,7 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
 // Constants
-const SUPPORT_ADMIN_ID = 1; // Assuming user with ID 1 is the super admin for support
+const SUPPORT_ADMIN_ID = 1;
 
 // Initialize Google GenAI
 if (!process.env.API_KEY) {
@@ -46,143 +39,6 @@ const logSystemEvent = async (level, message, moduleName) => {
         console.error("Failed to write log to DB", e);
     }
 };
-
-// --- REAL-TIME CHAT LOGIC ---
-
-io.on('connection', (socket) => {
-    console.log('🔌 A user connected:', socket.id);
-    const userId = socket.handshake.query.userId;
-    const userRole = socket.handshake.query.userRole;
-
-    if (!userId) {
-        console.log('🚫 User disconnected: No userId provided.');
-        return socket.disconnect();
-    }
-    
-    // Join a room based on role
-    if (userRole === 'admin') {
-        socket.join('admins');
-        console.log(`🛡️  Admin ${userId} joined the 'admins' room.`);
-    } else {
-        const userRoom = `user_${userId}`;
-        socket.join(userRoom);
-        console.log(`👤 User ${userId} joined room: ${userRoom}`);
-    }
-
-    // Admin fetches all support conversations
-    socket.on('support:admin_get_conversations', async (ack) => {
-        if (userRole !== 'admin') return;
-        try {
-            const result = await pool.query(`
-                SELECT 
-                    c.id,
-                    p.id AS "partnerId",
-                    p.name AS "partnerName",
-                    p.avatar AS "partnerAvatar",
-                    (SELECT text FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS "lastMessage",
-                    (SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS "timestamp",
-                    (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND is_read = FALSE AND sender_id != $1) AS "unread"
-                FROM conversations c
-                JOIN users p ON p.id = c.user1_id
-                WHERE c.user2_id = $1
-                ORDER BY (SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) DESC NULLS LAST
-            `, [SUPPORT_ADMIN_ID]);
-            ack(result.rows.map(r => ({ ...r, id: r.id.toString(), partnerId: r.partnerId.toString(), unread: parseInt(r.unread) })));
-        } catch (error) {
-            console.error('Error fetching admin conversations:', error);
-        }
-    });
-
-    // User or Admin fetches history for a specific conversation
-    socket.on('support:get_history', async (partnerId, ack) => {
-        try {
-            const conversation = await pool.query(
-                `SELECT id FROM conversations WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)`,
-                [userId, partnerId]
-            );
-
-            if (conversation.rows.length === 0) {
-                return ack([]);
-            }
-            const conversationId = conversation.rows[0].id;
-
-            const messages = await pool.query(
-                `SELECT id, sender_id, text, created_at FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC`,
-                [conversationId]
-            );
-
-            // Mark messages as read
-            await pool.query(
-                `UPDATE messages SET is_read = TRUE WHERE conversation_id = $1 AND sender_id != $2`,
-                [conversationId, userId]
-            );
-
-            ack(messages.rows.map(m => ({ ...m, role: m.sender_id.toString() === userId.toString() ? 'user' : 'partner' })));
-
-        } catch (error) {
-            console.error('Error fetching message history:', error);
-        }
-    });
-
-    // Listen for a new message
-    socket.on('support:send_message', async ({ text, recipientId }, ack) => {
-        const senderId = userId;
-        const client = await pool.connect();
-        try {
-            await client.query('BEGIN');
-            
-            // Find or create conversation
-            let convRes = await client.query(
-                `SELECT id FROM conversations WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)`,
-                [senderId, recipientId]
-            );
-
-            let conversationId;
-            if (convRes.rows.length > 0) {
-                conversationId = convRes.rows[0].id;
-                await client.query('UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [conversationId]);
-            } else {
-                const newConvRes = await client.query('INSERT INTO conversations (user1_id, user2_id) VALUES ($1, $2) RETURNING id', [senderId, recipientId]);
-                conversationId = newConvRes.rows[0].id;
-            }
-
-            // Insert message
-            const msgRes = await client.query(
-                'INSERT INTO messages (conversation_id, sender_id, text) VALUES ($1, $2, $3) RETURNING *',
-                [conversationId, senderId, text]
-            );
-            const newMessage = msgRes.rows[0];
-
-            await client.query('COMMIT');
-            
-            const messagePayload = {
-                id: newMessage.id,
-                conversation_id: newMessage.conversation_id,
-                sender_id: newMessage.sender_id,
-                text: newMessage.text,
-                created_at: newMessage.created_at,
-                is_read: newMessage.is_read
-            };
-
-            // Emit to recipient
-            const recipientRoom = userRole === 'admin' ? `user_${recipientId}` : 'admins';
-            socket.to(recipientRoom).emit('support:receive_message', messagePayload);
-            
-            // Acknowledge to sender
-            ack(messagePayload);
-
-        } catch (error) {
-            await client.query('ROLLBACK');
-            console.error('Error sending message:', error);
-        } finally {
-            client.release();
-        }
-    });
-
-    socket.on('disconnect', () => {
-        console.log('🔌 User disconnected:', socket.id);
-    });
-});
 
 // --- API ROUTES ---
 
@@ -293,6 +149,136 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (err) {
         console.error("❌ Login Error:", err);
         res.status(500).json({ error: 'Ошибка при входе: ' + err.message });
+    }
+});
+
+// --- SUPPORT CHAT API ROUTES (NEW) ---
+
+// Admin: Get all support conversations
+app.get('/api/support/conversations', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT 
+                c.id,
+                p.id AS "partnerId",
+                p.name AS "partnerName",
+                p.avatar AS "partnerAvatar",
+                (SELECT text FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS "lastMessage",
+                (SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS "timestamp",
+                (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND is_read = FALSE AND sender_id != $1) AS "unread"
+            FROM conversations c
+            JOIN users p ON p.id = (CASE WHEN c.user1_id = $1 THEN c.user2_id ELSE c.user1_id END)
+            WHERE (c.user1_id = $1 OR c.user2_id = $1)
+            ORDER BY (SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) DESC NULLS LAST
+        `, [SUPPORT_ADMIN_ID]);
+        res.json(result.rows.map(r => ({ ...r, id: r.id.toString(), partnerId: r.partnerId.toString(), unread: parseInt(r.unread) })));
+    } catch (error) {
+        console.error('Error fetching admin support conversations:', error);
+        res.status(500).json({ error: 'Failed to fetch support conversations' });
+    }
+});
+
+// User or Admin: Get message history for a support conversation
+app.get('/api/support/history/:userId/:partnerId', async (req, res) => {
+    const { userId, partnerId } = req.params;
+    try {
+        const parsedUserId = parseInt(userId, 10);
+        const parsedPartnerId = parseInt(partnerId, 10);
+
+        if (isNaN(parsedUserId) || isNaN(parsedPartnerId)) {
+            return res.status(400).json({ error: 'Invalid user or partner ID' });
+        }
+
+        const conversation = await pool.query(
+            `SELECT id FROM conversations WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)`,
+            [parsedUserId, parsedPartnerId]
+        );
+
+        if (conversation.rows.length === 0) {
+            return res.json([]);
+        }
+        const conversationId = conversation.rows[0].id;
+
+        // Mark messages as read now that the conversation is being viewed
+        await pool.query(
+            `UPDATE messages SET is_read = TRUE WHERE conversation_id = $1 AND sender_id != $2`,
+            [conversationId, parsedUserId]
+        );
+
+        const messagesResult = await pool.query(
+            `SELECT * FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC`,
+            [conversationId]
+        );
+        
+        // Explicitly set role for frontend.
+        const messagesWithRoles = messagesResult.rows.map(msg => ({
+            ...msg,
+            role: msg.sender_id.toString() === parsedUserId.toString() ? 'user' : 'partner'
+        }));
+
+        res.json(messagesWithRoles);
+    } catch (error) {
+        console.error('Error fetching support message history:', error);
+        res.status(500).json({ error: 'Failed to fetch history' });
+    }
+});
+
+// User or Admin: Send a support message
+app.post('/api/support/messages', async (req, res) => {
+    let { senderId, recipientId, text } = req.body;
+
+    const parsedRecipientId = parseInt(recipientId, 10);
+    let parsedSenderId = parseInt(senderId, 10);
+    
+    if (isNaN(parsedSenderId) || isNaN(parsedRecipientId) || !text) {
+        return res.status(400).json({ error: "Invalid data" });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        
+        // --- FIX: Alias any admin sender to the official SUPPORT_ADMIN_ID ---
+        const senderInfo = await client.query('SELECT role FROM users WHERE id = $1', [parsedSenderId]);
+        const senderRole = senderInfo.rows.length > 0 ? senderInfo.rows[0].role : 'amateur';
+        
+        if (senderRole === 'admin') {
+            parsedSenderId = SUPPORT_ADMIN_ID;
+        }
+        // --- END FIX ---
+
+        let convRes = await client.query(
+            `SELECT id FROM conversations WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)`,
+            [parsedSenderId, parsedRecipientId]
+        );
+
+        let conversationId;
+        if (convRes.rows.length > 0) {
+            conversationId = convRes.rows[0].id;
+            await client.query('UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [conversationId]);
+        } else {
+            const newConvRes = await client.query('INSERT INTO conversations (user1_id, user2_id) VALUES ($1, $2) RETURNING id', [parsedSenderId, parsedRecipientId]);
+            conversationId = newConvRes.rows[0].id;
+        }
+
+        const msgRes = await client.query(
+            'INSERT INTO messages (conversation_id, sender_id, text) VALUES ($1, $2, $3) RETURNING *',
+            [conversationId, parsedSenderId, text]
+        );
+        const newMessage = msgRes.rows[0];
+
+        await client.query('COMMIT');
+        
+        // The role is from the perspective of the original sender.
+        // If an admin sent it, their role is 'user' for their own client.
+        res.status(201).json({ ...newMessage, role: 'user' });
+
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error sending support message:', error);
+        res.status(500).json({ error: 'Failed to send message' });
+    } finally {
+        client.release();
     }
 });
 
@@ -1641,7 +1627,7 @@ app.get('/api/crm/stats/:coachId', async (req, res) => {
 
     try {
         const activePlayersRes = await pool.query(
-            `SELECT COUNT(*) FROM students WHERE coach_id = $1 AND status = 'active'`,
+            `SELECT COUNT(*) FROM students WHERE coach_id = $1 AND status = 'active'`, 
             [coachIdInt]
         );
 
@@ -2184,9 +2170,10 @@ app.get('/api/conversations', async (req, res) => {
                 (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND is_read = FALSE AND sender_id != $1) as "unread"
             FROM conversations c
             JOIN users p ON (p.id = CASE WHEN c.user1_id = $1 THEN c.user2_id ELSE c.user1_id END)
-            WHERE c.user1_id = $1 OR c.user2_id = $1
+            WHERE (c.user1_id = $1 OR c.user2_id = $1)
+              AND (c.user1_id != $2 AND c.user2_id != $2)
             ORDER BY c.updated_at DESC
-        `, [userId]);
+        `, [userId, SUPPORT_ADMIN_ID]);
         
         res.json(result.rows.map(r => ({ ...r, id: r.id.toString(), partnerId: r.partnerId.toString(), unread: parseInt(r.unread) })));
     } catch (err) {
@@ -2270,7 +2257,7 @@ app.post('/api/messages', async (req, res) => {
 
         await client.query('COMMIT');
         
-        res.status(201).json({ 
+        res.status(201).json({
             ...newMessage, 
             id: newMessage.id.toString(),
             sender_id: newMessage.sender_id.toString(),
@@ -2380,7 +2367,6 @@ app.get('/api/groups/:groupId/members', async (req, res) => {
 // Start Server and Init DB
 server.listen(PORT, async () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`⚡️ Socket.IO server listening on port ${PORT}`);
     console.log(`🔌 Attempting to connect to DB at ${process.env.DB_HOST || 'localhost'}...`);
     await initDb();
 });
