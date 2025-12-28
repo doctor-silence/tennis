@@ -211,6 +211,21 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
             nextRound.matches[nextMatchIdx][side] = { ...winner, lastMatchScore: matchScore };
         } else if (roundIdx === updated.rounds.length - 1) {
             updated.status = 'finished';
+            // --- NEW: Create a post for the tournament result ---
+            if (winner) {
+                await api.posts.create({
+                    userId: user.id, // Or a system user ID
+                    type: 'tournament_result',
+                    groupId: selectedTournament.target_group_id,
+                    content: {
+                        tournamentName: selectedTournament.name,
+                        winnerName: winner.name,
+                        winnerAvatar: winner.avatar,
+                    }
+                });
+                onTournamentUpdate();
+            }
+            // --- END NEW ---
         }
 
         const returnedTournament = await syncTournament(updated);

@@ -20,6 +20,14 @@ const ImageModal = ({ src, onClose }: { src: string, onClose: () => void }) => {
     );
 };
 
+// --- Winner Badge Component ---
+const WinnerBadge = () => (
+    <div className="absolute -top-1 -left-2 bg-lime-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full transform -rotate-12">
+        WIN
+    </div>
+);
+
+
 
 // --- Feed Item Components ---
 
@@ -201,7 +209,10 @@ const TournamentMatchPost = ({ post, user, onUpdate }: { post: any, user: User, 
             </div>
             <div className="flex items-center justify-between">
                 <div className="flex flex-col items-center text-center">
-                    <img src={winner ? `https://ui-avatars.com/api/?name=${winner.replace(' ', '+')}&background=84cc16&color=fff` : 'https://ui-avatars.com/api/?name=Unknown&background=84cc16&color=fff'} alt={winner || 'Unknown'} className="w-12 h-12 rounded-full border-2 border-lime-400 p-0.5" />
+                    <div className="relative">
+                        <img src={winner ? `https://ui-avatars.com/api/?name=${winner.replace(' ', '+')}&background=84cc16&color=fff` : 'https://ui-avatars.com/api/?name=Unknown&background=84cc16&color=fff'} alt={winner || 'Unknown'} className="w-12 h-12 rounded-full border-2 border-lime-400 p-0.5" />
+                        {winner && <WinnerBadge />}
+                    </div>
                     <p className="font-bold text-sm mt-1">{winner}</p>
                     <p className="text-xs text-lime-600 font-bold">Победитель</p>
                 </div>
@@ -314,9 +325,7 @@ const MatchResultPost = ({ post, user, onUpdate }: { post: any, user: User, onUp
                 <div className="flex items-center gap-2">
                     <div className="relative">
                         <img src={winner.avatar} alt={winner.name} className="w-12 h-12 rounded-full border-2 border-lime-400 p-0.5" />
-                        <div className="absolute -top-1 -left-2 bg-lime-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full transform -rotate-12">
-                            WIN
-                        </div>
+                        {isWinner && <WinnerBadge />}
                     </div>
                     <div>
                         <p className="font-bold text-sm">{winner.name}</p>
@@ -456,6 +465,39 @@ const TournamentAnnouncementPost = ({ post }: { post: any }) => (
 );
 
 
+const TournamentResultPost = ({ post }: { post: any }) => (
+    <div className="bg-gradient-to-br from-amber-50 to-white p-4 rounded-2xl shadow-lg border-2 border-amber-200/80 relative overflow-hidden">
+        <div className="absolute -top-4 -right-4 w-16 h-16 text-amber-200/50">
+            <Trophy size={64} strokeWidth={1}/>
+        </div>
+        <div className="relative z-10">
+            <div className="flex justify-between items-start mb-2">
+                <div className="flex gap-2 items-center">
+                    <div className="w-8 h-8 bg-amber-400 rounded-full flex items-center justify-center border-2 border-white shadow">
+                        <Trophy size={16} className="text-white" fill="white"/>
+                    </div>
+                    <div>
+                        <p className="font-bold text-amber-900 text-sm">ТУРНИР ЗАВЕРШЕН</p>
+                        <p className="text-xs text-amber-700/80">Опубликовал: {post.author.name}</p>
+                    </div>
+                </div>
+            </div>
+            <div className="text-center my-4">
+                <p className="text-xs font-bold text-amber-800/80">Поздравляем победителя турнира</p>
+                <h3 className="text-xl font-black text-slate-900 my-0.5">{post.content.tournamentName}</h3>
+                <div className="inline-flex items-center gap-2 mt-2 bg-white/50 px-3 py-1 rounded-full relative">
+                    <div className="relative">
+                        <img src={post.content.winnerAvatar} alt={post.content.winnerName} className="w-8 h-8 rounded-full" />
+                        <WinnerBadge />
+                    </div>
+                    <span className="font-bold text-base text-slate-800">{post.content.winnerName}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+);
+
+
 // --- Feed Component ---
 
 interface FeedProps {
@@ -481,6 +523,8 @@ const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate, onSta
                         return <MarketplacePost key={item.id} post={item} onStartConversation={onStartConversation} />;
                     case 'tournament_announcement':
                         return <TournamentAnnouncementPost key={item.id} post={item} />;
+                    case 'tournament_result':
+                        return <TournamentResultPost key={item.id} post={item} />;
                     default:
                         return null;
                 }
