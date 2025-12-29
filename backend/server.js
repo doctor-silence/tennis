@@ -2,7 +2,7 @@ require('dotenv').config({ path: __dirname + '/.env' });
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
-const { GoogleGenAI } = require('@google/genai');
+const OpenAI = require('openai');
 const bcrypt = require('bcryptjs');
 const pool = require('./db');
 const initDb = require('./initDb');
@@ -19,12 +19,14 @@ app.use(express.json({ limit: '50mb' }));
 // Constants
 const SUPPORT_ADMIN_ID = 1;
 
-// Initialize Google GenAI
-if (!process.env.API_KEY) {
-  console.error("❌ FATAL: API_KEY is missing in .env file");
-  process.exit(1);
+// Initialize DeepSeek AI
+if (!process.env.DEEPSEEK_API_KEY) {
+  console.warn("⚠️  WARNING: DEEPSEEK_API_KEY is missing in .env file. AI Coach will not work.");
 }
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const deepseek = new OpenAI({
+  apiKey: process.env.DEEPSEEK_API_KEY,
+  baseURL: 'https://api.deepseek.com/v1',
+});
 
 // Check for Admin Credentials
 if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD) {
@@ -2142,15 +2144,24 @@ app.delete('/api/tactic/:tacticId', async (req, res) => {
 // AI Coach Route (Actually using the Gemini API)
 app.post('/api/ai-coach', async (req, res) => {
     const { query } = req.body;
+    if (!query) {
+        return res.status(400).json({ error: 'Query is required' });
+    }
+    if (!process.env.DEEPSEEK_API_KEY) {
+        return res.status(500).json({ error: 'AI Coach is not configured on the server.' });
+    }
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: `Ты профессиональный теннисный тренер. Ответь кратко и по делу на вопрос: "${query}" `,
+        const completion = await deepseek.chat.completions.create({
+          model: "deepseek-chat",
+          messages: [
+            { role: "system", content: "Ты профессиональный теннисный тренер. Ответь кратко и по делу." },
+            { role: "user", content: query }
+          ],
         });
-        res.json({ text: response.text });
-    } catch (err) {
-        console.error('Gemini API Error:', err);
-        res.status(500).json({ error: 'Failed to generate advice' });
+        res.json({ text: completion.choices[0].message.content });
+    } catch (error) {
+        console.error('DeepSeek API error:', error);
+        res.status(500).json({ error: 'Failed to get advice from AI coach' });
     }
 });
 

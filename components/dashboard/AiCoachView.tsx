@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Loader2, Send } from 'lucide-react';
 import { User, ChatMessage } from '../../types';
 import Button from '../Button';
-import { getTennisAdvice } from '../../services/geminiService';
+import { getAiAdvice } from '../../services/aiService';
 
 const AiCoachView = ({ user }: { user: User }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([
@@ -27,7 +27,7 @@ const AiCoachView = ({ user }: { user: User }) => {
       setLoading(true);
 
       try {
-          const advice = await getTennisAdvice(input);
+          const advice = await getAiAdvice(input);
           setMessages(prev => [...prev, { role: 'model', text: advice }]);
       } catch (e) {
           setMessages(prev => [...prev, { role: 'model', text: "Извините, сейчас я не могу ответить. Попробуйте позже." }]);
