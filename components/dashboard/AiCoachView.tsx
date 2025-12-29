@@ -68,7 +68,13 @@ const AiCoachView = ({ user }: { user: User }) => {
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && !loading && handleSend()}
                 />
-                <Button onClick={handleSend} disabled={loading} className="w-12 px-0"><Send size={20}/></Button>
+                <button 
+                  onClick={handleSend} 
+                  disabled={loading} 
+                  className="inline-flex items-center justify-center rounded-xl font-bold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none active:scale-95 bg-slate-900 text-white hover:bg-slate-800 focus:ring-slate-900 shadow-lg shadow-slate-900/20 border border-transparent h-12 w-12"
+                >
+                  <Send size={20}/>
+                </button>
             </div>
         </div>
     );
