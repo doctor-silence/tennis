@@ -652,31 +652,36 @@ const GroupPostForm = ({ user, onPostCreated }: { user: User, onPostCreated: () 
     };
 
     if (myCreatedGroups.length === 0) {
-        return null; // Don't show the form if the user has not created any groups
+        return (
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6 text-center text-slate-500">
+                Вы пока не создали ни одной группы.
+            </div>
+        );
     }
 
     return (
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6">
+        <div className="bg-gradient-to-br from-lime-50 to-green-50 p-4 rounded-2xl shadow-sm border border-lime-200 mb-6">
+            <h3 className="font-bold text-lg mb-4 text-slate-700">Написать в группу</h3>
             <div className="flex flex-col gap-4">
                 <select 
                     value={selectedGroupId} 
                     onChange={(e) => setSelectedGroupId(e.target.value)}
-                    className="w-full bg-slate-100 p-2 rounded-lg outline-none border border-slate-200"
+                    className="w-full bg-white p-2 rounded-lg outline-none border border-slate-200"
                 >
                     {myCreatedGroups.map(group => (
                         <option key={group.id} value={group.id}>{group.name}</option>
                     ))}
                 </select>
                 <textarea
-                    className="w-full bg-slate-100 p-2 rounded-lg outline-none border border-slate-200"
+                    className="w-full bg-white p-2 rounded-lg outline-none border border-slate-200"
                     placeholder="Что нового в группе?"
                     value={postContent}
                     onChange={(e) => setPostContent(e.target.value)}
                     rows={3}
                 />
                 <div className="flex justify-between items-center">
-                    <label className="text-sm text-slate-500 cursor-pointer hover:text-lime-600">
-                        <PlusCircle size={20} className="inline-block mr-1"/>
+                    <label className="text-sm text-slate-500 cursor-pointer hover:text-lime-600 flex items-center gap-1">
+                        <PlusCircle size={20}/>
                         <input
                            type="file"
                            accept="image/*"
