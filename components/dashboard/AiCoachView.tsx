@@ -2,8 +2,42 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Loader2, Send } from 'lucide-react';
 import { User, ChatMessage } from '../../types';
-import Button from '../Button';
 import { getAiAdvice } from '../../services/aiService';
+
+// A simple component to render text with basic markdown-like formatting.
+const MarkdownRenderer = ({ text }: { text: string }) => {
+    const parts = text.split(/(\*\*.*?\*\*)/g); // Split by bold tags
+
+    const paragraphs = parts.reduce((acc, part) => {
+        const lines = part.split('\n');
+        return [...acc, ...lines];
+    }, [] as string[]).filter(p => p.trim() !== '');
+
+    return (
+        <>
+            {paragraphs.map((paragraph, pIndex) => (
+                <p key={pIndex} className="mb-2 last:mb-0">
+                    {paragraph.split(/(\*\*.*?\*\*)/g).map((part, index) => {
+                        if (part.startsWith('**') && part.endsWith('**')) {
+                            return <strong key={index}>{part.slice(2, -2)}</strong>;
+                        }
+                        // Render list items
+                        if (part.trim().startsWith('- ')) {
+                            return (
+                                <span key={index} className="flex gap-2">
+                                    <span className="opacity-60">•</span>
+                                    <span>{part.trim().substring(1).trim()}</span>
+                                </span>
+                            );
+                        }
+                        return <span key={index}>{part}</span>;
+                    })}
+                </p>
+            ))}
+        </>
+    );
+};
+
 
 const AiCoachView = ({ user }: { user: User }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([
@@ -41,13 +75,14 @@ const AiCoachView = ({ user }: { user: User }) => {
             <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50">
                {messages.map((msg, idx) => (
                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                       <div className={`max-w-[80%] p-4 rounded-2xl text-sm ${
+                       <div className={`max-w-[80%] p-4 rounded-2xl text-sm leading-relaxed ${
                            msg.role === 'user' 
                            ? 'bg-slate-900 text-white rounded-tr-none' 
-                           : msg.role === 'system' ? 'bg-lime-100 text-lime-800 border border-lime-200'
-                           : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none'
+                           : msg.role === 'system' 
+                           ? 'bg-lime-100 text-lime-800 border border-lime-200'
+                           : 'bg-lime-100 text-lime-800 border border-lime-200 rounded-tl-none'
                        }`}>
-                           {msg.text}
+                           {msg.role === 'model' ? <MarkdownRenderer text={msg.text} /> : msg.text}
                        </div>
                    </div>
                ))}
