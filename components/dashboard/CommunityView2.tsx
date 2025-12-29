@@ -83,8 +83,9 @@ const TextPost = ({ post, user, onUpdate }: { post: any, user: User, onUpdate: (
                 </div>
                 <button className="text-slate-400">...</button>
             </div>
-            <p className="text-slate-700 mb-4 whitespace-pre-wrap">{post.content.text}</p>
-            <div className="flex items-center gap-4 text-slate-500 text-sm">
+            {post.content.text && <p className="text-slate-700 mb-4 whitespace-pre-wrap">{post.content.text}</p>}
+            {post.content.image && <img src={post.content.image} alt="Post image" className="mt-2 rounded-lg w-full" />}
+            <div className="flex items-center gap-4 text-slate-500 text-sm mt-4">
                 <button onClick={handleLikeClick} className="flex items-center gap-1">
                     <Heart size={16} className={`transition-colors ${isLiked ? "text-red-500 fill-current" : "hover:text-red-500"}`}/> {currentLikes}
                 </button>
@@ -602,6 +603,102 @@ const GroupsView = forwardRef(({ user, onGroupSelect }: { user: User, onGroupSel
         </div>
     );
 });
+
+
+const GroupPostForm = ({ user, onPostCreated }: { user: User, onPostCreated: () => void }) => {
+    const [myCreatedGroups, setMyCreatedGroups] = useState<Group[]>([]);
+    const [selectedGroupId, setSelectedGroupId] = useState<string>('');
+    const [postContent, setPostContent] = useState('');
+    const [postImage, setPostImage] = useState<string | null>(null);
+
+    useEffect(() => {
+        api.groups.getAll().then(allGroups => {
+            const userGroups = allGroups.filter(g => String(g.creatorId) === String(user.id));
+            setMyCreatedGroups(userGroups);
+            if (userGroups.length > 0) {
+                setSelectedGroupId(userGroups[0].id);
+            }
+        });
+    }, [user.id]);
+
+    const handleImageChange = (file: File | null) => {
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPostImage(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        } else {
+            setPostImage(null);
+        }
+    };
+
+    const handlePublish = async () => {
+        if (!selectedGroupId || (!postContent && !postImage)) return;
+
+        try {
+            await api.posts.create({
+                userId: user.id,
+                groupId: selectedGroupId,
+                type: 'text_post',
+                content: { text: postContent, image: postImage }
+            });
+            setPostContent('');
+            setPostImage(null);
+            onPostCreated();
+        } catch (error) {
+            console.error("Failed to publish group post:", error);
+        }
+    };
+
+    if (myCreatedGroups.length === 0) {
+        return null; // Don't show the form if the user has not created any groups
+    }
+
+    return (
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6">
+            <div className="flex flex-col gap-4">
+                <select 
+                    value={selectedGroupId} 
+                    onChange={(e) => setSelectedGroupId(e.target.value)}
+                    className="w-full bg-slate-100 p-2 rounded-lg outline-none border border-slate-200"
+                >
+                    {myCreatedGroups.map(group => (
+                        <option key={group.id} value={group.id}>{group.name}</option>
+                    ))}
+                </select>
+                <textarea
+                    className="w-full bg-slate-100 p-2 rounded-lg outline-none border border-slate-200"
+                    placeholder="Что нового в группе?"
+                    value={postContent}
+                    onChange={(e) => setPostContent(e.target.value)}
+                    rows={3}
+                />
+                <div className="flex justify-between items-center">
+                    <label className="text-sm text-slate-500 cursor-pointer hover:text-lime-600">
+                        <PlusCircle size={20} className="inline-block mr-1"/>
+                        <input
+                           type="file"
+                           accept="image/*"
+                           className="hidden"
+                           onChange={(e) => handleImageChange(e.target.files ? e.target.files[0] : null)}
+                       />
+                       Фото
+                    </label>
+                    <Button onClick={handlePublish} disabled={!selectedGroupId || (!postContent && !postImage)}>Опубликовать</Button>
+                </div>
+                {postImage && (
+                    <div className="mt-2 relative w-24 h-24">
+                        <img src={postImage} className="h-full w-full object-cover rounded-md" />
+                        <button onClick={() => setPostImage(null)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5">
+                            <X size={12}/>
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 
 // --- Widgets ---
@@ -1156,7 +1253,14 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated,
                      {postType === 'event' && <div className="text-center p-4 text-slate-500 mt-4">Форма для событий скоро появится!</div>}
                 </div>}
 
-                { activeTab === 'Группы' ? <GroupsView user={user} ref={groupsViewRef} onGroupSelect={setSelectedGroupForModal} /> : (loadingFeed ? <Loader2 className="animate-spin text-slate-400 mx-auto" /> : <Feed activeTab={activeTab} feedItems={feedItems} user={user} onUpdate={fetchFeed} onStartConversation={onStartConversation} />) }
+                {activeTab === 'Группы' ? (
+                    <>
+                        <GroupPostForm user={user} onPostCreated={fetchFeed} />
+                        <GroupsView user={user} ref={groupsViewRef} onGroupSelect={setSelectedGroupForModal} />
+                    </>
+                ) : (
+                    loadingFeed ? <Loader2 className="animate-spin text-slate-400 mx-auto" /> : <Feed activeTab={activeTab} feedItems={feedItems} user={user} onUpdate={fetchFeed} onStartConversation={onStartConversation} />
+                )}
             </div>
             <div className="space-y-6">
                 <TournamentsWidget />
