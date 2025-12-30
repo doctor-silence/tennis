@@ -758,6 +758,38 @@ export const StudentsView = ({ user }: { user: User }) => {
                         <div className="bg-slate-50 p-10 rounded-[40px] border-2 border-dashed border-slate-200 relative overflow-hidden" id="report-content">
                             <div className="flex justify-between items-start mb-12"><div><div className="flex items-center gap-2 mb-2"><div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white"><Zap size={18} fill="currentColor"/></div><span className="font-black tracking-tighter uppercase italic">TENNIS<span className="text-lime-600">PRO</span></span></div><h2 className="text-3xl font-black text-slate-900 leading-none">Октябрь 2024</h2><p className="text-slate-400 text-sm font-bold uppercase tracking-widest mt-2">Индивидуальный прогресс-репорт</p></div><div className="text-right"><div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Игрок</div><div className="text-xl font-black text-slate-900">{selectedStudent.name}</div><div className="text-xs font-bold text-indigo-600 uppercase mt-1">Тренер: {user.name}</div></div></div>
                             <div className="grid grid-cols-3 gap-6 mb-12"><div className="bg-white p-5 rounded-3xl border shadow-sm text-center"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">Посещаемость</div><div className="text-2xl font-black text-slate-900">100%</div><div className="text-[8px] font-bold text-emerald-500 uppercase">12 из 12 занятий</div></div><div className="bg-white p-5 rounded-3xl border shadow-sm text-center"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">Набрано XP</div><div className="text-2xl font-black text-amber-500">+850</div><div className="text-[8px] font-bold text-amber-500 uppercase">Прогресс активен</div></div><div className="bg-white p-5 rounded-3xl border shadow-sm text-center"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">Средняя оценка</div><div className="text-2xl font-black text-indigo-600">4.9 / 5.0</div><div className="text-[8px] font-bold text-indigo-400 uppercase">Стабильный рост</div></div></div>
+                            
+                            {/* SKILLS DYNAMICS */}
+                            <div className="space-y-6 mb-12">
+                                <h4 className="font-black text-xs uppercase text-slate-400 tracking-widest">Анализ навыков (динамика)</h4>
+                                {(() => {
+                                    const skillTranslations: { [key: string]: string } = {
+                                        'serve': 'Подача',
+                                        'forehand': 'Форхенд',
+                                        'backhand': 'Бэкхенд',
+                                        'stamina': 'Выносливость',
+                                        'tactics': 'Тактика',
+                                    };
+                                    // Mock dynamics data as seen in the screenshot
+                                    const skillDynamics: { [key: string]: string } = {
+                                        'serve': '+5%',
+                                        'forehand': '+2%',
+                                        'backhand': '+5%',
+                                        'stamina': '+3%',
+                                        'tactics': '+6%',
+                                    };
+                                    return (Object.keys(skillTranslations) as Array<keyof typeof skillTranslations>).map(skillKey => (
+                                        <div key={skillKey} className="flex items-center gap-4">
+                                            <span className="w-28 text-xs font-bold text-slate-500 uppercase tracking-wider">{skillTranslations[skillKey]}</span>
+                                            <div className="flex-1 bg-slate-200 rounded-full h-2.5">
+                                                <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${(selectedStudent.skills && selectedStudent.skills[skillKey]) || 0}%` }}></div>
+                                            </div>
+                                            <span className="w-12 text-sm font-bold text-green-600 text-right">{skillDynamics[skillKey]}</span>
+                                        </div>
+                                    ));
+                                })()}
+                            </div>
+
                             <div className="space-y-6 mb-12"><h4 className="font-black text-xs uppercase text-slate-400 tracking-widest flex items-center gap-2"><Award size={16} className="text-lime-500"/> Комментарий тренера</h4><p className="text-sm text-slate-700 leading-relaxed italic">"{selectedStudent.name} показывает отличную дисциплину. В этом месяце мы сделали большой упор на стабильность подачи. Получен бейдж «Марафонец» — гордимся!"</p></div>
                         </div>
                         <div className="flex gap-4"><Button variant="outline" className="flex-1 gap-2 h-14 rounded-2xl" onClick={() => window.print()}><Printer size={18}/> Печать</Button><Button className="flex-1 gap-2 h-14 rounded-2xl" onClick={() => alert('PDF файл сформирован')}><Download size={18}/> Скачать PDF</Button></div>
