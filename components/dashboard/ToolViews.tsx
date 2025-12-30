@@ -258,6 +258,32 @@ export const StudentsView = ({ user }: { user: User }) => {
         name: '', age: 18, level: 'NTRP 3.5', phone: '', isPro: false, rttRank: 0
     });
 
+    const reportStats = useMemo(() => {
+        if (!selectedStudent) return null;
+
+        const studentLessons = lessons.filter(l => l.studentId === selectedStudent.id);
+        const attendedCount = studentLessons.length;
+        // Assuming trainingFrequency is per week, for a 4-week month.
+        const plannedLessons = (selectedStudent.trainingFrequency || 0) * 4;
+        const attendancePercentage = plannedLessons > 0 ? Math.round((attendedCount / plannedLessons) * 100) : 0;
+
+        // XP Gained is not tracked, so we display total XP.
+        const xpGained = selectedStudent.xp || 0;
+
+        // Average rating is not in the data model, so it's mocked.
+        const averageRating = 4.9;
+        const maxRating = 5.0;
+        
+        return {
+            attendancePercentage,
+            attendedCount,
+            plannedLessons,
+            xpGained,
+            averageRating,
+            maxRating
+        };
+    }, [selectedStudent, lessons]);
+
     const weekDates = useMemo(() => {
         const now = new Date();
         const startOfWeek = now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1);
@@ -757,7 +783,24 @@ export const StudentsView = ({ user }: { user: User }) => {
                     <div className="space-y-8 py-4">
                         <div className="bg-slate-50 p-10 rounded-[40px] border-2 border-dashed border-slate-200 relative overflow-hidden" id="report-content">
                             <div className="flex justify-between items-start mb-12"><div><div className="flex items-center gap-2 mb-2"><div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white"><Zap size={18} fill="currentColor"/></div><span className="font-black tracking-tighter uppercase italic">TENNIS<span className="text-lime-600">PRO</span></span></div><h2 className="text-3xl font-black text-slate-900 leading-none">Октябрь 2024</h2><p className="text-slate-400 text-sm font-bold uppercase tracking-widest mt-2">Индивидуальный прогресс-репорт</p></div><div className="text-right"><div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Игрок</div><div className="text-xl font-black text-slate-900">{selectedStudent.name}</div><div className="text-xs font-bold text-indigo-600 uppercase mt-1">Тренер: {user.name}</div></div></div>
-                            <div className="grid grid-cols-3 gap-6 mb-12"><div className="bg-white p-5 rounded-3xl border shadow-sm text-center"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">Посещаемость</div><div className="text-2xl font-black text-slate-900">100%</div><div className="text-[8px] font-bold text-emerald-500 uppercase">12 из 12 занятий</div></div><div className="bg-white p-5 rounded-3xl border shadow-sm text-center"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">Набрано XP</div><div className="text-2xl font-black text-amber-500">+850</div><div className="text-[8px] font-bold text-amber-500 uppercase">Прогресс активен</div></div><div className="bg-white p-5 rounded-3xl border shadow-sm text-center"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">Средняя оценка</div><div className="text-2xl font-black text-indigo-600">4.9 / 5.0</div><div className="text-[8px] font-bold text-indigo-400 uppercase">Стабильный рост</div></div></div>
+                                                        {/* Dynamic Report Stats */}
+                            <div className="grid grid-cols-3 gap-6 mb-12">
+                                <div className="bg-white p-5 rounded-3xl border shadow-sm text-center">
+                                    <div className="text-[9px] font-black text-slate-400 uppercase mb-1">Посещаемость</div>
+                                    <div className="text-2xl font-black text-slate-900">{reportStats?.attendancePercentage}%</div>
+                                    <div className="text-[8px] font-bold text-emerald-500 uppercase">{reportStats?.attendedCount} из {reportStats?.plannedLessons} занятий</div>
+                                </div>
+                                <div className="bg-white p-5 rounded-3xl border shadow-sm text-center">
+                                    <div className="text-[9px] font-black text-slate-400 uppercase mb-1">Набрано XP</div>
+                                    <div className="text-2xl font-black text-amber-500">+{reportStats?.xpGained}</div>
+                                    <div className="text-[8px] font-bold text-amber-500 uppercase">Прогресс активен</div>
+                                </div>
+                                <div className="bg-white p-5 rounded-3xl border shadow-sm text-center">
+                                    <div className="text-[9px] font-black text-slate-400 uppercase mb-1">Средняя оценка</div>
+                                    <div className="text-2xl font-black text-indigo-600">{reportStats?.averageRating.toFixed(1)} / {reportStats?.maxRating.toFixed(1)}</div>
+                                    <div className="text-[8px] font-bold text-indigo-400 uppercase">Стабильный рост</div>
+                                </div>
+                            </div>
                             
                             {/* SKILLS DYNAMICS */}
                             <div className="space-y-6 mb-12">
