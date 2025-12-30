@@ -93,25 +93,35 @@ const StudentProfileFlyout: React.FC<StudentProfileFlyoutProps> = ({ studentId, 
 
                         {/* Skills Section */}
                         <div className="mb-6">
-                            <h3 className="text-lg font-semibold text-gray-700 mb-3">НАВЫКИ (PRO RADAR)</h3>
-                            {student.skills && student.skills.length > 0 ? (
-                                student.skills.map((skill: Skill) => (
-                                    <div key={skill.name} className="mb-3">
-                                        <div className="flex justify-between text-sm mb-1">
-                                            <span>{skill.name}</span>
-                                            <span>{skill.value}%</span>
+                            <h3 className="text-lg font-semibold text-gray-700 mb-3">НАВЫКИ (ПРО РАДАР)</h3>
+                            {/* Skill Translations Map */}
+                            {(() => {
+                                const skillTranslations: { [key: string]: string } = {
+                                    'serve': 'Подача',
+                                    'forehand': 'Форхенд',
+                                    'backhand': 'Бэкхенд',
+                                    'stamina': 'Выносливость',
+                                    'tactics': 'Тактика',
+                                };
+                                return student.skills && student.skills.length > 0 ? (
+                                    student.skills.map((skill: Skill) => (
+                                        <div key={skill.name} className="mb-3">
+                                            <div className="flex justify-between text-sm mb-1">
+                                                <span>{skillTranslations[skill.name.toLowerCase()] || skill.name}</span>
+                                                <span>{skill.value}%</span>
+                                            </div>
+                                            <div className="w-full bg-gray-200 rounded-full h-2">
+                                                <div
+                                                    className="bg-blue-500 h-2 rounded-full"
+                                                    style={{ width: `${skill.value}%` }}
+                                                ></div>
+                                            </div>
                                         </div>
-                                        <div className="w-full bg-gray-200 rounded-full h-2">
-                                            <div 
-                                                className="bg-blue-500 h-2 rounded-full" 
-                                                style={{ width: `${skill.value}%` }}
-                                            ></div>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="text-gray-500 text-sm">Навыки не указаны.</p>
-                            )}
+                                    ))
+                                ) : (
+                                    <p className="text-gray-500 text-sm">Навыки не указаны.</p>
+                                );
+                            })()}
                         </div>
                     </div>
 

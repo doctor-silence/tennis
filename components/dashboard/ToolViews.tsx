@@ -662,17 +662,27 @@ export const StudentsView = ({ user }: { user: User }) => {
                                             </div>
                                         </div>
                                         <div className="space-y-6">
-                                            <h4 className="font-black text-xs uppercase text-slate-400 tracking-widest">Навыки (+XP за рост)</h4>
-                                            {(['serve', 'forehand', 'backhand', 'stamina', 'tactics'] as const).map(skill => (
-                                                <div key={skill} className="space-y-3">
-                                                    <div className="flex justify-between items-end"><span className="text-[10px] font-black text-slate-600 uppercase">{skill}</span><span className="text-xs font-black text-indigo-600">{(selectedStudent.skills && selectedStudent.skills[skill]) || 0}%</span></div>
-                                                    <div className="flex items-center gap-4">
-                                                        <button onClick={() => updateSkill(skill, -5)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-red-500 transition-all"><Minus size={14}/></button>
-                                                        <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden shadow-inner"><div className="h-full bg-indigo-500 transition-all duration-500" style={{ width: `${(selectedStudent.skills && selectedStudent.skills[skill]) || 0}%` }}></div></div>
-                                                        <button onClick={() => updateSkill(skill, 5)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-emerald-500 transition-all"><Plus size={14}/></button>
+                                            <h4 className="font-black text-xs uppercase text-slate-400 tracking-widest">Навыки (прирост XP)</h4>
+                                            {/* Skill Translations Map */}
+                                            {(() => {
+                                                const skillTranslations: { [key: string]: string } = {
+                                                    'serve': 'Подача',
+                                                    'forehand': 'Форхенд',
+                                                    'backhand': 'Бэкхенд',
+                                                    'stamina': 'Выносливость',
+                                                    'tactics': 'Тактика',
+                                                };
+                                                return (['serve', 'forehand', 'backhand', 'stamina', 'tactics'] as const).map(skill => (
+                                                    <div key={skill} className="space-y-3">
+                                                        <div className="flex justify-between items-end"><span className="text-[10px] font-black text-slate-600 uppercase">{skillTranslations[skill] || skill}</span><span className="text-xs font-black text-indigo-600">{(selectedStudent.skills && selectedStudent.skills[skill]) || 0}%</span></div>
+                                                        <div className="flex items-center gap-4">
+                                                            <button onClick={() => updateSkill(skill, -5)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-red-500 transition-all"><Minus size={14}/></button>
+                                                            <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden shadow-inner"><div className="h-full bg-indigo-500 transition-all duration-500" style={{ width: `${(selectedStudent.skills && selectedStudent.skills[skill]) || 0}%` }}></div></div>
+                                                            <button onClick={() => updateSkill(skill, 5)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-emerald-500 transition-all"><Plus size={14}/></button>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))}
+                                                ));
+                                            })()}
                                         </div>
                                     </div>
                                     <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-xl space-y-6 h-fit sticky top-0">
