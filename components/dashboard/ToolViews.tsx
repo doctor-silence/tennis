@@ -252,6 +252,7 @@ export const StudentsView = ({ user }: { user: User }) => {
     const [newGoalDate, setNewGoalDate] = '';
     const [newNote, setNewNote] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [reportComment, setReportComment] = useState('');
 
     const videoInputRef = useRef<HTMLInputElement>(null);
     const [newStudent, setNewStudent] = useState({
@@ -650,7 +651,13 @@ export const StudentsView = ({ user }: { user: User }) => {
                                 </div>
                                 <div className="text-right flex flex-col gap-3">
                                     <div className={`text-3xl font-black ${selectedStudent.balance < 0 ? 'text-red-400' : 'text-lime-400'}`}>{selectedStudent.balance.toLocaleString()} ₽</div>
-                                    <button onClick={() => setShowReportModal(true)} className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2.5 rounded-xl border border-white/10 text-xs font-black uppercase tracking-widest transition-all"><FileText size={16}/> Отчет родителю</button>
+                                                                         <button onClick={() => {
+                                                                            if (!selectedStudent) return;
+                                                                            const defaultComment = `"${selectedStudent.name} показывает отличную дисциплину. В этом месяце мы сделали большой упор на стабильность подачи. Получен бейдж «Марафонец» — гордимся!"`;
+                                                                            setReportComment(defaultComment);
+                                                                            setShowReportModal(true);
+                                                                        }} className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2.5 rounded-xl border border-white/10 text-xs font-black uppercase tracking-widest transition-all"><FileText size={16}/> Отчет родителю</button>
+                                    
                                 </div>
                             </div>
 
@@ -833,7 +840,14 @@ export const StudentsView = ({ user }: { user: User }) => {
                                 })()}
                             </div>
 
-                            <div className="space-y-6 mb-12"><h4 className="font-black text-xs uppercase text-slate-400 tracking-widest flex items-center gap-2"><Award size={16} className="text-lime-500"/> Комментарий тренера</h4><p className="text-sm text-slate-700 leading-relaxed italic">"{selectedStudent.name} показывает отличную дисциплину. В этом месяце мы сделали большой упор на стабильность подачи. Получен бейдж «Марафонец» — гордимся!"</p></div>
+                            <div className="space-y-6 mb-12">
+                                <h4 className="font-black text-xs uppercase text-slate-400 tracking-widest flex items-center gap-2"><Award size={16} className="text-lime-500"/> Комментарий тренера</h4>
+                                <textarea
+                                    className="w-full bg-slate-100 border border-slate-200 rounded-xl p-4 text-sm text-slate-700 leading-relaxed italic resize-none h-32 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    value={reportComment}
+                                    onChange={(e) => setReportComment(e.target.value)}
+                                />
+                            </div>
                         </div>
                         <div className="flex gap-4"><Button variant="outline" className="flex-1 gap-2 h-14 rounded-2xl" onClick={() => window.print()}><Printer size={18}/> Печать</Button><Button className="flex-1 gap-2 h-14 rounded-2xl" onClick={() => alert('PDF файл сформирован')}><Download size={18}/> Скачать PDF</Button></div>
                     </div>
