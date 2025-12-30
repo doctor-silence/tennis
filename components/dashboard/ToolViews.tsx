@@ -375,7 +375,7 @@ export const StudentsView = ({ user }: { user: User }) => {
         const currentSkills = selectedStudent.skills || { serve: 0, forehand: 0, backhand: 0, stamina: 0, tactics: 0 };
         const currentVal = currentSkills[skillKey] || 0;
         const newVal = Math.max(0, Math.min(100, currentVal + delta));
-        const xpGain = delta > 0 ? 50 : 0;
+        const xpGain = delta > 0 ? 2 : 0;
         const updatedSkills = { ...currentSkills, [skillKey]: newVal };
         const updated = await api.students.update(selectedStudent.id, { 
             skills: updatedSkills,
@@ -565,7 +565,7 @@ export const StudentsView = ({ user }: { user: User }) => {
                 <div className="lg:col-span-1 bg-slate-900 rounded-[40px] p-8 text-white relative overflow-hidden group shadow-2xl transition-all hover:scale-[1.02]">
                     <div className="text-[10px] font-black uppercase tracking-[0.3em] text-lime-400 mb-2">База учеников</div>
                     <div className="text-5xl font-black">{students.length}</div>
-                    <Button size="sm" className="bg-lime-400 text-slate-900 mt-6 rounded-2xl h-11 px-6 font-black uppercase text-[10px] tracking-widest hover:bg-white" onClick={() => setShowAddStudentModal(true)}><Plus size={16} className="mr-1"/> Добавить</Button>
+                    <Button size="sm" className="bg-lime-400 text-slate-900 mt-6 rounded-2xl h-11 px-6 font-black uppercase text-[10px] tracking-widest hover:bg-white hover:text-slate-900" onClick={() => setShowAddStudentModal(true)}><Plus size={16} className="mr-1"/> Добавить</Button>
                 </div>
                 <div className="lg:col-span-1 bg-white rounded-[40px] p-8 border shadow-sm"><div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Активные абонементы</div><div className="text-4xl font-black text-slate-900">12</div></div>
                 <div className="lg:col-span-2 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[40px] p-8 text-white flex items-center justify-between shadow-xl">
