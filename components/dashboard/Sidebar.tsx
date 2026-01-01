@@ -15,27 +15,37 @@ interface SidebarProps {
   ladderNotifications: number;
 }
 
-const SidebarItem = ({ icon, label, active, onClick, isSpecial = false, badge, title }: any) => (
+const SidebarItem = ({ icon, label, active, onClick, isSpecial = false, badge, title, inDevelopment = false }: any) => (
   <button
-    onClick={onClick}
+    onClick={inDevelopment ? () => {} : onClick}
     className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 group relative
       ${active 
         ? isSpecial 
           ? 'bg-gradient-to-r from-lime-400 to-lime-500 text-slate-900 font-bold shadow-lg shadow-lime-900/20' 
           : 'bg-slate-800 text-white font-medium border-l-4 border-lime-400' 
-        : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+        : `text-slate-400 ${inDevelopment ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-800/50 hover:text-white'}`
     }`}
+    disabled={inDevelopment}
   >
     <span className={active ? 'text-inherit' : 'group-hover:text-white transition-colors'}>{icon}</span>
     <span className="font-medium">{label}</span>
-    {isSpecial && !active && <div className="ml-auto w-2 h-2 rounded-full bg-lime-400 animate-pulse"></div>}
-    {badge && (
+    
+    {inDevelopment && (
+      <span className="ml-auto bg-red-900/70 text-red-300 text-[9px] font-bold px-2 py-0.5 rounded">
+        В разработке
+      </span>
+    )}
+
+    {isSpecial && !active && !inDevelopment && <div className="ml-auto w-2 h-2 rounded-full bg-lime-400 animate-pulse"></div>}
+    
+    {badge && !inDevelopment && (
       <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">
         {badge}
       </span>
     )}
+
     {/* Tooltip */}
-    {title && (
+    {title && !inDevelopment && (
       <div className="absolute left-full ml-4 px-3 py-2 bg-slate-700 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50">
         {title}
       </div>
@@ -61,9 +71,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogo
           <SidebarItem icon={<Swords size={20} />} label="Турнирная лестница" active={activeTab === 'ladder'} onClick={() => setActiveTab('ladder')} badge={ladderNotifications > 0 && ladderNotifications} />
           <SidebarItem icon={<Globe size={20} />} label="Сообщество" active={activeTab === 'community'} onClick={() => setActiveTab('community')} />
           <SidebarItem icon={<BookOpen size={20} />} label="Тактика" active={activeTab === 'tactics'} onClick={() => setActiveTab('tactics')} />
-          <SidebarItem icon={<Video size={20} />} label="Видео-анализ" active={activeTab === 'video_analysis'} onClick={() => setActiveTab('video_analysis')} isSpecial />
+          <SidebarItem icon={<Video size={20} />} label="Видео-анализ" active={activeTab === 'video_analysis'} onClick={() => {}} inDevelopment={true} />
           <SidebarItem icon={<MessageSquare size={20} />} label="Сообщения" active={activeTab === 'messages'} onClick={() => setActiveTab('messages')} badge={unreadCount > 0 && unreadCount} />
-          <SidebarItem icon={<Bot size={20} />} label="AI Тренер" active={activeTab === 'ai_coach'} onClick={() => setActiveTab('ai_coach')} />
+          <SidebarItem icon={<Bot size={20} />} label="AI Тренер" active={activeTab === 'ai_coach'} onClick={() => setActiveTab('ai_coach')} isSpecial />
           {user.role === 'coach' && (
             <>
               <SidebarItem icon={<Users size={20} />} label="Ученики (CRM)" active={activeTab === 'students'} onClick={() => setActiveTab('students')} />

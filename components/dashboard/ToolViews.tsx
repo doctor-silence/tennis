@@ -13,6 +13,7 @@ import {
     Eye, EyeOff, ChevronDown, ChevronUp, FileText, Download, Printer,
     Dribbble
 } from 'lucide-react';
+import { addDays, getDay } from 'date-fns';
 import { User, Student, ScheduledLesson, LessonType, TrainingNote, PlayerGoal, SkillSet } from '../../types';
 import Button from '../Button';
 import { api } from '../../services/api';
@@ -245,6 +246,11 @@ export const StudentsView = ({ user }: { user: User }) => {
     const [useRacketRental, setUseRacketRental] = useState(false);
     const [courtRentPrice, setCourtRentPrice] = useState<number>(2000); 
     const [lessonPrice, setLessonPrice] = useState<number>(2500); 
+
+    // Recurring lesson states
+    const [isRecurring, setIsRecurring] = useState(false);
+    const [recurringDays, setRecurringDays] = useState<Record<number, boolean>>({});
+    const [recurringEndDate, setRecurringEndDate] = useState('');
 
     // CRM states
     const [customAmount, setCustomAmount] = useState<string>('1000');
@@ -491,36 +497,105 @@ export const StudentsView = ({ user }: { user: User }) => {
     const handleBookLesson = async () => {
         if (!selectedSlot || !bookingStudentId) return;
         setIsSubmitting(true);
+        console.log('handleBookLesson called');
+        console.log('API object in ToolViews:', api);
+        
+        // Destructure lessons from api here to ensure we get the latest reference
+        const { lessons: apiLessons } = api; 
+        console.log('apiLessons object in ToolViews (destructured):', apiLessons);
+
+
         try {
             const student = students.find(s => s.id === bookingStudentId);
             if (!student) return;
 
-            const totalCharge = lessonPrice + courtRentPrice + (useCannon ? CANNON_PRICE : 0) + (useRacketRental ? RACKET_RENTAL_PRICE : 0);
-            let newBadges = [...(student.badges || [])];
-            if (selectedSlot.time === '08:00' && !newBadges.includes('early_bird')) newBadges.push('early_bird');
+            if (isRecurring) {
+                // Logic for recurring lessons
+                if (!recurringEndDate || Object.keys(recurringDays).length === 0) {
+                    alert("Выберите дни недели и дату окончания для создания серии тренировок.");
+                    setIsSubmitting(false);
+                    return;
+                }
 
-            const newLesson = await api.lessons.add({
-                coachId: user.id, studentId: student.id, studentName: student.name, type: 'indiv', startTime: selectedSlot.time, dayIndex: selectedSlot.dayIndex, duration: 60, status: 'confirmed', courtName: 'ТК Спартак', useCannon, useRacketRental, courtCost: courtRentPrice, lessonPrice: lessonPrice 
-            });
+                const lessonsToCreate: Omit<ScheduledLesson, 'id'>[] = [];
+                let currentDate = new Date(selectedSlot.date);
+                const endDate = new Date(recurringEndDate);
+                
+                while(currentDate <= endDate) {
+                    // date-fns getDay(): Sun=0, Mon=1...Sat=6
+                    // My logic: Mon=0, Tue=1...Sun=6
+                    const dayOfWeek = (getDay(currentDate) + 6) % 7;
 
-            const updated = await api.students.update(student.id, {
-                racketHours: (student.racketHours || 0) + 1,
-                balance: (student.balance || 0) - totalCharge,
-                xp: (student.xp || 0) + 20,
-                badges: newBadges
-            });
+                    if (recurringDays[dayOfWeek]) {
+                        const newLesson: Omit<ScheduledLesson, 'id'> = {
+                            coachId: user.id, 
+                            studentId: student.id, 
+                            studentName: student.name, 
+                            type: 'indiv', 
+                            startTime: selectedSlot.time, 
+                            dayIndex: dayOfWeek,
+                            date: currentDate.toISOString().split('T')[0], // Pass the actual date
+                            duration: 60, 
+                            status: 'confirmed', 
+                            courtName: 'ТК Спартак', 
+                            useCannon, 
+                            useRacketRental, 
+                            courtCost: courtRentPrice, 
+                            lessonPrice: lessonPrice 
+                        };
+                        lessonsToCreate.push(newLesson);
+                    }
+                    currentDate = addDays(currentDate, 1);
+                }
+
+                if (lessonsToCreate.length > 0) {
+                    console.log('Calling apiLessons.addRecurring');
+                    const createdLessons = await apiLessons.addRecurring(lessonsToCreate); // Use apiLessons
+                    setLessons(prev => [...prev, ...createdLessons]);
+                    // Update student balance for all created lessons
+                    const totalCharge = lessonsToCreate.reduce((sum, lesson) => sum + lesson.lessonPrice + lesson.courtCost + (lesson.useCannon ? CANNON_PRICE : 0) + (lesson.useRacketRental ? RACKET_RENTAL_PRICE : 0), 0);
+                    const updated = await api.students.update(student.id, {
+                       balance: (student.balance || 0) - totalCharge,
+                       racketHours: (student.racketHours || 0) + lessonsToCreate.length,
+                    });
+                    const updatedStudent = { ...student, ...updated };
+                    setStudents(prev => prev.map(s => s.id === student.id ? updatedStudent : s));
+                }
+
+            } else {
+                // Logic for a single lesson
+                const totalCharge = lessonPrice + courtRentPrice + (useCannon ? CANNON_PRICE : 0) + (useRacketRental ? RACKET_RENTAL_PRICE : 0);
+                let newBadges = [...(student.badges || [])];
+                if (selectedSlot.time === '08:00' && !newBadges.includes('early_bird')) newBadges.push('early_bird');
+                
+                console.log('Calling apiLessons.add');
+                const newLesson = await apiLessons.add({ // Use apiLessons
+                    coachId: user.id, studentId: student.id, studentName: student.name, type: 'indiv', startTime: selectedSlot.time, dayIndex: selectedSlot.dayIndex, date: selectedSlot.date, duration: 60, status: 'confirmed', courtName: 'ТК Спартак', useCannon, useRacketRental, courtCost: courtRentPrice, lessonPrice: lessonPrice 
+                });
+
+                const updated = await api.students.update(student.id, {
+                    racketHours: (student.racketHours || 0) + 1,
+                    balance: (student.balance || 0) - totalCharge,
+                    xp: (student.xp || 0) + 20,
+                    badges: newBadges
+                });
+                
+                const updatedStudent = { ...student, ...updated };
+                setStudents(prev => prev.map(s => s.id === student.id ? updatedStudent : s));
+                setLessons(prev => [...prev, newLesson]);
+            }
             
-            const updatedStudent = { ...student, ...updated };
-            setStudents(prev => prev.map(s => s.id === student.id ? updatedStudent : s));
-            setLessons(prev => [...prev, newLesson]);
             setShowBookLessonModal(false);
             
-            // Reset modal states
+        } finally {
+            // Reset all modal states
+            setIsSubmitting(false);
             setBookingStudentId('');
             setUseCannon(false);
             setUseRacketRental(false);
-        } finally {
-            setIsSubmitting(false);
+            setIsRecurring(false);
+            setRecurringDays({});
+            setRecurringEndDate('');
         }
     };
 
@@ -656,7 +731,7 @@ export const StudentsView = ({ user }: { user: User }) => {
                                                                             const defaultComment = `"${selectedStudent.name} показывает отличную дисциплину. В этом месяце мы сделали большой упор на стабильность подачи. Получен бейдж «Марафонец» — гордимся!"`;
                                                                             setReportComment(defaultComment);
                                                                             setShowReportModal(true);
-                                                                        }} className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2.5 rounded-xl border border-white/10 text-xs font-black uppercase tracking-widest transition-all"><FileText size={16}/> Отчет родителю</button>
+                                                                        }} className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2.5 rounded-xl border border-white/10 text-xs font-black uppercase tracking-widest transition-all"><FileText size={16}/> Отчет</button>
                                     
                                 </div>
                             </div>
@@ -926,7 +1001,55 @@ export const StudentsView = ({ user }: { user: User }) => {
                             </div>
                         )}
 
-                        {/* 3. TOTAL & CONFIRM */}
+                        {/* 3. RECURRENCE SETTINGS */}
+                        {bookingStudentId && (
+                            <div className="space-y-4 animate-fade-in-up">
+                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest px-1">3. Повторение</label>
+                                <button 
+                                    onClick={() => setIsRecurring(!isRecurring)}
+                                    className={`w-full flex items-center justify-between p-5 rounded-[28px] border-2 transition-all ${isRecurring ? 'bg-indigo-50 border-indigo-400 shadow-md' : 'bg-white border-slate-100'}`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-2 rounded-xl ${isRecurring ? 'bg-indigo-400 text-white' : 'bg-slate-100 text-slate-400'}`}><RefreshCw size={20}/></div>
+                                        <div className="text-left">
+                                            <div className="font-black text-slate-900 text-sm">Повторять тренировку</div>
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase">Создать серию уроков</div>
+                                        </div>
+                                    </div>
+                                    {isRecurring ? <CheckCircle2 className="text-indigo-500" size={24}/> : <Circle className="text-slate-200" size={24}/>}
+                                </button>
+
+                                {isRecurring && (
+                                    <div className="p-5 bg-slate-50/50 rounded-3xl border border-slate-100 space-y-4 animate-fade-in-up">
+                                        <div>
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Дни недели</label>
+                                            <div className="grid grid-cols-7 gap-2 mt-2">
+                                                {DAYS_SHORT.map((day, index) => (
+                                                    <button
+                                                        key={index}
+                                                        onClick={() => setRecurringDays(prev => ({...prev, [index]: !prev[index]}))}
+                                                        className={`py-3 rounded-xl text-xs font-black uppercase transition-all ${recurringDays[index] ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600 border'}`}
+                                                    >
+                                                        {day}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Закончить</label>
+                                            <input 
+                                                type="date" 
+                                                value={recurringEndDate}
+                                                onChange={e => setRecurringEndDate(e.target.value)}
+                                                className="w-full mt-2 bg-white border-none rounded-2xl px-4 py-3 outline-none font-bold text-sm shadow-sm"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* 4. TOTAL & CONFIRM */}
                         <div className="p-8 bg-[#0f172a] rounded-[45px] text-white flex flex-col sm:flex-row justify-between items-center gap-6 shadow-2xl relative overflow-hidden">
                             <div className="absolute top-0 right-0 p-8 opacity-5"><DollarSign size={100}/></div>
                             <div className="text-center sm:text-left relative z-10">
