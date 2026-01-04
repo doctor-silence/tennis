@@ -295,7 +295,6 @@ export interface Tournament {
   id: string;
   name: string;
   groupName?: string;
-  date: string;
   prizePool: string;
   status: 'draft' | 'live' | 'finished';
   type: 'single_elimination' | 'round_robin';
@@ -304,4 +303,14 @@ export interface Tournament {
     name: string;
     matches: TournamentMatch[];
   }[];
+  userId?: string;
+  category?: string;
+  tournamentType?: 'Одиночный' | 'Парный';
+  gender?: 'Мужской' | 'Женский' | 'Смешанный';
+  ageGroup?: string;
+  system?: 'Олимпийская' | 'Круговая';
+  matchFormat?: string;
+  participantsCount?: number;
+  startDate?: string;
+  endDate?: string;
 }

@@ -660,6 +660,66 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                             <label className="text-xs font-bold text-slate-500 uppercase">Название</label>
                             <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.name || ''} onChange={e => setEditingTournament({...editingTournament, name: e.target.value})} />
                         </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Категория</label>
+                                <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.category || ''} onChange={e => setEditingTournament({...editingTournament, category: e.target.value})} />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Разряд</label>
+                                <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.tournamentType || 'Одиночный'} onChange={e => setEditingTournament({...editingTournament, tournamentType: e.target.value as any})}>
+                                    <option>Одиночный</option>
+                                    <option>Парный</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Пол</label>
+                                <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.gender || 'Мужской'} onChange={e => setEditingTournament({...editingTournament, gender: e.target.value as any})}>
+                                    <option>Мужской</option>
+                                    <option>Женский</option>
+                                    <option>Смешанный</option>
+                                </select>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Возрастная группа</label>
+                                <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.ageGroup || ''} onChange={e => setEditingTournament({...editingTournament, ageGroup: e.target.value})} />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Система</label>
+                                <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.system || 'Олимпийская'} onChange={e => setEditingTournament({...editingTournament, system: e.target.value as any})}>
+                                    <option>Олимпийская</option>
+                                    <option>Круговая</option>
+                                </select>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Формат матчей</label>
+                                <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.matchFormat || ''} onChange={e => setEditingTournament({...editingTournament, matchFormat: e.target.value})} />
+                            </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Начало</label>
+                                <input type="date" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.startDate ? editingTournament.startDate.split('T')[0] : ''} onChange={e => setEditingTournament({...editingTournament, startDate: e.target.value})} />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Окончание</label>
+                                <input type="date" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.endDate ? editingTournament.endDate.split('T')[0] : ''} onChange={e => setEditingTournament({...editingTournament, endDate: e.target.value})} />
+                            </div>
+                        </div>
+
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Кол-во участников</label>
+                            <input type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.participantsCount || 16} onChange={e => setEditingTournament({...editingTournament, participantsCount: Number(e.target.value)})} />
+                        </div>
+                        
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Приз</label>
                             <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.prizePool || ''} onChange={e => setEditingTournament({...editingTournament, prizePool: e.target.value})} />

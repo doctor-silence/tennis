@@ -774,12 +774,18 @@ const TournamentsWidget = ({ user, onNavigate }: { user: User, onNavigate: (tab:
                 {selectedTournament && (
                     <div className="p-4">
                          <p className="text-sm text-slate-600 mb-2"><strong>Группа:</strong> {selectedTournament.groupName || 'N/A'}</p>
-                         <p className="text-sm text-slate-600 mb-2"><strong>Статус:</strong> {selectedTournament.status}</p>
+                         <p className="text-sm text-slate-600 mb-2"><strong>Статус:</strong> {
+                            selectedTournament.status === 'draft' ? 'Черновик' :
+                            selectedTournament.status === 'live' ? 'Идет' :
+                            selectedTournament.status === 'finished' ? 'Завершен' :
+                            selectedTournament.status
+                         }</p>
                          <p className="text-sm text-slate-600 mb-2"><strong>Призовой фонд:</strong> {selectedTournament.prizePool}</p>
-                         <p className="text-sm text-slate-600 mb-4"><strong>Дата:</strong> {new Date(selectedTournament.date || '').toLocaleDateString('ru-RU')}</p>
-                         <Button onClick={() => { setSelectedTournament(null); onNavigate('tournaments'); }} className="w-full">
-                            Перейти к турниру
-                         </Button>
+                         <p className="text-sm text-slate-600 mb-4"><strong>Дата:</strong> {
+                            selectedTournament.date && !isNaN(new Date(selectedTournament.date).getTime())
+                                ? new Date(selectedTournament.date).toLocaleDateString('ru-RU')
+                                : 'Не указана'
+                         }</p>
                     </div>
                 )}
             </Modal>
