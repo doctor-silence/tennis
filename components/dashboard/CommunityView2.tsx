@@ -1242,13 +1242,9 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated,
                              <Tooltip text="Создать группу">
                                 <button onClick={() => setPostType(postType === 'group' ? 'text' : 'group')} className={`p-2 rounded-full transition-colors ${postType === 'group' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Users size={20}/></button>
                              </Tooltip>
-                            <Tooltip text="Создать событие">
-                               <button onClick={() => setPostType(postType === 'event' ? 'text' : 'event')} className={`p-2 rounded-full transition-colors ${postType === 'event' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Calendar size={20}/></button>
-                            </Tooltip>
-                             <Tooltip text="Продать вещь">
-                                <button onClick={() => setPostType(postType === 'marketplace' ? 'text' : 'marketplace')} className={`p-2 rounded-full transition-colors ${postType === 'marketplace' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><ShoppingCart size={20}/></button>
-                             </Tooltip>
-                        </div>
+                                                         <Tooltip text="Продать вещь">
+                                                            <button onClick={() => setPostType(postType === 'marketplace' ? 'text' : 'marketplace')} className={`p-2 rounded-full transition-colors ${postType === 'marketplace' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><ShoppingCart size={20}/></button>
+                                                         </Tooltip>                        </div>
                         <Button onClick={() => handlePublishPost({text: postText})} disabled={!postText.trim()}>Опубликовать</Button>
                     </div>
                      {postType === 'partner_search' && <PartnerSearchForm onPublish={handlePublishPost} />}
