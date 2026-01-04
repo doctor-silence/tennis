@@ -1618,8 +1618,8 @@ app.get('/api/tournaments', async (req, res) => {
 
 app.post('/api/tournaments', async (req, res) => {
     const { 
-        userId, name, groupName, prizePool, status, type, target_group_id, rounds,
-        category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate 
+        userId, name, groupName, prize_pool, status, type, target_group_id, rounds,
+        category, tournament_type, gender, age_group, system, match_format, start_date, end_date, participants_count
     } = req.body;
     if (!userId || !name) {
         return res.status(400).json({ error: 'userId and name are required' });
@@ -1628,12 +1628,12 @@ app.post('/api/tournaments', async (req, res) => {
         const result = await pool.query(
             `INSERT INTO tournaments (
                 user_id, name, group_name, prize_pool, status, type, target_group_id, rounds,
-                category, tournament_type, gender, age_group, system, match_format, start_date, end_date
+                category, tournament_type, gender, age_group, system, match_format, start_date, end_date, participants_count
             )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING *`,
             [
-                userId, name, groupName, prizePool, status, type, target_group_id, JSON.stringify(rounds),
-                category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate
+                userId, name, groupName, prize_pool, status, type, target_group_id, JSON.stringify(rounds),
+                category, tournament_type, gender, age_group, system, match_format, start_date, end_date, participants_count
             ]
         );
         const newTournament = result.rows[0];
@@ -1647,20 +1647,20 @@ app.post('/api/tournaments', async (req, res) => {
 app.put('/api/tournaments/:id', async (req, res) => {
     const { id } = req.params;
     const { 
-        name, groupName, prizePool, status, type, target_group_id, rounds,
-        category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate
+        name, groupName, prize_pool, status, type, target_group_id, rounds,
+        category, tournament_type, gender, age_group, system, match_format, start_date, end_date, participants_count
     } = req.body;
 
     try {
         const result = await pool.query(
             `UPDATE tournaments 
              SET name = $1, group_name = $2, prize_pool = $3, status = $4, type = $5, target_group_id = $6, rounds = $7,
-                 category = $8, tournament_type = $9, gender = $10, age_group = $11, system = $12, match_format = $13, start_date = $14, end_date = $15
+                 category = $8, tournament_type = $9, gender = $10, age_group = $11, system = $12, match_format = $13, start_date = $14, end_date = $15, participants_count = $17
              WHERE id = $16 RETURNING *`,
             [
-                name, groupName, prizePool, status, type, target_group_id, JSON.stringify(rounds),
-                category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate,
-                id
+                name, groupName, prize_pool, status, type, target_group_id, JSON.stringify(rounds),
+                category, tournament_type, gender, age_group, system, match_format, start_date, end_date,
+                id, participants_count
             ]
         );
         if (result.rows.length === 0) {

@@ -716,7 +716,7 @@ const TournamentsWidget = ({ user, onNavigate }: { user: User, onNavigate: (tab:
     useEffect(() => {
         api.tournaments.getAll(user.id)
             .then(data => {
-                setTournaments(data.slice(0, 3)); // Show max 3
+                setTournaments(data);
                 setLoading(false);
             })
             .catch(err => {

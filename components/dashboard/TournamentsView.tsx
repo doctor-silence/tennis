@@ -32,8 +32,8 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
     const [createForm, setCreateForm] = useState({
         name: '',
         groupName: '',
-        date: new Date().toISOString().split('T')[0],
-        prizePool: '50 000 ₽',
+        start_date: new Date().toISOString().split('T')[0],
+        prize_pool: '50000',
         bracketSize: 16 as BracketSize,
         target_group_id: ''
     });
@@ -51,7 +51,6 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
                 setGroups(gData);
             } catch (error) {
                 console.error("Failed to load tournament data:", error);
-                // Здесь можно было бы показать уведомление пользователю
             }
         };
         load();
@@ -91,7 +90,12 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
             const rounds = generateEmptyRounds(createForm.bracketSize);
             console.log('Creating tournament with target_group_id:', createForm.target_group_id);
             const newTournament = await api.tournaments.create({
-                ...createForm,
+                name: createForm.name,
+                groupName: createForm.groupName,
+                start_date: createForm.start_date,
+                prize_pool: createForm.prize_pool,
+                target_group_id: createForm.target_group_id,
+                participants_count: createForm.bracketSize,
                 userId: user.id,
                 rounds, 
                 status: 'draft',
@@ -117,8 +121,8 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
                 content: {
                     title: returnedTournament.name,
                     groupName: returnedTournament.groupName,
-                    prizePool: returnedTournament.prizePool,
-                    date: returnedTournament.date,
+                    prizePool: returnedTournament.prize_pool,
+                    date: returnedTournament.start_date,
                     authorName: user.name,
                 }
             });
@@ -293,7 +297,7 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
                             <div key={t.id} onClick={() => setSelectedTournament(t)} className="bg-white rounded-[35px] border p-8 hover:shadow-xl transition-all cursor-pointer group hover:border-lime-400">
                                 <div className="flex justify-between mb-4">
                                     <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase ${t.status === 'live' ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'}`}>{t.status}</span>
-                                    <span className="text-xs font-bold text-slate-300">{formatDate(t.date)}</span>
+                                    <span className="text-xs font-bold text-slate-300">{formatDate(t.start_date)}</span>
                                 </div>
                                 <h3 className="text-xl font-black text-slate-900 mb-6">{t.name}</h3>
                                 {t.groupName && <div className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-4">Группа: {t.groupName}</div>}
@@ -312,7 +316,7 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
                                 <h2 className="text-2xl font-black uppercase italic tracking-tighter">{selectedTournament.name}</h2>
                                 <div className="flex items-center gap-3 mt-1">
                                     <p className="text-lime-400 text-xs font-black uppercase tracking-widest">{selectedTournament.groupName || 'Частный кубок'}</p>
-                                    <p className="text-white/40 text-xs font-bold uppercase tracking-widest">• {formatDate(selectedTournament.date)} • {selectedTournament.prizePool}</p>
+                                    <p className="text-white/40 text-xs font-bold uppercase tracking-widest">• {formatDate(selectedTournament.start_date)} • {selectedTournament.prize_pool}</p>
                                 </div>
                             </div>
                         </div>
@@ -401,8 +405,8 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
                         </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Дата</label><input type="date" className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 outline-none font-bold shadow-inner" value={createForm.date} onChange={e => setCreateForm({...createForm, date: e.target.value})} /></div>
-                        <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Приз</label><input className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 outline-none font-bold shadow-inner" value={createForm.prizePool} onChange={e => setCreateForm({...createForm, prizePool: e.target.value})} /></div>
+                        <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Дата</label><input type="date" className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 outline-none font-bold shadow-inner" value={createForm.start_date} onChange={e => setCreateForm({...createForm, start_date: e.target.value})} /></div>
+                        <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Приз</label><input className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 outline-none font-bold shadow-inner" value={createForm.prize_pool} onChange={e => setCreateForm({...createForm, prize_pool: e.target.value})} /></div>
                     </div>
                     <div className="space-y-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Размер сетки</label>
