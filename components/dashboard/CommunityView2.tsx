@@ -708,39 +708,84 @@ const GroupPostForm = ({ user, onPostCreated }: { user: User, onPostCreated: () 
 
 // --- Widgets ---
 
-const TournamentsWidget = () => (
-    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-        <div className="flex justify-between items-center mb-4">
-            <h3 className="font-bold text-lg flex items-center gap-2">
-                <Calendar size={20} className="text-slate-400"/>
-                Турниры
-            </h3>
-            <a href="#" className="text-sm font-bold text-lime-600">Все</a>
-        </div>
-        <div className="space-y-4">
-            <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-slate-100 rounded-lg flex flex-col items-center justify-center">
-                    <span className="text-xs font-bold text-red-600">ОКТ</span>
-                    <span className="font-bold text-lg">24</span>
+const TournamentsWidget = ({ user, onNavigate }: { user: User, onNavigate: (tab: string) => void }) => {
+    const [tournaments, setTournaments] = useState<Tournament[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null);
+
+    useEffect(() => {
+        api.tournaments.getAll(user.id)
+            .then(data => {
+                setTournaments(data.slice(0, 3)); // Show max 3
+                setLoading(false);
+            })
+            .catch(err => {
+                console.error("Failed to fetch tournaments for widget", err);
+                setLoading(false);
+            });
+    }, [user.id]);
+
+    const formatDate = (isoDate: string | undefined) => {
+        if (!isoDate) return { month: '', day: '' };
+        try {
+            const date = new Date(isoDate);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = date.toLocaleString('ru-RU', { month: 'short' }).toUpperCase().replace('.', '');
+            return { month, day };
+        } catch (e) {
+            return { month: 'ERR', day: '00' };
+        }
+    };
+    
+    return (
+        <>
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-bold text-lg flex items-center gap-2">
+                        <Calendar size={20} className="text-slate-400"/>
+                        Турниры
+                    </h3>
+                    <button onClick={() => onNavigate('tournaments')} className="text-sm font-bold text-lime-600">Все</button>
                 </div>
-                <div>
-                    <p className="font-bold text-sm">Weekend Cup Amateur</p>
-                    <p className="text-xs text-slate-500">Теннис Парк</p>
+                <div className="space-y-4 max-h-56 overflow-y-auto">
+                    {loading && <Loader2 className="animate-spin text-slate-400" />}
+                    {!loading && tournaments.map(t => {
+                        const { month, day } = formatDate(t.date);
+                        return (
+                            <div key={t.id} onClick={() => setSelectedTournament(t)} className="flex items-center gap-4 cursor-pointer group">
+                                <div className="w-12 h-12 bg-slate-100 rounded-lg flex flex-col items-center justify-center group-hover:bg-lime-100 transition-colors">
+                                    <span className="text-xs font-bold text-red-600">{month}</span>
+                                    <span className="font-bold text-lg">{day}</span>
+                                </div>
+                                <div>
+                                    <p className="font-bold text-sm group-hover:text-lime-600 transition-colors">{t.name}</p>
+                                    <p className="text-xs text-slate-500">{t.groupName || 'Частный турнир'}</p>
+                                </div>
+                            </div>
+                        );
+                    })}
+                     {!loading && tournaments.length === 0 && (
+                        <p className="text-sm text-slate-400 text-center py-4">Нет предстоящих турниров.</p>
+                     )}
                 </div>
             </div>
-            <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-slate-100 rounded-lg flex flex-col items-center justify-center">
-                    <span className="text-xs font-bold text-red-600">НОЯ</span>
-                    <span className="font-bold text-lg">01</span>
-                </div>
-                <div>
-                    <p className="font-bold text-sm">Autumn Indoor Open</p>
-                    <p className="text-xs text-slate-500">Мультиспорт</p>
-                </div>
-            </div>
-        </div>
-    </div>
-);
+
+            <Modal isOpen={!!selectedTournament} onClose={() => setSelectedTournament(null)} title={selectedTournament?.name || ''}>
+                {selectedTournament && (
+                    <div className="p-4">
+                         <p className="text-sm text-slate-600 mb-2"><strong>Группа:</strong> {selectedTournament.groupName || 'N/A'}</p>
+                         <p className="text-sm text-slate-600 mb-2"><strong>Статус:</strong> {selectedTournament.status}</p>
+                         <p className="text-sm text-slate-600 mb-2"><strong>Призовой фонд:</strong> {selectedTournament.prizePool}</p>
+                         <p className="text-sm text-slate-600 mb-4"><strong>Дата:</strong> {new Date(selectedTournament.date || '').toLocaleDateString('ru-RU')}</p>
+                         <Button onClick={() => { setSelectedTournament(null); onNavigate('tournaments'); }} className="w-full">
+                            Перейти к турниру
+                         </Button>
+                    </div>
+                )}
+            </Modal>
+        </>
+    );
+};
 
 const TopPlayersWidget = ({ onNavigate }: { onNavigate: (tab: string) => void }) => {
     const [players, setPlayers] = useState<LadderPlayer[]>([]);
@@ -1264,7 +1309,7 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated,
                 )}
             </div>
             <div className="space-y-6">
-                <TournamentsWidget />
+                <TournamentsWidget user={user} onNavigate={onNavigate} />
                 <TopPlayersWidget onNavigate={onNavigate} />
                 <GroupsWidget onGroupClickForModal={setSelectedGroupForModal} myGroups={myGroups} />
                 <MarketplaceWidget />
