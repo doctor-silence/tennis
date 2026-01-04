@@ -750,7 +750,7 @@ const TournamentsWidget = ({ user, onNavigate }: { user: User, onNavigate: (tab:
                 <div className="space-y-4 max-h-56 overflow-y-auto">
                     {loading && <Loader2 className="animate-spin text-slate-400" />}
                     {!loading && tournaments.map(t => {
-                        const { month, day } = formatDate(t.date);
+                        const { month, day } = formatDate(t.start_date);
                         return (
                             <div key={t.id} onClick={() => setSelectedTournament(t)} className="flex items-center gap-4 cursor-pointer group">
                                 <div className="w-12 h-12 bg-slate-100 rounded-lg flex flex-col items-center justify-center group-hover:bg-lime-100 transition-colors">
@@ -772,20 +772,32 @@ const TournamentsWidget = ({ user, onNavigate }: { user: User, onNavigate: (tab:
 
             <Modal isOpen={!!selectedTournament} onClose={() => setSelectedTournament(null)} title={selectedTournament?.name || ''}>
                 {selectedTournament && (
-                    <div className="p-4">
-                         <p className="text-sm text-slate-600 mb-2"><strong>Группа:</strong> {selectedTournament.groupName || 'N/A'}</p>
-                         <p className="text-sm text-slate-600 mb-2"><strong>Статус:</strong> {
+                    <div className="p-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                        <p className="text-slate-600"><strong>Группа:</strong> {selectedTournament.groupName || 'N/A'}</p>
+                        <p className="text-slate-600"><strong>Статус:</strong> {
                             selectedTournament.status === 'draft' ? 'Черновик' :
                             selectedTournament.status === 'live' ? 'Идет' :
                             selectedTournament.status === 'finished' ? 'Завершен' :
                             selectedTournament.status
-                         }</p>
-                         <p className="text-sm text-slate-600 mb-2"><strong>Призовой фонд:</strong> {selectedTournament.prizePool}</p>
-                         <p className="text-sm text-slate-600 mb-4"><strong>Дата:</strong> {
-                            selectedTournament.date && !isNaN(new Date(selectedTournament.date).getTime())
-                                ? new Date(selectedTournament.date).toLocaleDateString('ru-RU')
+                        }</p>
+                         <p className="text-slate-600 col-span-2"><strong>Категория:</strong> {selectedTournament.category || 'Не указана'}</p>
+                         <p className="text-slate-600"><strong>Разряд:</strong> {selectedTournament.tournament_type || 'Не указан'}</p>
+                         <p className="text-slate-600"><strong>Пол:</strong> {selectedTournament.gender || 'Не указан'}</p>
+                         <p className="text-slate-600 col-span-2"><strong>Возраст:</strong> {selectedTournament.age_group || 'Не указана'}</p>
+                         <p className="text-slate-600"><strong>Система:</strong> {selectedTournament.system || 'Не указана'}</p>
+                         <p className="text-slate-600"><strong>Формат:</strong> {selectedTournament.match_format || 'Не указан'}</p>
+                         <p className="text-slate-600 col-span-2"><strong>Участники:</strong> {selectedTournament.participants_count || 'Не указано'}</p>
+                         <p className="text-slate-600"><strong>Начало:</strong> {
+                            selectedTournament.start_date && !isNaN(new Date(selectedTournament.start_date).getTime())
+                                ? new Date(selectedTournament.start_date).toLocaleDateString('ru-RU')
                                 : 'Не указана'
                          }</p>
+                         <p className="text-slate-600"><strong>Окончание:</strong> {
+                            selectedTournament.end_date && !isNaN(new Date(selectedTournament.end_date).getTime())
+                                ? new Date(selectedTournament.end_date).toLocaleDateString('ru-RU')
+                                : 'Не указана'
+                         }</p>
+                         <p className="text-slate-600 col-span-2"><strong>Призовой фонд:</strong> {selectedTournament.prize_pool || 'Не указан'}</p>
                     </div>
                 )}
             </Modal>

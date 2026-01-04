@@ -419,16 +419,36 @@ app.delete('/api/admin/users/:id', async (req, res) => {
 });
 
 app.get('/api/admin/groups', async (req, res) => {
+    const { userId } = req.query;
+
     try {
-        const result = await pool.query(`
+        let user;
+        if (userId) {
+            const userRes = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+            if (userRes.rows.length > 0) {
+                user = userRes.rows[0];
+            }
+        }
+
+        let query = `
             SELECT 
                 g.*, 
                 u.name as creator_name, 
                 (SELECT COUNT(*) FROM group_members gm WHERE gm.group_id = g.id) as members_count
             FROM groups g
             LEFT JOIN users u ON g.creator_id = u.id
-            ORDER BY g.id DESC
-        `);
+        `;
+        const queryParams = [];
+
+        if (user && user.role === 'coach') {
+            query += ' WHERE g.creator_id = $1';
+            queryParams.push(user.id);
+        }
+
+        query += ' ORDER BY g.id DESC';
+
+        const result = await pool.query(query, queryParams);
+
         res.json(result.rows.map(row => ({
             ...row,
             id: row.id.toString(),
@@ -511,7 +531,7 @@ app.delete('/api/admin/groups/:id', async (req, res) => {
 
 app.get('/api/admin/tournaments', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM tournaments ORDER BY date DESC');
+        const result = await pool.query('SELECT * FROM tournaments ORDER BY start_date DESC NULLS LAST, id DESC');
         res.json(result.rows.map(t => ({ ...t, id: t.id.toString() })));
     } catch (err) {
         console.error("Admin Get Tournaments Error:", err);
@@ -1577,14 +1597,15 @@ app.get('/api/tournaments', async (req, res) => {
 
     try {
         const query = `
-            SELECT t.*, u.role as creator_role
+            SELECT t.*, u.role as creator_role, g.name as "groupName"
             FROM tournaments t
             JOIN users u ON t.user_id = u.id
-            LEFT JOIN group_members gm ON CAST(t.target_group_id AS INTEGER) = gm.group_id AND gm.user_id = $1
+            LEFT JOIN groups g ON t.target_group_id IS NOT NULL AND t.target_group_id != '' AND CAST(t.target_group_id AS INTEGER) = g.id
+            LEFT JOIN group_members gm ON g.id = gm.group_id AND gm.user_id = $1
             WHERE
                 u.role = 'admin'
                 OR (u.role = 'coach' AND gm.user_id IS NOT NULL)
-            ORDER BY t.date DESC
+            ORDER BY t.start_date DESC NULLS LAST, t.id DESC
         `;
         
         const result = await pool.query(query, [userId]);
@@ -1596,15 +1617,24 @@ app.get('/api/tournaments', async (req, res) => {
 });
 
 app.post('/api/tournaments', async (req, res) => {
-    const { userId, name, groupName, date, prizePool, status, type, target_group_id, rounds } = req.body;
+    const { 
+        userId, name, groupName, prizePool, status, type, target_group_id, rounds,
+        category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate 
+    } = req.body;
     if (!userId || !name) {
         return res.status(400).json({ error: 'userId and name are required' });
     }
     try {
         const result = await pool.query(
-            `INSERT INTO tournaments (user_id, name, group_name, date, prize_pool, status, type, target_group_id, rounds)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-            [userId, name, groupName, date, prizePool, status, type, target_group_id, JSON.stringify(rounds)]
+            `INSERT INTO tournaments (
+                user_id, name, group_name, prize_pool, status, type, target_group_id, rounds,
+                category, tournament_type, gender, age_group, system, match_format, start_date, end_date
+            )
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
+            [
+                userId, name, groupName, prizePool, status, type, target_group_id, JSON.stringify(rounds),
+                category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate
+            ]
         );
         const newTournament = result.rows[0];
         res.status(201).json({ ...newTournament, id: newTournament.id.toString() });
@@ -1616,14 +1646,22 @@ app.post('/api/tournaments', async (req, res) => {
 
 app.put('/api/tournaments/:id', async (req, res) => {
     const { id } = req.params;
-    const { name, groupName, date, prizePool, status, type, target_group_id, rounds } = req.body;
+    const { 
+        name, groupName, prizePool, status, type, target_group_id, rounds,
+        category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate
+    } = req.body;
 
     try {
         const result = await pool.query(
             `UPDATE tournaments 
-             SET name = $1, group_name = $2, date = $3, prize_pool = $4, status = $5, type = $6, target_group_id = $7, rounds = $8
-             WHERE id = $9 RETURNING *`,
-            [name, groupName, date, prizePool, status, type, target_group_id, JSON.stringify(rounds), id]
+             SET name = $1, group_name = $2, prize_pool = $3, status = $4, type = $5, target_group_id = $6, rounds = $7,
+                 category = $8, tournament_type = $9, gender = $10, age_group = $11, system = $12, match_format = $13, start_date = $14, end_date = $15
+             WHERE id = $16 RETURNING *`,
+            [
+                name, groupName, prizePool, status, type, target_group_id, JSON.stringify(rounds),
+                category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate,
+                id
+            ]
         );
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Tournament not found' });
