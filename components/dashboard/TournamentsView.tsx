@@ -265,6 +265,20 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
         </div>
     );
 
+    const formatDate = (isoDate: string) => {
+        if (!isoDate) return '';
+        try {
+            const date = new Date(isoDate);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}.${month}.${year}`;
+        } catch (e) {
+            console.error("Invalid date format", isoDate);
+            return isoDate; // return original if parsing fails
+        }
+    };
+
     return (
         <div className="space-y-8 animate-fade-in-up pb-20">
             {!selectedTournament ? (
@@ -279,7 +293,7 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
                             <div key={t.id} onClick={() => setSelectedTournament(t)} className="bg-white rounded-[35px] border p-8 hover:shadow-xl transition-all cursor-pointer group hover:border-lime-400">
                                 <div className="flex justify-between mb-4">
                                     <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase ${t.status === 'live' ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'}`}>{t.status}</span>
-                                    <span className="text-xs font-bold text-slate-300">{t.date}</span>
+                                    <span className="text-xs font-bold text-slate-300">{formatDate(t.date)}</span>
                                 </div>
                                 <h3 className="text-xl font-black text-slate-900 mb-6">{t.name}</h3>
                                 {t.groupName && <div className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-4">Группа: {t.groupName}</div>}
@@ -298,7 +312,7 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
                                 <h2 className="text-2xl font-black uppercase italic tracking-tighter">{selectedTournament.name}</h2>
                                 <div className="flex items-center gap-3 mt-1">
                                     <p className="text-lime-400 text-xs font-black uppercase tracking-widest">{selectedTournament.groupName || 'Частный кубок'}</p>
-                                    <p className="text-white/40 text-xs font-bold uppercase tracking-widest">• {selectedTournament.date} • {selectedTournament.prizePool}</p>
+                                    <p className="text-white/40 text-xs font-bold uppercase tracking-widest">• {formatDate(selectedTournament.date)} • {selectedTournament.prizePool}</p>
                                 </div>
                             </div>
                         </div>
