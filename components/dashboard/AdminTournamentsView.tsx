@@ -1,23 +1,25 @@
 
 import React from 'react';
 import { Tournament } from '../../types';
-import { Trash2, Edit } from 'lucide-react';
+import { Trash2, Edit, Plus } from 'lucide-react';
+import Button from '../Button';
 
 interface AdminTournamentsViewProps {
   tournaments: Tournament[];
   onDelete: (id: string) => void;
   onEdit: (tournament: Tournament) => void;
+  onAdd: () => void;
 }
 
-const AdminTournamentsView: React.FC<AdminTournamentsViewProps> = ({ tournaments, onDelete, onEdit }) => {
+const AdminTournamentsView: React.FC<AdminTournamentsViewProps> = ({ tournaments, onDelete, onEdit, onAdd }) => {
   return (
     <div className="animate-fade-in-up">
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-200 flex justify-between items-center">
           <h3 className="font-bold">Всего турниров: {tournaments.length}</h3>
-          {/* <Button size="sm" onClick={() => {}} className="gap-2">
+          <Button size="sm" onClick={onAdd} className="gap-2">
             <Plus size={16}/> Создать турнир
-          </Button> */}
+          </Button>
         </div>
         <table className="w-full text-sm text-left">
           <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs">

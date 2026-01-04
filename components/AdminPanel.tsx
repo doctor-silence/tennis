@@ -270,6 +270,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     };
 
     // Tournament Handlers
+    const handleAddTournament = () => {
+        setEditingTournament({
+            name: 'Новый турнир',
+            prizePool: '10000 RUB',
+            status: 'draft',
+            type: 'single_elimination',
+            rounds: [],
+            userId: user.id
+        });
+        setIsTournamentModalOpen(true);
+    };
+
     const handleEditTournament = (tournament: Tournament) => {
         setEditingTournament(tournament);
         setIsTournamentModalOpen(true);
@@ -277,9 +289,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
 
     const handleSaveTournament = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!editingTournament || !editingTournament.id) return;
+        if (!editingTournament) return;
         try {
-            await api.admin.updateTournament(editingTournament.id, editingTournament);
+            if (editingTournament.id) {
+                await api.admin.updateTournament(editingTournament.id, editingTournament);
+            } else {
+                await api.admin.createTournament(editingTournament);
+            }
             await loadData();
             setIsTournamentModalOpen(false);
             setEditingTournament(null);
@@ -374,10 +390,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                     )}
 
                     {activeTab === 'tournaments' && (
-                        <AdminTournamentsView tournaments={tournaments.map(t => {
-                            const group = groups.find(g => g.id === t.target_group_id);
-                            return { ...t, groupName: group ? group.name : t.groupName };
-                        })} onDelete={handleDeleteTournament} onEdit={handleEditTournament} />
+                        <AdminTournamentsView 
+                            tournaments={tournaments.map(t => {
+                                const group = groups.find(g => g.id === t.target_group_id);
+                                return { ...t, groupName: group ? group.name : t.groupName };
+                            })} 
+                            onDelete={handleDeleteTournament} 
+                            onEdit={handleEditTournament} 
+                            onAdd={handleAddTournament}
+                        />
                     )}
 
                     {activeTab === 'support' && (
