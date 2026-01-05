@@ -372,6 +372,19 @@ const initDb = async () => {
     `);
     console.log('✅ Table "tournaments" checked.');
 
+    // 16. Create Tournament Applications Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS tournament_applications (
+        id SERIAL PRIMARY KEY,
+        tournament_id INTEGER NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending, approved, rejected
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (tournament_id, user_id)
+      );
+    `);
+    console.log('✅ Table "tournament_applications" checked.');
+
     await client.query('COMMIT');
 
     // --- SEED DATA ---

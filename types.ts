@@ -314,3 +314,15 @@ export interface Tournament {
   startDate?: string;
   endDate?: string;
 }
+
+export interface TournamentApplication {
+  id: string;
+  tournament_id: string;
+  user_id: string;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  tournament_name?: string;
+  user_name?: string;
+  user_avatar?: string;
+  user_level?: string;
+}

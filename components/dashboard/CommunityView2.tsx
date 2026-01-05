@@ -708,7 +708,7 @@ const GroupPostForm = ({ user, onPostCreated }: { user: User, onPostCreated: () 
 
 // --- Widgets ---
 
-const TournamentsWidget = ({ user, onNavigate }: { user: User, onNavigate: (tab: string) => void }) => {
+const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavigate: (tab: string) => void, myGroups: Group[] }) => {
     const [tournaments, setTournaments] = useState<Tournament[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null);
@@ -737,6 +737,16 @@ const TournamentsWidget = ({ user, onNavigate }: { user: User, onNavigate: (tab:
         }
     };
     
+    const handleApply = (tournamentId: string) => {
+        console.log(`Applying for tournament ${tournamentId} for user ${user.id}`);
+        // TODO: Call api.tournaments.apply(tournamentId, user.id);
+        alert('Заявка отправлена!');
+    };
+
+    const isMember = selectedTournament?.target_group_id ? myGroups.some(g => g.id === selectedTournament.target_group_id) : false;
+    const canApply = selectedTournament && selectedTournament.creator_role === 'coach' && isMember && selectedTournament.status === 'draft';
+
+
     return (
         <>
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
@@ -772,33 +782,40 @@ const TournamentsWidget = ({ user, onNavigate }: { user: User, onNavigate: (tab:
 
             <Modal isOpen={!!selectedTournament} onClose={() => setSelectedTournament(null)} title={selectedTournament?.name || ''}>
                 {selectedTournament && (
-                    <div className="p-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                        <p className="text-slate-600"><strong>Группа:</strong> {selectedTournament.groupName || 'N/A'}</p>
-                        <p className="text-slate-600"><strong>Статус:</strong> {
-                            selectedTournament.status === 'draft' ? 'Черновик' :
-                            selectedTournament.status === 'live' ? 'Идет' :
-                            selectedTournament.status === 'finished' ? 'Завершен' :
-                            selectedTournament.status
-                        }</p>
-                         <p className="text-slate-600 col-span-2"><strong>Категория:</strong> {selectedTournament.category || 'Не указана'}</p>
-                         <p className="text-slate-600"><strong>Разряд:</strong> {selectedTournament.tournament_type || 'Не указан'}</p>
-                         <p className="text-slate-600"><strong>Пол:</strong> {selectedTournament.gender || 'Не указан'}</p>
-                         <p className="text-slate-600 col-span-2"><strong>Возраст:</strong> {selectedTournament.age_group || 'Не указана'}</p>
-                         <p className="text-slate-600"><strong>Система:</strong> {selectedTournament.system || 'Не указана'}</p>
-                         <p className="text-slate-600"><strong>Формат:</strong> {selectedTournament.match_format || 'Не указан'}</p>
-                         <p className="text-slate-600 col-span-2"><strong>Участники:</strong> {selectedTournament.participants_count || 'Не указано'}</p>
-                         <p className="text-slate-600"><strong>Начало:</strong> {
-                            selectedTournament.start_date && !isNaN(new Date(selectedTournament.start_date).getTime())
-                                ? new Date(selectedTournament.start_date).toLocaleDateString('ru-RU')
-                                : 'Не указана'
-                         }</p>
-                         <p className="text-slate-600"><strong>Окончание:</strong> {
-                            selectedTournament.end_date && !isNaN(new Date(selectedTournament.end_date).getTime())
-                                ? new Date(selectedTournament.end_date).toLocaleDateString('ru-RU')
-                                : 'Не указана'
-                         }</p>
-                         <p className="text-slate-600 col-span-2"><strong>Призовой фонд:</strong> {selectedTournament.prize_pool || 'Не указан'}</p>
-                    </div>
+                    <>
+                        <div className="p-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                            <p className="text-slate-600"><strong>Группа:</strong> {selectedTournament.groupName || 'N/A'}</p>
+                            <p className="text-slate-600"><strong>Статус:</strong> {
+                                selectedTournament.status === 'draft' ? 'Набор' :
+                                selectedTournament.status === 'live' ? 'Идет' :
+                                selectedTournament.status === 'finished' ? 'Завершен' :
+                                selectedTournament.status
+                            }</p>
+                            <p className="text-slate-600 col-span-2"><strong>Категория:</strong> {selectedTournament.category || 'Не указана'}</p>
+                            <p className="text-slate-600"><strong>Разряд:</strong> {selectedTournament.tournament_type || 'Не указан'}</p>
+                            <p className="text-slate-600"><strong>Пол:</strong> {selectedTournament.gender || 'Не указан'}</p>
+                            <p className="text-slate-600 col-span-2"><strong>Возраст:</strong> {selectedTournament.age_group || 'Не указана'}</p>
+                            <p className="text-slate-600"><strong>Система:</strong> {selectedTournament.system || 'Не указана'}</p>
+                            <p className="text-slate-600"><strong>Формат:</strong> {selectedTournament.match_format || 'Не указан'}</p>
+                            <p className="text-slate-600 col-span-2"><strong>Участники:</strong> {selectedTournament.participants_count || 'Не указано'}</p>
+                            <p className="text-slate-600"><strong>Начало:</strong> {
+                                selectedTournament.start_date && !isNaN(new Date(selectedTournament.start_date).getTime())
+                                    ? new Date(selectedTournament.start_date).toLocaleDateString('ru-RU')
+                                    : 'Не указана'
+                            }</p>
+                            <p className="text-slate-600"><strong>Окончание:</strong> {
+                                selectedTournament.end_date && !isNaN(new Date(selectedTournament.end_date).getTime())
+                                    ? new Date(selectedTournament.end_date).toLocaleDateString('ru-RU')
+                                    : 'Не указана'
+                            }</p>
+                            <p className="text-slate-600 col-span-2"><strong>Призовой фонд:</strong> {selectedTournament.prize_pool || 'Не указан'}</p>
+                        </div>
+                        {canApply && (
+                            <div className="p-4 border-t border-slate-200">
+                                <Button onClick={() => handleApply(selectedTournament.id)} className="w-full">Подать заявку</Button>
+                            </div>
+                        )}
+                    </>
                 )}
             </Modal>
         </>
@@ -1327,7 +1344,7 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated,
                 )}
             </div>
             <div className="space-y-6">
-                <TournamentsWidget user={user} onNavigate={onNavigate} />
+                <TournamentsWidget user={user} onNavigate={onNavigate} myGroups={myGroups} />
                 <TopPlayersWidget onNavigate={onNavigate} />
                 <GroupsWidget onGroupClickForModal={setSelectedGroupForModal} myGroups={myGroups} />
                 <MarketplaceWidget />

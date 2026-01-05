@@ -1644,6 +1644,166 @@ app.post('/api/tournaments', async (req, res) => {
     }
 });
 
+app.get('/api/users/:userId/applications', async (req, res) => {
+    const { userId } = req.params;
+    try {
+        const result = await pool.query(
+            `SELECT ta.*, t.name as tournament_name, t.start_date
+             FROM tournament_applications ta
+             JOIN tournaments t ON ta.tournament_id = t.id
+             WHERE ta.user_id = $1
+             ORDER BY ta.created_at DESC`,
+            [userId]
+        );
+        res.json(result.rows.map(row => ({ ...row, id: row.id.toString(), tournament_id: row.tournament_id.toString(), user_id: row.user_id.toString() })));
+    } catch (err) {
+        console.error("Fetch User Applications Error:", err);
+        res.status(500).json({ error: 'Failed to fetch user applications' });
+    }
+});
+
+app.get('/api/tournaments/:id/applications', async (req, res) => {
+    const { id: tournamentId } = req.params;
+    const { userId } = req.query; // Coach's user ID making the request
+
+    try {
+        // Verify the requesting user is the coach of this tournament
+        const tournamentRes = await pool.query('SELECT user_id FROM tournaments WHERE id = $1', [tournamentId]);
+        if (tournamentRes.rows.length === 0) {
+            return res.status(404).json({ error: 'Tournament not found' });
+        }
+        if (tournamentRes.rows[0].user_id.toString() !== userId) {
+            return res.status(403).json({ error: 'You are not authorized to view applications for this tournament' });
+        }
+
+        const result = await pool.query(
+            `SELECT ta.*, u.name as user_name, u.avatar as user_avatar, u.level as user_level
+             FROM tournament_applications ta
+             JOIN users u ON ta.user_id = u.id
+             WHERE ta.tournament_id = $1
+             ORDER BY ta.created_at ASC`,
+            [tournamentId]
+        );
+        res.json(result.rows.map(row => ({
+            ...row,
+            id: row.id.toString(),
+            tournament_id: row.tournament_id.toString(),
+            user_id: row.user_id.toString(),
+        })));
+    } catch (err) {
+        console.error("Fetch Tournament Applications Error:", err);
+        res.status(500).json({ error: 'Failed to fetch tournament applications' });
+    }
+});
+
+app.put('/api/applications/:applicationId/status', async (req, res) => {
+    const { applicationId } = req.params;
+    const { status, coachId } = req.body; // coachId is the user modifying the status
+
+    if (!['pending', 'approved', 'rejected'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Verify the coach has permission to modify this application
+        const applicationRes = await client.query(
+            `SELECT ta.tournament_id, t.user_id as creator_id
+             FROM tournament_applications ta
+             JOIN tournaments t ON ta.tournament_id = t.id
+             WHERE ta.id = $1`,
+            [applicationId]
+        );
+
+        if (applicationRes.rows.length === 0) {
+            throw new Error('Application not found');
+        }
+        if (applicationRes.rows[0].creator_id.toString() !== coachId) {
+            throw new Error('You are not authorized to modify this application');
+        }
+
+        const result = await client.query(
+            'UPDATE tournament_applications SET status = $1 WHERE id = $2 RETURNING *',
+            [status, applicationId]
+        );
+
+        await client.query('COMMIT');
+        await logSystemEvent('info', `Application ${applicationId} status updated to ${status} by coach ${coachId}`, 'Tournaments');
+        res.json({ ...result.rows[0], id: result.rows[0].id.toString() });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error("Update Application Status Error:", err);
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
+    }
+});
+
+app.post('/api/tournaments/:id/apply', async (req, res) => {
+    const { id: tournamentId } = req.params;
+    const { userId } = req.body;
+
+    if (!userId) {
+        return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Get tournament and user info
+        const tournamentRes = await client.query('SELECT user_id, name FROM tournaments WHERE id = $1', [tournamentId]);
+        if (tournamentRes.rows.length === 0) {
+            throw new Error('Tournament not found');
+        }
+        const { user_id: coachId, name: tournamentName } = tournamentRes.rows[0];
+
+        const userRes = await client.query('SELECT name FROM users WHERE id = $1', [userId]);
+        if (userRes.rows.length === 0) {
+            throw new Error('Applicant user not found');
+        }
+        const { name: userName } = userRes.rows[0];
+
+        // 2. Create the application
+        const applicationRes = await client.query(
+            `INSERT INTO tournament_applications (tournament_id, user_id, status)
+             VALUES ($1, $2, 'pending')
+             ON CONFLICT (tournament_id, user_id) DO NOTHING
+             RETURNING id`,
+            [tournamentId, userId]
+        );
+        
+        if (applicationRes.rows.length === 0) {
+            // This means the user has already applied due to the UNIQUE constraint
+            await client.query('ROLLBACK');
+            return res.status(409).json({ error: 'Вы уже подали заявку на этот турнир' });
+        }
+        
+        const applicationId = applicationRes.rows[0].id;
+
+        // 3. Create a notification for the coach
+        await client.query(
+            `INSERT INTO notifications (user_id, type, message, reference_id)
+             VALUES ($1, 'tournament_application', $2, $3)`,
+            [coachId, `${userName} хочет участвовать в турнире "${tournamentName}"`, applicationId]
+        );
+
+        await client.query('COMMIT');
+        await logSystemEvent('info', `User ${userId} applied for tournament ${tournamentId}`, 'Tournaments');
+        res.status(201).json({ success: true, message: 'Application submitted' });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error("Apply to Tournament Error:", err);
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
+    }
+});
+
 app.put('/api/tournaments/:id', async (req, res) => {
     const { id } = req.params;
     const { 

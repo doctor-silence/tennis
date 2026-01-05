@@ -779,24 +779,21 @@ export const api = {
             }
         },
         update: async (id: string, data: Partial<Tournament>): Promise<Tournament> => {
-            try {
-                const res = await fetch(`${API_URL}/tournaments/${id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                if (!res.ok) throw new Error('Failed to update tournament');
-                return await res.json();
-            } catch (e) {
-                console.warn(`Backend offline, mocking tournament update for id: ${id}`, e);
-                const index = MOCK_TOURNAMENTS.findIndex(t => t.id === id);
-                if (index > -1) {
-                    MOCK_TOURNAMENTS[index] = { ...MOCK_TOURNAMENTS[index], ...data };
-                    return MOCK_TOURNAMENTS[index];
-                }
-                throw new Error("Mock tournament not found for update");
-            }
-        }
+            const res = await fetch(`${API_URL}/tournaments/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            return handleResponse(res);
+        },
+        apply: async (tournamentId: string, userId: string): Promise<{ success: boolean, message: string }> => {
+            const res = await fetch(`${API_URL}/tournaments/${tournamentId}/apply`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId }),
+            });
+            return handleResponse(res);
+        },
     },
 
     getPartners: async (params?: { city?: string; level?: string; search?: string }) => {
