@@ -2,7 +2,7 @@
 import React from 'react';
 import { 
   User as UserIcon, Search, MapPin, MessageSquare, LogOut, 
-  Bot, Video, BookOpen, Swords, Globe, Users, Trophy
+  Bot, Video, BookOpen, Swords, Globe, Users, Trophy, Mail
 } from 'lucide-react';
 import { User, DashboardTab } from '../../types';
 
@@ -70,6 +70,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogo
           <SidebarItem icon={<MapPin size={20} />} label="Бронирование" active={activeTab === 'courts'} onClick={() => setActiveTab('courts')} />
           <SidebarItem icon={<Swords size={20} />} label="Турнирная лестница" active={activeTab === 'ladder'} onClick={() => setActiveTab('ladder')} badge={ladderNotifications > 0 && ladderNotifications} />
           <SidebarItem icon={<Globe size={20} />} label="Сообщество" active={activeTab === 'community'} onClick={() => setActiveTab('community')} />
+          <SidebarItem icon={<Mail size={20} />} label="Мои заявки" active={activeTab === 'my_applications'} onClick={() => setActiveTab('my_applications')} />
           <SidebarItem icon={<BookOpen size={20} />} label="Тактика" active={activeTab === 'tactics'} onClick={() => setActiveTab('tactics')} />
           <SidebarItem icon={<Video size={20} />} label="Видео-анализ" active={activeTab === 'video_analysis'} onClick={() => {}} inDevelopment={true} />
           <SidebarItem icon={<MessageSquare size={20} />} label="Сообщения" active={activeTab === 'messages'} onClick={() => setActiveTab('messages')} badge={unreadCount > 0 && unreadCount} />

@@ -1,5 +1,5 @@
 export type ViewState = 'landing' | 'auth' | 'dashboard' | 'pro' | 'shop' | 'admin';
-export type DashboardTab = 'profile' | 'search' | 'courts' | 'ai_coach' | 'messages' | 'notifications' | 'tactics' | 'students' | 'tournaments' | 'video_analysis' | 'ladder' | 'community';
+export type DashboardTab = 'profile' | 'search' | 'courts' | 'ai_coach' | 'messages' | 'notifications' | 'tactics' | 'students' | 'tournaments' | 'video_analysis' | 'ladder' | 'community' | 'my_applications';
 
 export interface User {
   id: string;

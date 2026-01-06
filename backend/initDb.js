@@ -370,7 +370,16 @@ const initDb = async () => {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ Table "tournaments" checked.');
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS category VARCHAR(100);`);
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS tournament_type VARCHAR(100);`);
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS gender VARCHAR(50);`);
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS age_group VARCHAR(50);`);
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS system VARCHAR(100);`);
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS match_format VARCHAR(100);`);
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS start_date DATE;`);
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS end_date DATE;`);
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS participants_count INTEGER;`);
+    console.log('✅ Table "tournaments" checked and migrated.');
 
     // 16. Create Tournament Applications Table
     await client.query(`

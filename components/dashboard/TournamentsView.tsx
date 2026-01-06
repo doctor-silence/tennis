@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
     Plus, Trophy, Users, Calendar, ChevronRight, Dices, ChevronLeft,
     ListChecks, CheckCircle2, Play, RefreshCw, UserPlus, Check, User as UserIcon, Zap,
-    ChevronDown
+    ChevronDown, Mail, AlertCircle, Clock
 } from 'lucide-react';
-import { User, Student, Tournament, TournamentMatch, TournamentPlayer, Group } from '../../types';
+import { User, Student, Tournament, TournamentMatch, TournamentPlayer, Group, TournamentApplication } from '../../types';
 import Button from '../Button';
 import { api } from '../../services/api';
 import { Modal } from '../Shared';
@@ -17,6 +17,7 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
     const [students, setStudents] = useState<Student[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
     const [selectedTournament, setSelectedTournament] = useState<any | null>(null);
+    const [applications, setApplications] = useState<TournamentApplication[]>([]);
     
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isMatchModalOpen, setIsMatchModalOpen] = useState(false);
@@ -55,6 +56,45 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
         };
         load();
     }, [user.id]);
+    
+    useEffect(() => {
+        if (selectedTournament && selectedTournament.user_id === user.id) {
+            alert(`Tournament Creator: ${selectedTournament.user_id}, Logged-in Coach: ${user.id}`);
+            fetchApplications(selectedTournament.id);
+        } else {
+            setApplications([]);
+        }
+    }, [selectedTournament, user.id]);
+
+    const fetchApplications = async (tournamentId: string) => {
+        try {
+            const apps = await api.tournaments.getApplications(tournamentId, user.id);
+            setApplications(apps);
+        } catch (error) {
+            console.error("Failed to fetch applications:", error);
+        }
+    };
+
+    const handleApplicationStatusUpdate = async (applicationId: string, status: 'approved' | 'rejected') => {
+        try {
+            await api.tournaments.updateApplicationStatus(applicationId, status, user.id);
+            
+            if (status === 'approved') {
+                const app = applications.find(a => a.id === applicationId);
+                if (app) {
+                    setBulkNames(prev => `${prev}\n${app.user_name}`.trim());
+                }
+            }
+
+            // Refresh applications list
+            if(selectedTournament) {
+                fetchApplications(selectedTournament.id);
+            }
+        } catch (error) {
+            console.error("Failed to update application status:", error);
+            alert('Не удалось обновить статус заявки.');
+        }
+    };
 
     const syncTournament = async (tournament: Tournament): Promise<Tournament> => {
         const updatedTournament = await api.tournaments.update(tournament.id, tournament);
@@ -335,6 +375,42 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
                             )}
                         </div>
                     </div>
+                    
+                    {selectedTournament.user_id === user.id && applications.length > 0 && (
+                        <div className="bg-white p-6 rounded-[40px] border shadow-sm">
+                            <h3 className="text-lg font-black text-slate-900 mb-4 flex items-center gap-2"><Mail size={20} className="text-slate-400"/> Заявки на участие</h3>
+                            <div className="space-y-3">
+                                {applications.map(app => (
+                                    <div key={app.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                                        <div className="flex items-center gap-3">
+                                            <img src={app.user_avatar} alt={app.user_name} className="w-10 h-10 rounded-full" />
+                                            <div>
+                                                <p className="font-bold text-sm">{app.user_name}</p>
+                                                <p className="text-xs text-slate-500">{app.user_level}</p>
+                                            </div>
+                                        </div>
+                                        {app.status === 'pending' ? (
+                                            <div className="flex gap-2">
+                                                <Button size="sm" variant="success_outline" onClick={() => handleApplicationStatusUpdate(app.id, 'approved')}>
+                                                    <Check size={16}/>
+                                                </Button>
+                                                <Button size="sm" variant="danger_outline" onClick={() => handleApplicationStatusUpdate(app.id, 'rejected')}>
+                                                    <X size={16}/>
+                                                </Button>
+                                            </div>
+                                        ) : (
+                                            <div className={`text-sm font-bold flex items-center gap-2 px-3 py-1 rounded-full ${
+                                                app.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                            }`}>
+                                                {app.status === 'approved' ? <CheckCircle2 size={14}/> : <AlertCircle size={14}/>}
+                                                {app.status === 'approved' ? 'Принят' : 'Отклонен'}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     <div className="bg-[#f8fafc] rounded-[50px] border border-slate-100 p-12 overflow-x-auto custom-scrollbar shadow-inner min-h-[600px]">
                         <div className="flex gap-20 min-w-max px-10">

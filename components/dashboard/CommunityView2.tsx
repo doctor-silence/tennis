@@ -712,6 +712,10 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
     const [tournaments, setTournaments] = useState<Tournament[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null);
+    const [isApplying, setIsApplying] = useState(false);
+    const [applicationStatus, setApplicationStatus] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [userApplications, setUserApplications] = useState<any[]>([]);
+
 
     useEffect(() => {
         api.tournaments.getAll(user.id)
@@ -723,6 +727,7 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
                 console.error("Failed to fetch tournaments for widget", err);
                 setLoading(false);
             });
+        api.tournaments.getUserApplications(user.id).then(setUserApplications);
     }, [user.id]);
 
     const formatDate = (isoDate: string | undefined) => {
@@ -737,14 +742,29 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
         }
     };
     
-    const handleApply = (tournamentId: string) => {
-        console.log(`Applying for tournament ${tournamentId} for user ${user.id}`);
-        // TODO: Call api.tournaments.apply(tournamentId, user.id);
-        alert('Заявка отправлена!');
+    const handleApply = async (tournamentId: string) => {
+        setIsApplying(true);
+        setApplicationStatus(null);
+        try {
+            await api.tournaments.apply(tournamentId, user.id);
+            setApplicationStatus({ message: 'Заявка успешно отправлена!', type: 'success' });
+            // Refresh user applications
+            api.tournaments.getUserApplications(user.id).then(setUserApplications);
+        } catch (error: any) {
+            setApplicationStatus({ message: error.message || 'Ошибка при отправке заявки.', type: 'error' });
+        } finally {
+            setIsApplying(false);
+        }
+    };
+
+    const handleModalClose = () => {
+        setSelectedTournament(null);
+        setApplicationStatus(null);
     };
 
     const isMember = selectedTournament?.target_group_id ? myGroups.some(g => g.id === selectedTournament.target_group_id) : false;
-    const canApply = selectedTournament && selectedTournament.creator_role === 'coach' && isMember && selectedTournament.status === 'draft';
+    const hasApplied = selectedTournament ? userApplications.some(app => app.tournament_id === selectedTournament.id) : false;
+    const canApply = selectedTournament && selectedTournament.creator_role !== 'admin' && !hasApplied && selectedTournament.status === 'draft';
 
 
     return (
@@ -780,7 +800,7 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
                 </div>
             </div>
 
-            <Modal isOpen={!!selectedTournament} onClose={() => setSelectedTournament(null)} title={selectedTournament?.name || ''}>
+            <Modal isOpen={!!selectedTournament} onClose={handleModalClose} title={selectedTournament?.name || ''}>
                 {selectedTournament && (
                     <>
                         <div className="p-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
@@ -810,9 +830,25 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
                             }</p>
                             <p className="text-slate-600 col-span-2"><strong>Призовой фонд:</strong> {selectedTournament.prize_pool || 'Не указан'}</p>
                         </div>
-                        {canApply && (
+                        
+                        {(canApply || hasApplied) && (
                             <div className="p-4 border-t border-slate-200">
-                                <Button onClick={() => handleApply(selectedTournament.id)} className="w-full">Подать заявку</Button>
+                                {applicationStatus && (
+                                    <div className={`mb-4 text-center p-2 rounded-lg text-sm ${applicationStatus.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                        {applicationStatus.message}
+                                    </div>
+                                )}
+                                <Button 
+                                    onClick={() => handleApply(selectedTournament.id)} 
+                                    className="w-full"
+                                    disabled={isApplying || hasApplied}
+                                >
+                                    {isApplying 
+                                        ? <Loader2 className="animate-spin" /> 
+                                        : hasApplied 
+                                        ? 'Заявка отправлена' 
+                                        : 'Подать заявку'}
+                                </Button>
                             </div>
                         )}
                     </>

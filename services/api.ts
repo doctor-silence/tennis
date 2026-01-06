@@ -389,6 +389,14 @@ const MOCK_GROUPS: Group[] = [
 let MOCK_TOURNAMENTS: Tournament[] = [];
 
 
+const handleResponse = async (res: Response) => {
+    const data = await res.json();
+    if (!res.ok) {
+        throw new Error(data.error || `Request failed with status ${res.status}`);
+    }
+    return data;
+};
+
 export const api = {
     auth: {
         register: async (userData: any): Promise<User> => {
@@ -762,21 +770,14 @@ export const api = {
             }
         },
         create: async (data: Partial<Tournament> & { userId: string }): Promise<Tournament> => {
-            try {
-                const res = await fetch(`${API_URL}/tournaments`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                const json = await res.json();
-                if (!res.ok) throw new Error(json.error || 'Failed to create tournament');
-                return json;
-            } catch (e) {
-                console.warn("Backend offline, mocking tournament creation", e);
-                const newTournament = { id: `mock-tourney-${Date.now()}`, ...data } as Tournament;
-                MOCK_TOURNAMENTS.push(newTournament);
-                return newTournament;
-            }
+            const res = await fetch(`${API_URL}/tournaments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || 'Failed to create tournament');
+            return json;
         },
         update: async (id: string, data: Partial<Tournament>): Promise<Tournament> => {
             const res = await fetch(`${API_URL}/tournaments/${id}`, {
@@ -791,6 +792,22 @@ export const api = {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId }),
+            });
+            return handleResponse(res);
+        },
+        getApplications: async (tournamentId: string, coachId: string): Promise<any[]> => {
+            const res = await fetch(`${API_URL}/tournaments/${tournamentId}/applications?userId=${coachId}`);
+            return handleResponse(res);
+        },
+        getUserApplications: async (userId: string): Promise<any[]> => {
+            const res = await fetch(`${API_URL}/users/${userId}/applications`);
+            return handleResponse(res);
+        },
+        updateApplicationStatus: async (applicationId: string, status: 'approved' | 'rejected', coachId: string): Promise<any> => {
+            const res = await fetch(`${API_URL}/applications/${applicationId}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status, coachId }),
             });
             return handleResponse(res);
         },

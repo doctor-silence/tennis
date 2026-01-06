@@ -17,6 +17,7 @@ import AiCoachView from './dashboard/AiCoachView';
 import { MessagesView, NotificationsView, LadderView, CommunityView } from './dashboard/CommunityViews';
 import { TacticsView, VideoAnalysisView, StudentsView } from './dashboard/ToolViews';
 import { TournamentsView } from './dashboard/TournamentsView';
+import { MyApplications } from './dashboard/MyApplications';
 
 interface DashboardProps {
   user: User;
@@ -48,6 +49,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
     });
     api.ladder.getChallenges(user.id).then(setChallenges);
     fetchUnreadCount();
+    
+    const interval = setInterval(fetchUnreadCount, 15000); // Poll every 15 seconds
+
+    return () => clearInterval(interval); // Cleanup on component unmount
   }, [user.id]);
 
   const totalUnread = conversations.reduce((sum, convo) => sum + (convo.unread || 0), 0);
@@ -117,6 +122,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
         video_analysis: <VideoAnalysisView />,
         ladder: <LadderView user={user} challenges={challenges} setChallenges={setChallenges} />,
         community: <CommunityView user={user} onNavigate={handleNavigate} onStartConversation={handleStartConversation} feedVersion={feedVersion} />,
+        my_applications: <MyApplications user={user} />,
     };
 
     return (
@@ -173,6 +179,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
                    activeTab === 'courts' ? 'Бронирование' :
                    activeTab === 'tactics' ? 'Тактическая доска' :
                    activeTab === 'messages' ? 'Сообщения' :
+                   activeTab === 'my_applications' ? 'Мои Заявки' :
                    activeTab === 'notifications' ? 'Уведомления' :
                    activeTab}
                 </h1>
