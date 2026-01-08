@@ -313,6 +313,7 @@ export interface Tournament {
   participantsCount?: number;
   startDate?: string;
   endDate?: string;
+  pending_applications_count?: number;
 }
 
 export interface TournamentApplication {

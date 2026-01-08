@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
     Plus, Trophy, Users, Calendar, ChevronRight, Dices, ChevronLeft,
     ListChecks, CheckCircle2, Play, RefreshCw, UserPlus, Check, User as UserIcon, Zap,
-    ChevronDown, Mail, AlertCircle, Clock
+    ChevronDown, Mail, AlertCircle, Clock, X
 } from 'lucide-react';
 import { User, Student, Tournament, TournamentMatch, TournamentPlayer, Group, TournamentApplication } from '../../types';
 import Button from '../Button';
@@ -12,14 +12,22 @@ import TournamentBanner from './TournamentBanner';
 
 type BracketSize = 2 | 4 | 8 | 16 | 32 | 64;
 
+// Extend TournamentApplication to include tournamentName
+interface TournamentApplicationWithTournamentName extends TournamentApplication {
+    tournamentName: string;
+}
+
 export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTournamentUpdate: () => void }) => {
     const [tournaments, setTournaments] = useState<Tournament[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
     const [selectedTournament, setSelectedTournament] = useState<any | null>(null);
     const [applications, setApplications] = useState<TournamentApplication[]>([]);
+    const [allApplications, setAllApplications] = useState<TournamentApplicationWithTournamentName[]>([]);
+    const [totalPendingApplications, setTotalPendingApplications] = useState(0);
     
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isApplicationsModalOpen, setIsApplicationsModalOpen] = useState(false);
     const [isMatchModalOpen, setIsMatchModalOpen] = useState(false);
     const [isBulkAddOpen, setIsBulkAddOpen] = useState(false);
     const [isScoreModalOpen, setIsScoreModalOpen] = useState(false);
@@ -39,27 +47,46 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
         target_group_id: ''
     });
 
-    useEffect(() => {
-        const load = async () => {
-            try {
-                const [tData, sData, gData] = await Promise.all([
-                    api.tournaments.getAll(user.id),
-                    api.students.getAll(user.id),
-                    api.groups.getAll()
-                ]);
-                setTournaments(tData);
-                setStudents(sData);
-                setGroups(gData);
-            } catch (error) {
-                console.error("Failed to load tournament data:", error);
+    const loadAllData = async () => {
+        try {
+            const [tData, sData, gData] = await Promise.all([
+                api.tournaments.getAll(user.id),
+                api.students.getAll(user.id),
+                api.groups.getAll()
+            ]);
+            setTournaments(tData);
+            setStudents(sData);
+            setGroups(gData);
+
+            const pendingCount = tData.reduce((sum, t) => sum + (t.pending_applications_count || 0), 0);
+            setTotalPendingApplications(pendingCount);
+
+            // Fetch all applications for all tournaments
+            let allApps: TournamentApplicationWithTournamentName[] = [];
+            for (const tournament of tData) {
+                if (String(tournament.user_id) === user.id) {
+                    try {
+                        const apps = await api.tournaments.getApplications(tournament.id, user.id);
+                        const appsWithTournamentName = apps.map(app => ({...app, tournamentName: tournament.name}));
+                        allApps = [...allApps, ...appsWithTournamentName];
+                    } catch (error) {
+                        console.error(`Failed to fetch applications for tournament ${tournament.id}`, error);
+                    }
+                }
             }
-        };
-        load();
+            setAllApplications(allApps);
+
+        } catch (error) {
+            console.error("Failed to load tournament data:", error);
+        }
+    };
+
+    useEffect(() => {
+        loadAllData();
     }, [user.id]);
     
     useEffect(() => {
         if (selectedTournament && selectedTournament.user_id === user.id) {
-            alert(`Tournament Creator: ${selectedTournament.user_id}, Logged-in Coach: ${user.id}`);
             fetchApplications(selectedTournament.id);
         } else {
             setApplications([]);
@@ -80,16 +107,17 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
             await api.tournaments.updateApplicationStatus(applicationId, status, user.id);
             
             if (status === 'approved') {
-                const app = applications.find(a => a.id === applicationId);
+                const app = allApplications.find(a => a.id === applicationId);
                 if (app) {
-                    setBulkNames(prev => `${prev}\n${app.user_name}`.trim());
+                    // This logic might need adjustment if you want to add the approved player to a specific tournament's bulk add list
+                    // For now, it just adds to the general bulkNames state, which is tied to a selected tournament.
+                    // This is a potential UX issue to address.
                 }
             }
+            
+            // Refresh all data
+            await loadAllData();
 
-            // Refresh applications list
-            if(selectedTournament) {
-                fetchApplications(selectedTournament.id);
-            }
         } catch (error) {
             console.error("Failed to update application status:", error);
             alert('Не удалось обновить статус заявки.');
@@ -330,11 +358,28 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
                     <TournamentBanner activeCount={tournaments.length} />
                     <div className="flex justify-between items-center bg-white p-8 rounded-[40px] border shadow-sm mt-8">
                         <div><h2 className="text-3xl font-black text-slate-900 italic uppercase">Турниры</h2><p className="text-slate-400 font-bold uppercase text-[10px]">Управление сетками</p></div>
-                        <Button className="h-14 px-8 rounded-2xl" onClick={() => setIsCreateModalOpen(true)}><Plus size={20} className="mr-2"/> Новый турнир</Button>
+                        <div className="flex items-center gap-4">
+                            <Button className="h-14 px-8 rounded-2xl" onClick={() => setIsCreateModalOpen(true)}><Plus size={20} className="mr-2"/> Новый турнир</Button>
+                            <div className="relative">
+                                <Button variant="secondary" className="h-14 px-8 rounded-2xl" onClick={() => setIsApplicationsModalOpen(true)}>
+                                    <Mail size={20} className="mr-2"/> Заявки
+                                </Button>
+                                {totalPendingApplications > 0 && (
+                                    <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center">
+                                        {totalPendingApplications}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {tournaments.map(t => (
-                            <div key={t.id} onClick={() => setSelectedTournament(t)} className="bg-white rounded-[35px] border p-8 hover:shadow-xl transition-all cursor-pointer group hover:border-lime-400">
+                            <div key={t.id} onClick={() => setSelectedTournament(t)} className="relative bg-white rounded-[35px] border p-8 hover:shadow-xl transition-all cursor-pointer group hover:border-lime-400">
+                                {t.user_id === user.id && t.pending_applications_count && t.pending_applications_count > 0 && (
+                                    <div className="absolute top-4 right-4 bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center">
+                                        {t.pending_applications_count}
+                                    </div>
+                                )}
                                 <div className="flex justify-between mb-4">
                                     <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase ${t.status === 'live' ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'}`}>{t.status}</span>
                                     <span className="text-xs font-bold text-slate-300">{formatDate(t.start_date)}</span>
@@ -399,7 +444,7 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
                                                 </Button>
                                             </div>
                                         ) : (
-                                            <div className={`text-sm font-bold flex items-center gap-2 px-3 py-1 rounded-full ${
+                                            <div className={`text-sm font-bold flex items-center gap-2 px-3 py-1 rounded-full ${ 
                                                 app.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                                             }`}>
                                                 {app.status === 'approved' ? <CheckCircle2 size={14}/> : <AlertCircle size={14}/>}
@@ -438,6 +483,43 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
                     </div>
                 </div>
             )}
+            
+            <Modal isOpen={isApplicationsModalOpen} onClose={() => setIsApplicationsModalOpen(false)} title="Все заявки на участие">
+                <div className="space-y-3 max-h-[70vh] overflow-y-auto">
+                    {allApplications.length > 0 ? allApplications.map(app => (
+                        <div key={app.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                            <div className="flex items-center gap-3">
+                                <img src={app.user_avatar} alt={app.user_name} className="w-10 h-10 rounded-full" />
+                                <div>
+                                    <p className="font-bold text-sm">{app.user_name}</p>
+                                    <p className="text-xs text-slate-500">
+                                        <span className="font-semibold">{app.tournamentName}</span> - {app.user_level}
+                                    </p>
+                                </div>
+                            </div>
+                            {app.status === 'pending' ? (
+                                <div className="flex gap-2">
+                                    <Button size="sm" variant="success_outline" onClick={() => handleApplicationStatusUpdate(app.id, 'approved')}>
+                                        <Check size={16}/>
+                                    </Button>
+                                    <Button size="sm" variant="danger_outline" onClick={() => handleApplicationStatusUpdate(app.id, 'rejected')}>
+                                        <X size={16}/>
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className={`text-sm font-bold flex items-center gap-2 px-3 py-1 rounded-full ${ 
+                                    app.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                }`}>
+                                    {app.status === 'approved' ? <CheckCircle2 size={14}/> : <AlertCircle size={14}/>}
+                                    {app.status === 'approved' ? 'Принят' : 'Отклонен'}
+                                </div>
+                            )}
+                        </div>
+                    )) : (
+                        <p className="text-center text-slate-500 py-8">Нет активных заявок.</p>
+                    )}
+                </div>
+            </Modal>
 
             <Modal isOpen={isScoreModalOpen} onClose={() => setIsScoreModalOpen(false)} title="Результат матча">
                 <div className="space-y-6">
@@ -496,7 +578,7 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
 
             <Modal isOpen={isBulkAddOpen} onClose={() => setIsBulkAddOpen(false)} title="Жеребьевка">
                 <div className="space-y-4">
-                    <textarea className="w-full h-48 bg-slate-50 rounded-[30px] p-8 outline-none font-bold shadow-inner text-sm leading-relaxed" placeholder="Имя Фамилия&#10;Имя Фамилия..." value={bulkNames} onChange={e => setBulkNames(e.target.value)} />
+                    <textarea className="w-full h-48 bg-slate-50 rounded-[30px] p-8 outline-none font-bold shadow-inner text-sm leading-relaxed" placeholder="Имя Фамилия\nИмя Фамилия..." value={bulkNames} onChange={e => setBulkNames(e.target.value)} />
                     <Button className="w-full h-16 rounded-[25px] gap-2 shadow-xl font-black uppercase tracking-widest text-xs" onClick={handleRandomize}><Dices size={20}/> Случайное распределение</Button>
                 </div>
             </Modal>
@@ -510,7 +592,7 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
                     <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-2">
                         {students.map(s => (
                             <button key={s.id} onClick={() => { setManualPlayerName(s.name); handleAddManualToMatch(!activeMatch?.player1 ? 1 : 2); }} className="w-full flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-2xl hover:border-lime-400 transition-all group">
-                                <img src={s.avatar} className="w-10 h-10 rounded-xl object-cover shadow-sm" />
+                                <img src={s.avatar} alt={s.name} className="w-10 h-10 rounded-xl object-cover shadow-sm" />
                                 <div className="text-left flex-1"><div className="font-black text-slate-900 text-sm group-hover:text-indigo-600">{s.name}</div><div className="text-[9px] text-slate-400 font-bold uppercase">{s.level}</div></div>
                                 <UserPlus size={16} className="text-slate-200 group-hover:text-lime-500 transition-colors"/>
                             </button>
