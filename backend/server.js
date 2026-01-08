@@ -1418,6 +1418,70 @@ app.post('/api/posts/:id/comments', async (req, res) => {
     }
 });
 
+app.delete('/api/posts/:id', async (req, res) => {
+    const { id } = req.params;
+    const { userId } = req.body; 
+
+    if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+        const postRes = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
+        if (postRes.rows.length === 0) {
+            return res.status(404).json({ error: 'Post not found' });
+        }
+
+        const authorId = postRes.rows[0].user_id;
+
+        if (authorId.toString() !== userId.toString()) {
+            return res.status(403).json({ error: 'You are not authorized to delete this post' });
+        }
+
+        // Before deleting post, delete related likes and comments
+        await pool.query('DELETE FROM post_likes WHERE post_id = $1', [id]);
+        await pool.query('DELETE FROM post_comments WHERE post_id = $1', [id]);
+        await pool.query('DELETE FROM posts WHERE id = $1', [id]);
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Delete Post Error:', err);
+        res.status(500).json({ error: 'Failed to delete post' });
+    }
+});
+
+app.delete('/api/posts/:id', async (req, res) => {
+    const { id } = req.params;
+    const { userId } = req.body; 
+
+    if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+        const postRes = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
+        if (postRes.rows.length === 0) {
+            return res.status(404).json({ error: 'Post not found' });
+        }
+
+        const authorId = postRes.rows[0].user_id;
+
+        if (authorId.toString() !== userId.toString()) {
+            return res.status(403).json({ error: 'You are not authorized to delete this post' });
+        }
+
+        // Before deleting post, delete related likes and comments
+        await pool.query('DELETE FROM post_likes WHERE post_id = $1', [id]);
+        await pool.query('DELETE FROM post_comments WHERE post_id = $1', [id]);
+        await pool.query('DELETE FROM posts WHERE id = $1', [id]);
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Delete Post Error:', err);
+        res.status(500).json({ error: 'Failed to delete post' });
+    }
+});
+
 app.post('/api/groups', async (req, res) => {
     const { name, description, location, avatar, userId, contact } = req.body;
     console.log('Received request to create group:', { name, description, location, avatar, userId, contact });

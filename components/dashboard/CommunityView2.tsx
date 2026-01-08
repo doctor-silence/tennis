@@ -387,7 +387,7 @@ const MatchResultPost = ({ post, user, onUpdate }: { post: any, user: User, onUp
     );
 };
 
-const MarketplacePost = ({ post, onStartConversation }: { post: any, onStartConversation: (partnerId: string) => void }) => {
+const MarketplacePost = ({ post, user, onStartConversation, onUpdate }: { post: any, user: User, onStartConversation: (partnerId: string) => void, onUpdate: () => void }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedImage, setSelectedImage] = useState('');
 
@@ -399,6 +399,20 @@ const MarketplacePost = ({ post, onStartConversation }: { post: any, onStartConv
     const closeModal = () => {
         setIsModalOpen(false);
         setSelectedImage('');
+    };
+
+    const isAuthor = String(post.author.id) === String(user.id);
+
+    const handleDelete = async () => {
+        if (window.confirm('Вы уверены, что хотите удалить это объявление?')) {
+            try {
+                await api.posts.delete(post.id, user.id);
+                onUpdate(); // This will re-fetch the feed
+            } catch (error) {
+                console.error("Failed to delete post", error);
+                alert("Не удалось удалить объявление.");
+            }
+        }
     };
 
     return (
@@ -432,7 +446,11 @@ const MarketplacePost = ({ post, onStartConversation }: { post: any, onStartConv
                                     <div className="text-sm font-bold text-slate-700">{post.author.name}</div>
                                 </div>
                             </div>
-                            <Button onClick={() => onStartConversation(post.author.id)}>Написать продавцу</Button>
+                            {isAuthor ? (
+                                <Button variant="danger_outline" size="sm" onClick={handleDelete}>Удалить</Button>
+                            ) : (
+                                <Button onClick={() => onStartConversation(post.author.id)}>Написать продавцу</Button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -521,7 +539,7 @@ const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate, onSta
                     case 'match_result':
                         return <MatchResultPost key={item.id} post={item} user={user} onUpdate={onUpdate} />;
                     case 'marketplace':
-                        return <MarketplacePost key={item.id} post={item} onStartConversation={onStartConversation} />;
+                        return <MarketplacePost key={item.id} post={item} user={user} onStartConversation={onStartConversation} onUpdate={onUpdate} />;
                     case 'tournament_announcement':
                         return <TournamentAnnouncementPost key={item.id} post={item} />;
                     case 'tournament_result':
@@ -557,7 +575,7 @@ const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate, onSta
     const FleaMarketFeed = () => (
         <div className="space-y-4">
             {feedItems.filter(item => item.type === 'marketplace').map(item => (
-                <MarketplacePost key={item.id} post={item} onStartConversation={onStartConversation} />
+                <MarketplacePost key={item.id} post={item} user={user} onStartConversation={onStartConversation} onUpdate={onUpdate} />
             ))}
         </div>
     );
@@ -992,15 +1010,16 @@ const GroupsWidget = forwardRef(({ onGroupClickForModal, myGroups }: { onGroupCl
     );
 });
 
-const MarketplaceWidget = () => {
-    const [items, setItems] = useState<MarketplaceItem[]>([]);
+const MarketplaceWidget = ({ user, onNavigate }: { user: User, onNavigate: (tab: string) => void }) => {
+    const [items, setItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchItems = async () => {
             try {
                 setLoading(true);
-                const marketplaceItems = await api.getMarketplaceItems();
+                const allPosts = await api.posts.getAll(user.id);
+                const marketplaceItems = allPosts.filter((p: any) => p.type === 'marketplace');
                 setItems(marketplaceItems);
             } catch (err) {
                 console.error(err);
@@ -1009,7 +1028,7 @@ const MarketplaceWidget = () => {
             }
         };
         fetchItems();
-    }, []);
+    }, [user.id]);
 
     const firstItem = items[0];
 
@@ -1020,14 +1039,20 @@ const MarketplaceWidget = () => {
                     <ShoppingCart size={20} className="text-slate-400"/>
                     Барахолка
                 </h3>
-                <a href="#" className="text-sm font-bold text-lime-600">Все</a>
+                <button onClick={() => onNavigate('Барахолка')} className="text-sm font-bold text-lime-600">Все</button>
             </div>
             {loading && <div className="text-center text-slate-400">Загрузка...</div>}
             {!loading && firstItem && (
                 <div>
-                    <img src={firstItem.image} alt={firstItem.title} className="rounded-lg h-32 w-full object-cover mb-2" />
-                    <h4 className="font-bold text-sm">{firstItem.title}</h4>
-                    <p className="text-lg font-bold text-slate-800">{firstItem.price} ₽</p>
+                    {firstItem.content.images && firstItem.content.images.length > 0 ? (
+                        <img src={firstItem.content.images[0]} alt={firstItem.content.title} className="rounded-lg h-32 w-full object-cover mb-2" />
+                    ) : (
+                        <div className="rounded-lg h-32 w-full bg-slate-100 flex items-center justify-center mb-2">
+                            <ShoppingCart className="text-slate-400" size={32} />
+                        </div>
+                    )}
+                    <h4 className="font-bold text-sm">{firstItem.content.title}</h4>
+                    <p className="text-lg font-bold text-slate-800">{firstItem.content.price} ₽</p>
                 </div>
             )}
             {!loading && !firstItem && (
@@ -1439,7 +1464,7 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated,
                 <TournamentsWidget user={user} onNavigate={onNavigate} myGroups={myGroups} />
                 <TopPlayersWidget onNavigate={onNavigate} />
                 <GroupsWidget onGroupClickForModal={setSelectedGroupForModal} myGroups={myGroups} />
-                <MarketplaceWidget />
+                <MarketplaceWidget user={user} onNavigate={setActiveTab} />
                  {selectedGroupForModal && (
                 <Modal isOpen={!!selectedGroupForModal} onClose={() => setSelectedGroupForModal(null)} title={selectedGroupForModal.name}>
                     <div className="p-6">
