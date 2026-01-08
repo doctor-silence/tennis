@@ -39,7 +39,7 @@ export const ProgressChart = ({ matches, type }: { matches: Match[], type: 'serv
 
 const modalRoot = document.getElementById('modal-root');
 
-export const Modal = ({ isOpen, onClose, title, children, maxWidth = "max-w-lg" }: { isOpen: boolean; onClose: () => void; title: string; children?: React.ReactNode; maxWidth?: string }) => {
+export const Modal = ({ isOpen, onClose, title, children, maxWidth = "max-w-lg", bodyClassName = "" }: { isOpen: boolean; onClose: () => void; title: string; children?: React.ReactNode; maxWidth?: string; bodyClassName?: string }) => {
   const elRef = useRef<HTMLDivElement | null>(null);
   if (!elRef.current) {
     elRef.current = document.createElement('div');
@@ -74,7 +74,7 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = "max-w-lg" 
             <X size={20} />
           </button>
         </div>
-        <div className="p-6 overflow-y-auto">
+        <div className={`p-6 overflow-y-auto ${bodyClassName}`}>
           {children}
         </div>
       </div>

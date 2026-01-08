@@ -792,6 +792,7 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
     const [isApplying, setIsApplying] = useState(false);
     const [applicationStatus, setApplicationStatus] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [userApplications, setUserApplications] = useState<any[]>([]);
+    const [showAllTournamentsModal, setShowAllTournamentsModal] = useState(false);
 
 
     useEffect(() => {
@@ -839,6 +840,14 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
         setApplicationStatus(null);
     };
 
+    const handleAllClick = () => {
+        if (user.role === 'coach') {
+            onNavigate('tournaments');
+        } else {
+            setShowAllTournamentsModal(true);
+        }
+    };
+
     const isMember = selectedTournament?.target_group_id ? myGroups.some(g => g.id === selectedTournament.target_group_id) : false;
     const hasApplied = selectedTournament ? userApplications.some(app => app.tournament_id === selectedTournament.id) : false;
     const canApply = selectedTournament && selectedTournament.creator_role !== 'admin' && !hasApplied && selectedTournament.status === 'draft';
@@ -852,7 +861,7 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
                         <Calendar size={20} className="text-slate-400"/>
                         Турниры
                     </h3>
-                    <button onClick={() => onNavigate('tournaments')} className="text-sm font-bold text-lime-600">Все</button>
+                    <button onClick={handleAllClick} className="text-sm font-bold text-lime-600">Все</button>
                 </div>
                 <div className="space-y-4 max-h-56 overflow-y-auto">
                     {loading && <Loader2 className="animate-spin text-slate-400" />}
@@ -930,6 +939,32 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
                         )}
                     </>
                 )}
+            </Modal>
+            <Modal isOpen={showAllTournamentsModal} onClose={() => setShowAllTournamentsModal(false)} title="Все турниры">
+                <div className="space-y-4">
+                    {loading && <Loader2 className="animate-spin text-slate-400" />}
+                    {!loading && tournaments.map(t => {
+                        const { month, day } = formatDate(t.start_date);
+                        return (
+                            <div key={t.id} onClick={() => {
+                                setSelectedTournament(t);
+                                setShowAllTournamentsModal(false);
+                            }} className="flex items-center gap-4 cursor-pointer group">
+                                <div className="w-12 h-12 bg-slate-100 rounded-lg flex flex-col items-center justify-center group-hover:bg-lime-100 transition-colors">
+                                    <span className="text-xs font-bold text-red-600">{month}</span>
+                                    <span className="font-bold text-lg">{day}</span>
+                                </div>
+                                <div>
+                                    <p className="font-bold text-sm group-hover:text-lime-600 transition-colors">{t.name}</p>
+                                    <p className="text-xs text-slate-500">{t.groupName || 'Частный турнир'}</p>
+                                </div>
+                            </div>
+                        );
+                    })}
+                     {!loading && tournaments.length === 0 && (
+                        <p className="text-sm text-slate-400 text-center py-4">Нет предстоящих турниров.</p>
+                     )}
+                </div>
             </Modal>
         </>
     );

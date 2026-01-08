@@ -4,7 +4,7 @@ import {
   MapPin, CheckCircle2, Activity, Zap, Trophy, Calendar, 
   BarChart2, Loader2, ChevronDown, Plus, Upload
 } from 'lucide-react';
-import { User, Match } from '../../types';
+import { User, Match, Tournament } from '../../types';
 import Button from '../Button';
 import { StatCard, ProgressChart, Modal } from '../Shared';
 import { api } from '../../services/api';
@@ -64,7 +64,9 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loadingMatches, setLoadingMatches] = useState(true);
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
-
+  
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [nearestTournament, setNearestTournament] = useState<Tournament | null>(null);
 
   const [editFormData, setEditFormData] = useState({
       name: user.name,
@@ -73,6 +75,24 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
       age: user.age || 0,
       avatar: user.avatar || ''
   });
+
+  useEffect(() => {
+    const fetchTournaments = async () => {
+        try {
+            const allTournaments = await api.tournaments.getAll(user.id);
+            setTournaments(allTournaments);
+
+            const upcomingTournaments = allTournaments.filter(t => new Date(t.start_date) > new Date());
+            if (upcomingTournaments.length > 0) {
+                upcomingTournaments.sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
+                setNearestTournament(upcomingTournaments[0]);
+            }
+        } catch (error) {
+            console.error("Failed to fetch tournaments", error);
+        }
+    };
+    fetchTournaments();
+  }, [user.id]);
 
   useEffect(() => {
       setEditFormData({
@@ -163,6 +183,20 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
   };
 
   const currentTraining = trainings[currentTrainingIndex];
+  
+    const formatDate = (isoDate: string | undefined) => {
+        if (!isoDate) return { month: '', day: '', dayOfWeek: '' };
+        try {
+            const date = new Date(isoDate);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = date.toLocaleString('ru-RU', { month: 'short' }).toUpperCase().replace('.', '');
+            const dayOfWeek = date.toLocaleString('ru-RU', { weekday: 'long' });
+            return { month, day, dayOfWeek: dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1) };
+        } catch (e) {
+            return { month: 'ERR', day: '00', dayOfWeek: 'Error' };
+        }
+    };
+
 
   return (
     <>
@@ -343,11 +377,17 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
         <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
             <h3 className="font-bold mb-4 flex items-center gap-2"><Trophy className="text-amber-500" size={18}/> Ближайший турнир</h3>
             <div className="space-y-3">
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                    <div className="text-xs font-bold text-slate-400 uppercase mb-1">24 Окт, Суббота</div>
-                    <div className="font-bold text-slate-900">Weekend Cup Amateur</div>
-                    <div className="text-sm text-slate-500 mt-1">Теннис Парк • Грунт</div>
-                </div>
+                { nearestTournament ? (
+                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                        <div className="text-xs font-bold text-slate-400 uppercase mb-1">{formatDate(nearestTournament.start_date).day} {formatDate(nearestTournament.start_date).month}, {formatDate(nearestTournament.start_date).dayOfWeek}</div>
+                        <div className="font-bold text-slate-900">{nearestTournament.name}</div>
+                        <div className="text-sm text-slate-500 mt-1">{nearestTournament.groupName || 'Частный'} • {nearestTournament.category}</div>
+                    </div>
+                ) : (
+                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-center text-sm text-slate-500">
+                        Нет ближайших турниров
+                    </div>
+                )}
                 <Button 
                     variant="outline" 
                     className="w-full text-sm" 
@@ -519,30 +559,26 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
         </div>
     </Modal>
 
-    <Modal isOpen={showTournamentsModal} onClose={() => setShowTournamentsModal(false)} title="Календарь турниров">
+    <Modal isOpen={showTournamentsModal} onClose={() => setShowTournamentsModal(false)} title="Календарь турниров" bodyClassName="max-h-96">
         <div className="space-y-4">
-            {[
-                { date: '24 Окт', name: 'Weekend Cup Amateur', surface: 'Грунт', level: 'Masters' },
-                { date: '01 Ноя', name: 'Autumn Indoor Open', surface: 'Хард', level: 'Challenger' },
-                { date: '15 Ноя', name: 'Pro-Am Doubles', surface: 'Ковер', level: 'Mixed' }
-            ].map((t, i) => (
-                <div key={i} className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-100">
+            {tournaments.map((t) => (
+                <div key={t.id} className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-100">
                     <div className="flex gap-4 items-center">
                         <div className="bg-white rounded-lg p-2 text-center border border-slate-200 min-w-[60px]">
-                            <div className="text-xs font-bold text-slate-400 uppercase">{t.date.split(' ')[1]}</div>
-                            <div className="text-lg font-bold text-slate-900">{t.date.split(' ')[0]}</div>
+                            <div className="text-xs font-bold text-slate-400 uppercase">{formatDate(t.start_date).month}</div>
+                            <div className="text-lg font-bold text-slate-900">{formatDate(t.start_date).day}</div>
                         </div>
                         <div>
                             <div className="font-bold text-slate-900">{t.name}</div>
-                            <div className="text-xs text-slate-500">{t.surface} • {t.level}</div>
+                            <div className="text-xs text-slate-500">{t.groupName || 'Частный'} • {t.category}</div>
                         </div>
                     </div>
                     <Button size="sm" variant="outline" onClick={() => alert('Заявка отправлена!')}>Записаться</Button>
                 </div>
             ))}
-            <div className="text-center text-xs text-slate-400 mt-4">
-                Полный список турниров доступен на сайте РТТ или Amatour.
-            </div>
+            {tournaments.length === 0 && (
+                <div className="text-center text-slate-500">Нет доступных турниров.</div>
+            )}
         </div>
     </Modal>
 
