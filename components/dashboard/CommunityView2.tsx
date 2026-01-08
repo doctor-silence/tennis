@@ -592,11 +592,19 @@ const GroupsView = forwardRef(({ user, onGroupSelect }: { user: User, onGroupSel
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {groups.map(group => (
-                    <div key={group.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 cursor-pointer" onClick={() => onGroupSelect(group)}>
-                        <h3 className="font-bold text-lg">{group.name}</h3>
-                        <p className="text-sm text-slate-500">{group.location}</p>
-                        <p className="text-sm text-slate-600 mt-2">{group.description}</p>
-                        {/* TODO: Add join/leave functionality and member list */}
+                    <div key={group.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 cursor-pointer overflow-hidden" onClick={() => onGroupSelect(group)}>
+                        {group.avatar ? (
+                            <img src={group.avatar} alt={group.name} className="w-full h-32 object-cover" />
+                        ) : (
+                            <div className="w-full h-32 bg-slate-100 flex items-center justify-center">
+                                <Users className="text-slate-400" size={48} />
+                            </div>
+                        )}
+                        <div className="p-6">
+                            <h3 className="font-bold text-lg">{group.name}</h3>
+                            <p className="text-sm text-slate-500">{group.location}</p>
+                            <p className="text-sm text-slate-600 mt-2">{group.description}</p>
+                        </div>
                     </div>
                 ))}
             </div>
@@ -923,15 +931,24 @@ const TopPlayersWidget = ({ onNavigate }: { onNavigate: (tab: string) => void })
     );
 };
 
-const GroupsWidget = ({ onGroupClickForModal, myGroups }: { onGroupClickForModal: (group: Group) => void, myGroups: Group[] }) => {
+const GroupsWidget = forwardRef(({ onGroupClickForModal, myGroups }: { onGroupClickForModal: (group: Group) => void, myGroups: Group[] }, ref) => {
     const [groups, setGroups] = useState<Group[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
+    const fetchGroups = () => {
+        setLoading(true);
         api.groups.getAll().then(data => {
             setGroups(data);
             setLoading(false);
         });
+    };
+
+    useImperativeHandle(ref, () => ({
+        fetchGroups
+    }));
+
+    useEffect(() => {
+        fetchGroups();
     }, []);
 
     const isMember = (groupId: string) => myGroups.some(g => g.id === groupId);
@@ -949,9 +966,13 @@ const GroupsWidget = ({ onGroupClickForModal, myGroups }: { onGroupClickForModal
                 {!loading && groups.map(g => (
                     <div key={g.id} className="flex justify-between items-center">
                         <div className="flex items-center gap-3">
-                             <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-slate-500">
-                                 {g.name.charAt(0)}
-                             </div>
+                             {g.avatar ? (
+                                <img src={g.avatar} alt={g.name} className="w-8 h-8 rounded-lg object-cover" />
+                            ) : (
+                                <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-slate-500">
+                                    {g.name.charAt(0)}
+                                </div>
+                            )}
                              <div>
                                 <p className="font-bold text-sm">{g.name}</p>
                                 <p className="text-xs text-slate-400">{g.members_count || 0} уч.</p>
@@ -969,7 +990,7 @@ const GroupsWidget = ({ onGroupClickForModal, myGroups }: { onGroupClickForModal
             </div>
         </div>
     );
-};
+});
 
 const MarketplaceWidget = () => {
     const [items, setItems] = useState<MarketplaceItem[]>([]);
@@ -1158,19 +1179,48 @@ const GroupForm = ({ onPublish, user }: { onPublish: (data: any) => void, user: 
     const [location, setLocation] = useState('');
     const [description, setDescription] = useState('');
     const [contact, setContact] = useState('');
+    const [avatar, setAvatar] = useState<string | null>(null);
+
+    const handleAvatarChange = (file: File | null) => {
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setAvatar(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        } else {
+            setAvatar(null);
+        }
+    };
 
     const handlePublish = () => {
         if (!name.trim()) return;
-        onPublish({ name, location, description, contact });
+        onPublish({ name, location, description, contact, avatar });
         setName('');
         setLocation('');
         setDescription('');
         setContact('');
+        setAvatar(null);
     };
 
     return (
         <div className="space-y-3 p-4 bg-slate-50 rounded-xl mt-4">
-            <input type="text" placeholder="Название группы" value={name} onChange={e => setName(e.target.value)} className="w-full bg-white p-2 rounded-lg outline-none border border-slate-200" />
+            <div className="flex items-center gap-4">
+                <div className="w-24 h-24 bg-slate-200 rounded-lg flex items-center justify-center">
+                    {avatar ? (
+                        <img src={avatar} alt="Avatar Preview" className="w-full h-full object-cover rounded-lg"/>
+                    ) : (
+                        <span className="text-slate-400 text-xs text-center">Аватар</span>
+                    )}
+                </div>
+                <div className="flex-1">
+                     <input type="text" placeholder="Название группы" value={name} onChange={e => setName(e.target.value)} className="w-full bg-white p-2 rounded-lg outline-none border border-slate-200" />
+                     <label className="text-sm mt-2 text-blue-600 cursor-pointer hover:text-blue-800">
+                        Загрузить аватар
+                        <input type="file" className="hidden" accept="image/*" onChange={(e) => handleAvatarChange(e.target.files?.[0] || null)} />
+                    </label>
+                </div>
+            </div>
             <input type="text" placeholder="Город" value={location} onChange={e => setLocation(e.target.value)} className="w-full bg-white p-2 rounded-lg outline-none border border-slate-200" />
             <textarea placeholder="Описание группы..." value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-white p-2 rounded-lg outline-none border border-slate-200 h-24" />
             <input type="text" placeholder="Контакты для связи (Telegram, телефон)" value={contact} onChange={e => setContact(e.target.value)} className="w-full bg-white p-2 rounded-lg outline-none border border-slate-200" />
@@ -1240,9 +1290,14 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated,
         api.groups.getUserGroups(user.id).then(setMyGroups);
     }, [user.id, feedVersion]);
 
+    const groupsWidgetRef = useRef<{ fetchGroups: () => void }>(null);
+
     const handleGroupCreated = () => {
         if (groupsViewRef.current) {
             groupsViewRef.current.fetchGroups();
+        }
+        if (groupsWidgetRef.current) {
+            groupsWidgetRef.current.fetchGroups();
         }
         setActiveTab('Группы');
     }
@@ -1300,6 +1355,7 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated,
                 location: data.location,
                 description: data.description,
                 contact: data.contact,
+                avatar: data.avatar,
                 userId: user.id
             });
             onGroupCreated();

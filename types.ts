@@ -273,6 +273,7 @@ export interface Group {
   location: string;
   description: string;
   creatorId?: string; // New field
+  avatar?: string;
 }
 
 export interface TournamentPlayer {
