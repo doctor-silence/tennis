@@ -31,7 +31,7 @@ const SidebarItem = ({ icon, label, active, onClick, isSpecial = false, badge, t
     <span className="font-medium">{label}</span>
     
     {inDevelopment && (
-      <span className="ml-auto bg-lime-400/20 text-lime-400 text-[9px] font-bold px-2 py-0.5 rounded">
+      <span className="ml-auto bg-lime-500/20 text-lime-500 text-[9px] font-bold px-2 py-0.5 rounded">
         В разработке
       </span>
     )}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
-import { Heart, MessageCircle, Calendar, Globe, Swords, Trophy, Users, ShoppingCart, Share2, Loader2, X, PlusCircle, CheckCircle } from 'lucide-react';
+import ReactDOM from 'react-dom';
+import { Heart, MessageCircle, Calendar, Globe, Swords, Trophy, Users, ShoppingCart, Share2, Loader2, X, PlusCircle, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '../../services/api';
 import Button from '../Button';
 import Tooltip from '../Tooltip';
@@ -7,17 +8,48 @@ import { MarketplaceItem, LadderPlayer, User, Group } from '../../types';
 import { Modal } from '../Shared';
 
 // --- Modal Component ---
-const ImageModal = ({ src, onClose }: { src: string, onClose: () => void }) => {
-    if (!src) return null;
+// --- Modal Component ---
+const ImageModal = ({ images, startIndex, onClose }: { images: string[], startIndex: number, onClose: () => void }) => {
+    if (!images || images.length === 0) return null;
 
-    return (
+    const [currentIndex, setCurrentIndex] = useState(startIndex);
+
+    const goToPrevious = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setCurrentIndex(prevIndex => (prevIndex === 0 ? images.length - 1 : prevIndex - 1));
+    };
+
+    const goToNext = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setCurrentIndex(prevIndex => (prevIndex === images.length - 1 ? 0 : prevIndex + 1));
+    };
+
+    const modalContent = (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={onClose}>
             <div className="max-w-4xl max-h-4xl relative" onClick={e => e.stopPropagation()}>
-                <img src={src} alt="Full-size view" className="max-w-full max-h-screen rounded-lg" />
-                <button onClick={onClose} className="absolute top-2 right-2 text-white bg-black/50 rounded-full p-1">&times;</button>
+                <img src={images[currentIndex]} alt="Full-size view" className="max-w-full max-h-screen rounded-lg" />
+                <button onClick={onClose} className="absolute top-2 right-2 text-white bg-black/50 rounded-full p-2 z-20 hover:bg-black/75">
+                    <X size={24} />
+                </button>
+                {images.length > 1 && (
+                    <>
+                        <button onClick={goToPrevious} className="absolute left-2 top-1/2 -translate-y-1/2 text-white bg-black/50 rounded-full p-2 hover:bg-black/75">
+                            <ChevronLeft size={32} />
+                        </button>
+                        <button onClick={goToNext} className="absolute right-2 top-1/2 -translate-y-1/2 text-white bg-black/50 rounded-full p-2 hover:bg-black/75">
+                            <ChevronRight size={32} />
+                        </button>
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 text-white text-sm px-3 py-1 rounded-full">
+                            {currentIndex + 1} / {images.length}
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );
+
+    const modalRoot = document.getElementById('modal-root');
+    return modalRoot ? ReactDOM.createPortal(modalContent, modalRoot) : null;
 };
 
 // --- Winner Badge Component ---
@@ -387,31 +419,36 @@ const MatchResultPost = ({ post, user, onUpdate }: { post: any, user: User, onUp
     );
 };
 
-const MarketplacePost = ({ post, user, onStartConversation, onUpdate }: { post: any, user: User, onStartConversation: (partnerId: string) => void, onUpdate: () => void }) => {
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedImage, setSelectedImage] = useState('');
 
-    const openModal = (imageUrl: string) => {
-        setSelectedImage(imageUrl);
-        setIsModalOpen(true);
+const MarketplacePost = ({ post, user, onStartConversation, onUpdate }: { post: any, user: User, onStartConversation: (partnerId: string) => void, onUpdate: () => void }) => {
+    const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+    const [selectedImageIndex, setSelectedImageIndex] = useState(0); // Track the index of the clicked image
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+    const openImageModal = (index: number) => {
+        setSelectedImageIndex(index);
+        setIsImageModalOpen(true);
     };
 
-    const closeModal = () => {
-        setIsModalOpen(false);
-        setSelectedImage('');
+    const closeImageModal = () => {
+        setIsImageModalOpen(false);
     };
 
     const isAuthor = String(post.author.id) === String(user.id);
 
-    const handleDelete = async () => {
-        if (window.confirm('Вы уверены, что хотите удалить это объявление?')) {
-            try {
-                await api.posts.delete(post.id, user.id);
-                onUpdate(); // This will re-fetch the feed
-            } catch (error) {
-                console.error("Failed to delete post", error);
-                alert("Не удалось удалить объявление.");
-            }
+    const handleDelete = () => {
+        setShowDeleteConfirm(true);
+    };
+
+    const confirmDelete = async () => {
+        try {
+            await api.posts.delete(post.id, user.id);
+            onUpdate(); // This will re-fetch the feed
+        } catch (error) {
+            console.error("Failed to delete post", error);
+            alert("Не удалось удалить объявление.");
+        } finally {
+            setShowDeleteConfirm(false);
         }
     };
 
@@ -424,11 +461,12 @@ const MarketplacePost = ({ post, user, onStartConversation, onUpdate }: { post: 
                 </div>
                 <div className="bg-white rounded-2xl overflow-hidden">
                      {post.content.images && post.content.images.length > 0 && (
+                        // Display the first image, and open modal with index 0
                         <img 
                             src={post.content.images[0]} 
                             alt={post.content.title} 
                             className="h-80 w-full object-cover rounded-xl cursor-pointer"
-                            onClick={() => openModal(post.content.images[0])}
+                            onClick={() => openImageModal(0)} // Pass 0 as the starting index
                         />
                     )}
                     <div className="py-4">
@@ -455,7 +493,20 @@ const MarketplacePost = ({ post, user, onStartConversation, onUpdate }: { post: 
                     </div>
                 </div>
             </div>
-            {isModalOpen && <ImageModal src={selectedImage} onClose={closeModal} />}
+            {isImageModalOpen && (
+                <ImageModal 
+                    images={post.content.images} 
+                    startIndex={selectedImageIndex} 
+                    onClose={closeImageModal} 
+                />
+            )}
+            <Modal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Подтвердите удаление">
+                <p className="text-slate-500 mt-2 mb-6">Вы уверены, что хотите удалить это объявление?</p>
+                <div className="flex justify-end gap-4">
+                    <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>Отмена</Button>
+                    <Button variant="danger" onClick={confirmDelete}>Удалить</Button>
+                </div>
+            </Modal>
         </>
     );
 };

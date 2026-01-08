@@ -92,6 +92,7 @@ const Shop: React.FC<ShopProps> = ({ onBack }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [itemToRemove, setItemToRemove] = useState<string | null>(null);
 
   const categories = [
     { id: 'all', label: 'Все товары' },
@@ -118,8 +119,13 @@ const Shop: React.FC<ShopProps> = ({ onBack }) => {
     setIsCartOpen(true);
   };
 
-  const removeFromCart = (id: string) => {
+  const handleRemoveFromCart = (id: string) => {
     setCart(prev => prev.filter(item => item.id !== id));
+    setItemToRemove(null);
+  };
+
+  const removeFromCart = (id: string) => {
+    setItemToRemove(id);
   };
 
   const updateQuantity = (id: string, delta: number) => {
@@ -283,6 +289,19 @@ const Shop: React.FC<ShopProps> = ({ onBack }) => {
             </div>
         </div>
       )}
+
+        {itemToRemove && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-2xl p-8 shadow-2xl w-full max-w-sm m-4">
+                    <h3 className="text-lg font-bold text-slate-900">Подтвердите удаление</h3>
+                    <p className="text-slate-500 mt-2 mb-6">Вы уверены, что хотите удалить этот товар из корзины?</p>
+                    <div className="flex justify-end gap-4">
+                        <Button variant="outline" onClick={() => setItemToRemove(null)}>Отмена</Button>
+                        <Button variant="danger" onClick={() => handleRemoveFromCart(itemToRemove)}>Удалить</Button>
+                    </div>
+                </div>
+            </div>
+        )}
     </div>
   );
 };
