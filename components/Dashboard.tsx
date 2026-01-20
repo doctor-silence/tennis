@@ -163,7 +163,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto pt-16 md:pt-0 bg-[#F1F5F9]">
+      <main className="flex-1 md:ml-72 overflow-y-auto pt-16 md:pt-0 bg-[#F1F5F9]">
         <div className="p-4 md:p-8 max-w-7xl mx-auto min-h-full">
            <header className="flex justify-between items-center mb-8">
               <div>

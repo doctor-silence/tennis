@@ -2122,6 +2122,7 @@ app.get('/api/lessons', async (req, res) => {
             type: row.type,
             startTime: row.start_time,
             dayIndex: row.day_index,
+            date: row.date,
             duration: row.duration,
             status: row.status,
             courtName: row.court_name,
@@ -2138,21 +2139,23 @@ app.get('/api/lessons', async (req, res) => {
 
 app.post('/api/lessons', async (req, res) => {
     const { 
-        coachId, studentId, studentName, type, startTime, dayIndex, 
+        coachId, studentId, studentName, type, startTime, dayIndex, date,
         duration, status, courtName, useCannon, useRacketRental, 
         courtCost, lessonPrice 
     } = req.body;
 
+    console.log('Creating lesson with data:', req.body);
+
     try {
         const result = await pool.query(
             `INSERT INTO scheduled_lessons (
-                coach_id, student_id, student_name, type, start_time, day_index, 
+                coach_id, student_id, student_name, type, start_time, day_index, date,
                 duration, status, court_name, use_cannon, use_racket_rental, 
                 court_cost, lesson_price
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
              RETURNING *`,
             [
-                coachId, studentId, studentName, type, startTime, dayIndex, 
+                coachId, studentId, studentName, type, startTime, dayIndex, date,
                 duration, status, courtName, useCannon, useRacketRental, 
                 courtCost, lessonPrice
             ]
@@ -2169,6 +2172,7 @@ app.post('/api/lessons', async (req, res) => {
             type: newLesson.type,
             startTime: newLesson.start_time,
             dayIndex: newLesson.day_index,
+            date: newLesson.date,
             duration: newLesson.duration,
             status: newLesson.status,
             courtName: newLesson.court_name,
@@ -2179,7 +2183,68 @@ app.post('/api/lessons', async (req, res) => {
         });
     } catch (err) {
         console.error("Create Lesson Error:", err);
-        res.status(500).json({ error: 'Database error while creating lesson' });
+        console.error("Error details:", err.message, err.stack);
+        res.status(500).json({ error: 'Database error while creating lesson', details: err.message });
+    }
+});
+
+// Create multiple recurring lessons
+app.post('/api/lessons/recurring', async (req, res) => {
+    const { lessons } = req.body;
+    
+    if (!lessons || !Array.isArray(lessons) || lessons.length === 0) {
+        return res.status(400).json({ error: 'lessons array is required' });
+    }
+
+    try {
+        const createdLessons = [];
+        
+        for (const lessonData of lessons) {
+            const { 
+                coachId, studentId, studentName, type, startTime, dayIndex, date,
+                duration, status, courtName, useCannon, useRacketRental, 
+                courtCost, lessonPrice 
+            } = lessonData;
+            
+            const result = await pool.query(
+                `INSERT INTO scheduled_lessons (
+                    coach_id, student_id, student_name, type, start_time, day_index, date,
+                    duration, status, court_name, use_cannon, use_racket_rental, 
+                    court_cost, lesson_price
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                 RETURNING *`,
+                [
+                    coachId, studentId, studentName, type, startTime, dayIndex, date,
+                    duration, status, courtName, useCannon, useRacketRental, 
+                    courtCost, lessonPrice
+                ]
+            );
+            
+            const newLesson = result.rows[0];
+            createdLessons.push({
+                id: newLesson.id.toString(),
+                coachId: newLesson.coach_id,
+                studentId: newLesson.student_id,
+                studentName: newLesson.student_name,
+                type: newLesson.type,
+                startTime: newLesson.start_time,
+                dayIndex: newLesson.day_index,
+                date: newLesson.date,
+                duration: newLesson.duration,
+                status: newLesson.status,
+                courtName: newLesson.court_name,
+                useCannon: newLesson.use_cannon,
+                useRacketRental: newLesson.use_racket_rental,
+                courtCost: newLesson.court_cost,
+                lessonPrice: newLesson.lesson_price,
+            });
+        }
+        
+        await logSystemEvent('info', `Created ${createdLessons.length} recurring lessons`, 'CRM');
+        res.status(201).json(createdLessons);
+    } catch (err) {
+        console.error("Create Recurring Lessons Error:", err);
+        res.status(500).json({ error: 'Database error while creating recurring lessons' });
     }
 });
 

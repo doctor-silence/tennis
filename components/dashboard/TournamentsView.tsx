@@ -578,7 +578,7 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
 
             <Modal isOpen={isBulkAddOpen} onClose={() => setIsBulkAddOpen(false)} title="Жеребьевка">
                 <div className="space-y-4">
-                    <textarea className="w-full h-48 bg-slate-50 rounded-[30px] p-8 outline-none font-bold shadow-inner text-sm leading-relaxed" placeholder="Имя Фамилия\nИмя Фамилия..." value={bulkNames} onChange={e => setBulkNames(e.target.value)} />
+                    <textarea className="w-full h-48 bg-slate-50 rounded-[30px] p-8 outline-none font-bold shadow-inner text-sm leading-relaxed" placeholder="Введите имена участников (каждый с новой строки)..." value={bulkNames} onChange={e => setBulkNames(e.target.value)} />
                     <Button className="w-full h-16 rounded-[25px] gap-2 shadow-xl font-black uppercase tracking-widest text-xs" onClick={handleRandomize}><Dices size={20}/> Случайное распределение</Button>
                 </div>
             </Modal>

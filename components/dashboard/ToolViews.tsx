@@ -194,8 +194,13 @@ export const TacticsView = ({ user }: { user: User }) => {
 export const VideoAnalysisView = () => (
     <div className="bg-white rounded-3xl p-12 shadow-sm border border-slate-200 text-center">
          <div className="max-w-md mx-auto">
-             <div className="w-20 h-20 bg-lime-50 rounded-2xl flex items-center justify-center mx-auto mb-6 text-lime-600">
-                 <Video size={40}/>
+             <div className="relative mb-6">
+                 <div className="w-20 h-20 bg-lime-50 rounded-2xl flex items-center justify-center mx-auto text-lime-600">
+                     <Video size={40}/>
+                 </div>
+                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-lime-400 via-lime-300 to-emerald-400 text-slate-900 px-5 py-2 rounded-full text-sm font-black uppercase tracking-widest shadow-2xl border-2 border-white" style={{ animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}>
+                     ⚡ В разработке
+                 </div>
              </div>
              <h3 className="text-2xl font-bold mb-4">AI Анализ Техники</h3>
              <p className="text-slate-500 mb-8">Загрузите видео вашего удара (форхенд, бэкхенд или подача), и наш алгоритм определит точки роста.</p>
@@ -223,6 +228,7 @@ const BADGE_CONFIG: Record<string, { label: string, icon: string, color: string 
 
 export const StudentsView = ({ user }: { user: User }) => {
     const [viewMode, setViewMode] = useState<'schedule' | 'list'>('schedule');
+    const [weekOffset, setWeekOffset] = useState(0);
     const [students, setStudents] = useState<Student[]>([]);
     const [lessons, setLessons] = useState<ScheduledLesson[]>([]);
     const [loading, setLoading] = useState(true);
@@ -261,6 +267,8 @@ export const StudentsView = ({ user }: { user: User }) => {
     const [reportComment, setReportComment] = useState('');
 
     const videoInputRef = useRef<HTMLInputElement>(null);
+    const [selectedVideo, setSelectedVideo] = useState<any>(null);
+    const [showVideoModal, setShowVideoModal] = useState(false);
     const [newStudent, setNewStudent] = useState({
         name: '', age: 18, level: 'NTRP 3.5', phone: '', isPro: false, rttRank: 0
     });
@@ -293,9 +301,10 @@ export const StudentsView = ({ user }: { user: User }) => {
 
     const weekDates = useMemo(() => {
         const now = new Date();
+        now.setDate(now.getDate() + (weekOffset * 7)); // Apply week offset
         const startOfWeek = now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1);
         return DAYS_SHORT.map((day, i) => {
-            const d = new Date(now.setDate(startOfWeek + i));
+            const d = new Date(now.getFullYear(), now.getMonth(), startOfWeek + i);
             return {
                 dayName: day,
                 dateNum: d.getDate(),
@@ -303,7 +312,7 @@ export const StudentsView = ({ user }: { user: User }) => {
                 fullDate: d.toISOString().split('T')[0]
             };
         });
-    }, []);
+    }, [weekOffset]);
 
     const finances = useMemo(() => {
         const totalRevenue = lessons.reduce((sum, l) => {
@@ -321,8 +330,20 @@ export const StudentsView = ({ user }: { user: User }) => {
     const lessonsLookup = useMemo(() => {
         const map = new Map<string, ScheduledLesson>();
         lessons.forEach(lesson => {
-            map.set(`${lesson.dayIndex}-${lesson.startTime}`, lesson);
+            // Use actual date as key
+            if (lesson.date) {
+                // Normalize date format (PostgreSQL might return YYYY-MM-DD or Date object)
+                const dateStr = typeof lesson.date === 'string' 
+                    ? lesson.date.split('T')[0] 
+                    : new Date(lesson.date).toISOString().split('T')[0];
+                const key = `${dateStr}-${lesson.startTime}`;
+                map.set(key, lesson);
+                console.log('Added lesson to lookup:', key, lesson);
+            } else {
+                console.warn('Lesson without date:', lesson);
+            }
         });
+        console.log('Lessons lookup map size:', map.size);
         return map;
     }, [lessons]);
 
@@ -447,7 +468,7 @@ export const StudentsView = ({ user }: { user: User }) => {
     const toggleGoal = async (goalId: string) => {
         if (!selectedStudent) return;
         const goalToToggle = selectedStudent.goals?.find(g => g.id === goalId);
-        const xpReward = (!goalToToggle?.isCompleted) ? 100 : 0; 
+        const xpReward = (!goalToToggle?.isCompleted) ? 20 : 0; 
         const updatedGoals = (selectedStudent.goals || []).map(g => 
             g.id === goalId ? { ...g, isCompleted: !g.isCompleted } : g
         );
@@ -481,7 +502,8 @@ export const StudentsView = ({ user }: { user: User }) => {
                     id: Date.now().toString(),
                     title: file.name.split('.')[0] || 'Новое видео',
                     date: new Date().toLocaleDateString('ru'),
-                    thumbnail: 'https://images.unsplash.com/photo-1599586120429-48281b6f0ece?q=80&w=400'
+                    thumbnail: 'https://images.unsplash.com/photo-1599586120429-48281b6f0ece?q=80&w=400',
+                    url: URL.createObjectURL(file)
                 };
                 const updatedVideos = [newVideo, ...(selectedStudent.videos || [])];
                 const updated = await api.students.update(selectedStudent.id, { videos: updatedVideos });
@@ -492,6 +514,20 @@ export const StudentsView = ({ user }: { user: User }) => {
                 setIsSubmitting(false);
             }
         }
+    };
+
+    const handleDeleteVideo = async (videoId: string) => {
+        if (!selectedStudent) return;
+        const updatedVideos = (selectedStudent.videos || []).filter(v => v.id !== videoId);
+        const updated = await api.students.update(selectedStudent.id, { videos: updatedVideos });
+        const updatedStudent = { ...selectedStudent, ...updated };
+        setStudents(prev => prev.map(s => s.id === selectedStudent.id ? updatedStudent : s));
+        setSelectedStudent(updatedStudent);
+    };
+
+    const handleViewVideo = (video: any) => {
+        setSelectedVideo(video);
+        setShowVideoModal(true);
     };
 
     const handleBookLesson = async () => {
@@ -521,12 +557,18 @@ export const StudentsView = ({ user }: { user: User }) => {
                 let currentDate = new Date(selectedSlot.date);
                 const endDate = new Date(recurringEndDate);
                 
+                console.log('Creating recurring lessons from', selectedSlot.date, 'to', recurringEndDate);
+                console.log('Selected days:', recurringDays);
+                
                 while(currentDate <= endDate) {
                     // date-fns getDay(): Sun=0, Mon=1...Sat=6
                     // My logic: Mon=0, Tue=1...Sun=6
                     const dayOfWeek = (getDay(currentDate) + 6) % 7;
 
                     if (recurringDays[dayOfWeek]) {
+                        const lessonDate = currentDate.toISOString().split('T')[0];
+                        console.log('Adding lesson for date:', lessonDate, 'dayOfWeek:', dayOfWeek);
+                        
                         const newLesson: Omit<ScheduledLesson, 'id'> = {
                             coachId: user.id, 
                             studentId: student.id, 
@@ -534,7 +576,7 @@ export const StudentsView = ({ user }: { user: User }) => {
                             type: 'indiv', 
                             startTime: selectedSlot.time, 
                             dayIndex: dayOfWeek,
-                            date: currentDate.toISOString().split('T')[0], // Pass the actual date
+                            date: lessonDate,
                             duration: 60, 
                             status: 'confirmed', 
                             courtName: 'ТК Спартак', 
@@ -548,9 +590,12 @@ export const StudentsView = ({ user }: { user: User }) => {
                     currentDate = addDays(currentDate, 1);
                 }
 
+                console.log('Total lessons to create:', lessonsToCreate.length);
+
                 if (lessonsToCreate.length > 0) {
                     console.log('Calling apiLessons.addRecurring');
                     const createdLessons = await apiLessons.addRecurring(lessonsToCreate); // Use apiLessons
+                    console.log('Created lessons:', createdLessons);
                     setLessons(prev => [...prev, ...createdLessons]);
                     // Update student balance for all created lessons
                     const totalCharge = lessonsToCreate.reduce((sum, lesson) => sum + lesson.lessonPrice + lesson.courtCost + (lesson.useCannon ? CANNON_PRICE : 0) + (lesson.useRacketRental ? RACKET_RENTAL_PRICE : 0), 0);
@@ -568,10 +613,11 @@ export const StudentsView = ({ user }: { user: User }) => {
                 let newBadges = [...(student.badges || [])];
                 if (selectedSlot.time === '08:00' && !newBadges.includes('early_bird')) newBadges.push('early_bird');
                 
-                console.log('Calling apiLessons.add');
+                console.log('Creating single lesson with date:', selectedSlot.date, 'time:', selectedSlot.time, 'dayIndex:', selectedSlot.dayIndex);
                 const newLesson = await apiLessons.add({ // Use apiLessons
                     coachId: user.id, studentId: student.id, studentName: student.name, type: 'indiv', startTime: selectedSlot.time, dayIndex: selectedSlot.dayIndex, date: selectedSlot.date, duration: 60, status: 'confirmed', courtName: 'ТК Спартак', useCannon, useRacketRental, courtCost: courtRentPrice, lessonPrice: lessonPrice 
                 });
+                console.log('Created lesson:', newLesson);
 
                 const updated = await api.students.update(student.id, {
                     racketHours: (student.racketHours || 0) + 1,
@@ -681,19 +727,36 @@ export const StudentsView = ({ user }: { user: User }) => {
                 </div>
             ) : (
                 <div className="bg-white rounded-[50px] border shadow-2xl overflow-hidden relative">
-                    <div className="overflow-x-auto custom-scrollbar max-h-[700px]">
+                    {/* Week Navigation */}
+                    <div className="sticky top-0 z-40 bg-white border-b px-6 py-4 flex items-center justify-between">
+                        <button onClick={() => setWeekOffset(prev => prev - 1)} className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold text-sm transition-colors">
+                            <ChevronLeft size={18} />
+                            Предыдущая неделя
+                        </button>
+                        <div className="text-center">
+                            <div className="text-sm font-black text-slate-900">
+                                {weekDates[0]?.dateNum} {weekDates[0]?.monthName} - {weekDates[6]?.dateNum} {weekDates[6]?.monthName}
+                            </div>
+                        </div>
+                        <button onClick={() => setWeekOffset(prev => prev + 1)} className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold text-sm transition-colors">
+                            Следующая неделя
+                            <ChevronRight size={18} />
+                        </button>
+                    </div>
+                    <div className="overflow-x-auto overflow-y-auto custom-scrollbar max-h-[700px]">
                         <div className="grid grid-cols-[100px_repeat(7,1fr)] min-w-[1200px]">
-                            <div className="h-20 sticky top-0 bg-white z-30 border-b border-r flex items-center justify-center"><Clock size={20} className="text-slate-300"/></div>
-                            {weekDates.map((dateObj, i) => (<div key={i} className={`h-20 sticky top-0 z-30 border-b flex flex-col items-center justify-center transition-colors ${new Date().getDate() === dateObj.dateNum ? 'bg-indigo-600 text-white' : 'bg-white text-slate-900'}`}><div className="font-black uppercase text-[10px] tracking-widest">{dateObj.dayName}</div><div className="text-2xl font-black">{dateObj.dateNum}</div></div>))}
+                            <div className="h-20 sticky top-0 left-0 bg-white z-30 border-b border-r flex items-center justify-center"><Clock size={20} className="text-slate-300"/></div>
+                            {weekDates.map((dateObj, i) => (<div key={i} className={`h-20 sticky top-0 z-20 border-b flex flex-col items-center justify-center transition-colors ${new Date().getDate() === dateObj.dateNum ? 'bg-indigo-600 text-white' : 'bg-white text-slate-900'}`}><div className="font-black uppercase text-[10px] tracking-widest">{dateObj.dayName}</div><div className="text-2xl font-black">{dateObj.dateNum}</div></div>))}
                             {HOURS.map(time => (
                                 <React.Fragment key={time}>
-                                    <div className="h-32 border-b border-r bg-slate-50/50 flex items-center justify-center text-xs font-black text-slate-400 sticky left-0 z-20">{time}</div>
+                                    <div className="h-32 border-b border-r bg-slate-50/50 flex items-center justify-center text-xs font-black text-slate-400 sticky left-0 z-10 bg-slate-50">{time}</div>
                                     {weekDates.map((dateObj, dayIdx) => {
-                                        const lesson = lessonsLookup.get(`${dayIdx}-${time}`);
+                                        // Look up lesson by actual date only
+                                        const lesson = lessonsLookup.get(`${dateObj.fullDate}-${time}`);
                                         return (
-                                            <div key={`${dayIdx}-${time}`} className="h-32 border-b border-r relative group transition-all hover:bg-slate-50/80">
+                                            <div key={`${dateObj.fullDate}-${time}`} className="h-32 border-b border-r relative group transition-all hover:bg-slate-50/80">
                                                 {lesson ? (
-                                                    <div className="absolute inset-2 p-3 rounded-2xl shadow-xl z-10 bg-white border-l-4 border-lime-400 cursor-pointer" onClick={() => { const student = students.find(s => s.id === lesson.studentId); if(student) { setSelectedStudent(student); setShowStudentDetails(true); setProfileTab('overview'); } }}>
+                                                    <div className="absolute inset-2 p-3 rounded-2xl shadow-xl z-10 bg-white border-l-4 border-lime-400 cursor-pointer hover:shadow-2xl hover:scale-105 transition-all" onClick={() => { const student = students.find(s => s.id === lesson.studentId); if(student) { setSelectedStudent(student); setShowStudentDetails(true); setProfileTab('overview'); } }}>
                                                         <div className="text-[8px] font-black uppercase text-slate-400">{lesson.type}</div>
                                                         <div className="text-xs font-black text-slate-900 truncate">{lesson.studentName}</div>
                                                     </div>
@@ -830,7 +893,7 @@ export const StudentsView = ({ user }: { user: User }) => {
                                 <div className="space-y-8 animate-fade-in-up">
                                     <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6">
                                         <h4 className="font-black text-xs uppercase text-slate-400 tracking-widest">Поставить новую цель</h4>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><input className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 outline-none font-bold shadow-inner" placeholder="Напр: Стабильный форхенд" value={newGoalText} onChange={e => setNewGoalText(e.target.value)} /><button onClick={handleAddGoal} disabled={!newGoalText.trim()} className="w-full bg-indigo-600 text-white rounded-2xl py-4 font-black uppercase text-xs tracking-widest transition-all hover:bg-indigo-700 active:scale-95">Создать цель (+100 XP)</button></div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><input className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 outline-none font-bold shadow-inner" placeholder="Напр: Стабильный форхенд" value={newGoalText} onChange={e => setNewGoalText(e.target.value)} /><button onClick={handleAddGoal} disabled={!newGoalText.trim()} className="w-full bg-indigo-600 text-white rounded-2xl py-4 font-black uppercase text-xs tracking-widest transition-all hover:bg-indigo-700 active:scale-95">Создать цель (+20 XP)</button></div>
                                     </div>
                                     <div className="grid grid-cols-1 gap-4">
                                         {(selectedStudent.goals || []).map(goal => (
@@ -848,7 +911,25 @@ export const StudentsView = ({ user }: { user: User }) => {
                                     </div>
                                     <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                                         {(selectedStudent.videos || []).map(vid => (
-                                            <div key={vid.id} className="bg-white p-3 rounded-3xl border border-slate-100 shadow-sm group cursor-pointer hover:border-indigo-200 transition-all"><div className="aspect-video bg-slate-200 rounded-2xl mb-3 relative overflow-hidden"><img src={vid.thumbnail} className="w-full h-full object-cover group-hover:scale-105 transition-transform" /><div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-900 shadow-xl"><Play size={18} fill="currentColor"/></div></div></div><div className="px-2"><div className="font-bold text-xs truncate">{vid.title}</div><div className="text-[9px] font-black text-slate-400 uppercase">{vid.date}</div></div></div>
+                                            <div key={vid.id} className="bg-white p-3 rounded-3xl border border-slate-100 shadow-sm group hover:border-indigo-200 transition-all relative">
+                                                <button onClick={() => handleDeleteVideo(vid.id)} className="absolute top-5 right-5 z-10 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 shadow-lg">
+                                                    <Trash2 size={14} />
+                                                </button>
+                                                <div onClick={() => handleViewVideo(vid)} className="cursor-pointer">
+                                                    <div className="aspect-video bg-slate-200 rounded-2xl mb-3 relative overflow-hidden">
+                                                        <img src={vid.thumbnail} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-900 shadow-xl">
+                                                                <Play size={18} fill="currentColor"/>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="px-2">
+                                                        <div className="font-bold text-xs truncate">{vid.title}</div>
+                                                        <div className="text-[9px] font-black text-slate-400 uppercase">{vid.date}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         ))}
                                         {!(selectedStudent.videos?.length) && <div className="col-span-full py-10 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest border-2 border-dashed rounded-[32px]">Нет загруженных видео</div>}
                                     </div>
@@ -1074,6 +1155,48 @@ export const StudentsView = ({ user }: { user: User }) => {
                     <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">ФИО Ученика</label><input required className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 outline-none font-bold shadow-inner" placeholder="Напр: Михаил Сафонов" value={newStudent.name} onChange={e => setNewStudent({...newStudent, name: e.target.value})} /></div>
                     <Button type="submit" disabled={isSubmitting} className="w-full h-16 rounded-[25px] font-black shadow-2xl uppercase tracking-widest text-xs">{isSubmitting ? <Loader2 className="animate-spin"/> : 'Создать карточку'}</Button>
                 </form>
+            </Modal>
+
+            {/* VIDEO VIEWER MODAL */}
+            <Modal isOpen={showVideoModal} onClose={() => { setShowVideoModal(false); setSelectedVideo(null); }} title={selectedVideo?.title || 'Просмотр видео'} maxWidth="max-w-4xl">
+                {selectedVideo && (
+                    <div className="space-y-4">
+                        <div className="aspect-video bg-slate-900 rounded-2xl overflow-hidden">
+                            {selectedVideo.url ? (
+                                <video controls className="w-full h-full" src={selectedVideo.url}>
+                                    Ваш браузер не поддерживает воспроизведение видео.
+                                </video>
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-white">
+                                    <div className="text-center">
+                                        <AlertTriangle size={48} className="mx-auto mb-4 text-amber-400" />
+                                        <p className="text-lg font-bold">Видео недоступно</p>
+                                        <p className="text-sm text-slate-400 mt-2">Файл не был загружен на сервер</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                            <div>
+                                <p className="font-bold text-slate-900">{selectedVideo.title}</p>
+                                <p className="text-xs text-slate-500 mt-1">Дата: {selectedVideo.date}</p>
+                            </div>
+                            <button 
+                                onClick={() => {
+                                    if (window.confirm('Вы уверены, что хотите удалить это видео?')) {
+                                        handleDeleteVideo(selectedVideo.id);
+                                        setShowVideoModal(false);
+                                        setSelectedVideo(null);
+                                    }
+                                }}
+                                className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-xl font-bold text-sm hover:bg-red-600 transition-colors"
+                            >
+                                <Trash2 size={16} />
+                                Удалить
+                            </button>
+                        </div>
+                    </div>
+                )}
             </Modal>
         </div>
     );

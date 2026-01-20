@@ -225,7 +225,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                    <img key={i} src="/assets/avatar-placeholder.svg" className="w-10 h-10 rounded-full border-2 border-slate-900" alt=""/>
                  ))}
                </div>
-               <p><span className="text-white font-bold">15,000+</span> игроков уже в игре</p>
+               <p><span className="text-white font-bold">1,000+</span> игроков уже в игре</p>
             </div>
           </div>
 

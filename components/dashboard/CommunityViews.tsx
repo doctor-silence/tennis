@@ -211,10 +211,10 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
     const activeConversation = conversations.find(c => c.id === activeConversationId);
 
     return (
-        <div className="flex h-[calc(100vh-10rem)] bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="w-1/3 border-r border-slate-100 flex flex-col">
+        <div className="flex h-[600px] bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="w-1/3 border-r border-slate-100 flex flex-col flex-shrink-0">
                 <div className="p-4 border-b border-slate-100 font-bold text-lg">Сообщения</div>
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-scroll">
                     {loadingConversations ? (
                         <div className="p-4 text-center text-slate-400">Загрузка...</div>
                     ) : (
@@ -250,16 +250,17 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                             <img src={activeConversation.partnerAvatar} className="w-8 h-8 rounded-full" alt=""/>
                             <h3 className="font-bold">{activeConversation.partnerName}</h3>
                         </div>
-                        <div className="flex-1 p-6 overflow-y-auto bg-slate-50/50">
+                        <div className="flex-1 p-6 overflow-y-scroll bg-slate-50/50">
                             <div className="space-y-4">
                                 {loadingMessages ? (
                                     <div className="flex justify-center items-center h-full"><Loader2 className="animate-spin text-slate-400"/></div>
                                 ) : (
                                     messages.map((msg, i) => (
                                         <div key={i} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                            <div className={`max-w-xs md:max-w-md p-0 rounded-2xl text-sm ${msg.role === 'user' ? (msg.text.startsWith('::sticker:') ? '' : 'bg-lime-500/20 rounded-br-lg') : 'bg-white border border-slate-100 rounded-bl-lg'}`}>
+                                            <div className={`max-w-xs md:max-w-md rounded-2xl text-sm ${msg.text.startsWith('::sticker:') ? 'p-0' : 'p-3'} ${msg.role === 'user' ? (msg.text.startsWith('::sticker:') ? '' : 'bg-lime-500/20 rounded-br-lg') : 'bg-white border border-slate-100 rounded-bl-lg'}`}>
                                                 {renderMessageContent(msg.text)}
-                                            </div>                                        </div>
+                                            </div>
+                                        </div>
                                     ))
                                 )}
                                 <div ref={messagesEndRef} />
@@ -272,20 +273,28 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                                     onSelectSticker={handleSendSticker}
                                 />
                             )}
-                            <form onSubmit={handleSendMessage} className="flex gap-2">
-                                <Button type="button" variant="ghost" className="w-12 h-12 px-0 text-slate-400 hover:text-lime-500 rounded-full" onClick={() => setShowStickerPanel(!showStickerPanel)}>
+                            <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
+                                <button 
+                                    type="button" 
+                                    className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-lime-500 hover:bg-slate-100 rounded-full transition-colors flex-shrink-0" 
+                                    onClick={() => setShowStickerPanel(!showStickerPanel)}
+                                >
                                     <Smile size={22}/>
-                                </Button>
+                                </button>
                                 <input 
-                                    className="flex-1 bg-slate-100 border-transparent rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-lime-400"
+                                    className="flex-1 bg-slate-100 border-transparent rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-lime-400"
                                     placeholder="Напишите сообщение..."
                                     value={newMessage}
                                     onChange={e => setNewMessage(e.target.value)}
                                     onFocus={() => setShowStickerPanel(false)}
                                 />
-                                <Button type="submit" variant="primary" className="w-12 h-12 px-0 rounded-full" disabled={!newMessage.trim()}>
-                                    <Send size={20}/>
-                                </Button>
+                                <button 
+                                    type="submit" 
+                                    className="w-10 h-10 flex items-center justify-center bg-slate-900 text-white hover:bg-slate-800 rounded-full transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed" 
+                                    disabled={!newMessage.trim()}
+                                >
+                                    <Send size={18}/>
+                                </button>
                             </form>
                         </div>
                     </>

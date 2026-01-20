@@ -16,19 +16,32 @@ export const ProgressChart = ({ matches, type }: { matches: Match[], type: 'serv
   const data = matches.slice(0, 10).reverse(); // Last 10 matches, chronological
   const maxVal = type === 'serve' ? 100 : 30;
   
+  if (data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-32 bg-slate-50 rounded-lg border border-slate-100 border-dashed">
+        <p className="text-xs text-slate-400">Нет данных</p>
+      </div>
+    );
+  }
+  
   return (
-    <div className="flex items-end justify-between h-24 gap-2">
+    <div className="flex items-end justify-between h-32 gap-2 mb-6 mt-8">
       {data.map((m, i) => {
-        const val = type === 'serve' ? m.stats?.firstServePercent || 0 : m.stats?.unforcedErrors || 0;
-        const height = Math.max(10, Math.min((val / maxVal) * 100, 100));
+        const val = type === 'serve' ? (m.stats?.firstServePercent || 0) : (m.stats?.unforcedErrors || 0);
+        const height = val === 0 ? 5 : Math.max(25, Math.min((val / maxVal) * 100, 100));
         return (
-          <div key={i} className="w-full bg-slate-100 rounded-t-lg relative group">
-             <div 
-               className={`absolute bottom-0 w-full rounded-t-lg transition-all ${type === 'serve' ? 'bg-lime-400' : 'bg-red-400'}`}
-               style={{ height: `${height}%` }}
-             ></div>
-             <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white px-2 py-1 rounded z-10 whitespace-nowrap">
-                {val} {type === 'serve' ? '%' : ''}
+          <div key={i} className="flex-1 min-w-0 relative flex flex-col items-center">
+             <div className="w-full h-32 bg-slate-200 rounded-t-lg relative group mb-1">
+               <div 
+                 className={`absolute bottom-0 w-full rounded-t-lg transition-all shadow-sm ${type === 'serve' ? 'bg-lime-400' : 'bg-red-400'}`}
+                 style={{ height: `${height}%` }}
+               ></div>
+               <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full mb-2 text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white px-2 py-1 rounded z-10 whitespace-nowrap pointer-events-none">
+                  {m.opponentName || `Матч ${i + 1}`}
+               </div>
+             </div>
+             <div className="text-[10px] font-bold text-slate-700 whitespace-nowrap mt-1">
+                {val}{type === 'serve' ? '%' : ''}
              </div>
           </div>
         )

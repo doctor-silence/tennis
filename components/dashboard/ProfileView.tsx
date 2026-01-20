@@ -161,7 +161,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
   };
 
   const handleCompleteTraining = async () => {
-      const xpReward = 50;
+      const xpReward = 10;
       const currentXp = user.xp || 0;
       const newXp = currentXp + xpReward;
 
@@ -562,7 +562,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
     <Modal isOpen={showTournamentsModal} onClose={() => setShowTournamentsModal(false)} title="Календарь турниров" bodyClassName="max-h-96">
         <div className="space-y-4">
             {tournaments.map((t) => (
-                <div key={t.id} className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <div key={t.id} className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                     <div className="flex gap-4 items-center">
                         <div className="bg-white rounded-lg p-2 text-center border border-slate-200 min-w-[60px]">
                             <div className="text-xs font-bold text-slate-400 uppercase">{formatDate(t.start_date).month}</div>
@@ -573,7 +573,6 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
                             <div className="text-xs text-slate-500">{t.groupName || 'Частный'} • {t.category}</div>
                         </div>
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => alert('Заявка отправлена!')}>Записаться</Button>
                 </div>
             ))}
             {tournaments.length === 0 && (
@@ -612,7 +611,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
                 <h2 className="text-2xl font-bold text-slate-900 mb-2">Отличная работа!</h2>
                 <p className="text-slate-500 mb-8">Тренировка успешно завершена.</p>
                 <div className="inline-flex items-center gap-2 bg-slate-900 text-lime-400 px-6 py-3 rounded-xl font-bold text-lg mb-8">
-                    <Zap size={20} className="fill-lime-400"/> +50 XP
+                    <Zap size={20} className="fill-lime-400"/> +10 XP
                 </div>
                 <Button className="w-full" onClick={resetTrainingModal}>Закрыть</Button>
             </div>

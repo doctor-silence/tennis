@@ -161,6 +161,7 @@ const initDb = async () => {
         type VARCHAR(50),
         start_time VARCHAR(10),
         day_index INTEGER,
+        date DATE,
         duration INTEGER,
         status VARCHAR(20),
         court_name VARCHAR(100),
@@ -169,6 +170,17 @@ const initDb = async () => {
         court_cost INTEGER,
         lesson_price INTEGER
       );
+    `);
+    
+    // Add date column if it doesn't exist (migration)
+    await client.query(`
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                      WHERE table_name='scheduled_lessons' AND column_name='date') THEN
+          ALTER TABLE scheduled_lessons ADD COLUMN date DATE;
+        END IF;
+      END $$;
     `);
     console.log('✅ Table "scheduled_lessons" checked.');
 

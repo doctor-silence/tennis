@@ -31,7 +31,7 @@ const SidebarItem = ({ icon, label, active, onClick, isSpecial = false, badge, t
     <span className="font-medium">{label}</span>
     
     {inDevelopment && (
-      <span className="ml-auto bg-lime-500/20 text-lime-500 text-[9px] font-bold px-2 py-0.5 rounded">
+      <span className="ml-auto bg-gradient-to-r from-lime-400 to-emerald-400 text-slate-900 text-[9px] font-black px-2.5 py-1 rounded-md shadow-lg border border-lime-300">
         В разработке
       </span>
     )}
@@ -55,7 +55,7 @@ const SidebarItem = ({ icon, label, active, onClick, isSpecial = false, badge, t
 
 const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogout, unreadCount, ladderNotifications }) => {
   return (
-    <aside className="w-72 bg-slate-900 text-white flex-shrink-0 hidden md:flex flex-col relative z-20 shadow-2xl">
+    <aside className="fixed left-0 top-0 h-screen w-72 bg-slate-900 text-white hidden md:flex flex-col z-20 shadow-2xl">
       <div className="p-8">
         <div className="flex items-center gap-3 mb-10">
            <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center shadow-lg border border-slate-700">
@@ -70,7 +70,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogo
           <SidebarItem icon={<MapPin size={20} />} label="Бронирование" active={activeTab === 'courts'} onClick={() => setActiveTab('courts')} />
           <SidebarItem icon={<Swords size={20} />} label="Турнирная лестница" active={activeTab === 'ladder'} onClick={() => setActiveTab('ladder')} badge={ladderNotifications > 0 && ladderNotifications} />
           <SidebarItem icon={<Globe size={20} />} label="Сообщество" active={activeTab === 'community'} onClick={() => setActiveTab('community')} />
-          <SidebarItem icon={<Mail size={20} />} label="Мои заявки" active={activeTab === 'my_applications'} onClick={() => setActiveTab('my_applications')} />
+          {user.role !== 'coach' && (
+            <SidebarItem icon={<Mail size={20} />} label="Мои заявки" active={activeTab === 'my_applications'} onClick={() => setActiveTab('my_applications')} />
+          )}
           <SidebarItem icon={<BookOpen size={20} />} label="Тактика" active={activeTab === 'tactics'} onClick={() => setActiveTab('tactics')} />
           <SidebarItem icon={<Video size={20} />} label="Видео-анализ" active={activeTab === 'video_analysis'} onClick={() => {}} inDevelopment={true} />
           <SidebarItem icon={<MessageSquare size={20} />} label="Сообщения" active={activeTab === 'messages'} onClick={() => setActiveTab('messages')} badge={unreadCount > 0 && unreadCount} />
