@@ -154,7 +154,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
            <div className="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700">
              <div className="w-3 h-3 rounded-full bg-lime-400"></div>
            </div>
-           <span className="font-bold">TennisPro</span>
+           <span className="font-black uppercase tracking-wider text-white">
+             НАКОРТЕ
+           </span>
          </div>
          <div className="flex gap-3">
              <button onClick={() => setActiveTab('messages')}><MessageSquare size={20}/></button>
@@ -194,6 +196,22 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
                  </button>
               </div>
            </header>
+
+          {/* Beta Testing Notice */}
+          <div className="mb-6 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-3xl p-6 text-white shadow-xl animate-fade-in-up">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center flex-shrink-0 backdrop-blur-sm">
+                <Bell size={24} className="text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-black mb-2">🎾 Бета-тестирование</h3>
+                <p className="text-sm leading-relaxed text-white/90">
+                  Уважаемые теннисисты и тренеры! На данный момент проект находится на бета-тестировании. 
+                  Если вы заметите несоответствия или ошибки, просим вас написать об этом в чат поддержки. Спасибо!
+                </p>
+              </div>
+            </div>
+          </div>
 
           <div className="animate-fade-in-up">
             {renderContent()}

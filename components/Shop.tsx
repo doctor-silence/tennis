@@ -142,14 +142,38 @@ const Shop: React.FC<ShopProps> = ({ onBack }) => {
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <div className="bg-slate-50 min-h-screen">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200">
+    <div className="bg-slate-50 min-h-screen relative">
+      {/* Черно-белый фильтр и оверлей */}
+      <div className="absolute inset-0 z-50 pointer-events-none" style={{ filter: 'grayscale(100%)' }}>
+        <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center pointer-events-auto">
+          <div className="text-center space-y-8">
+            <h1 className="text-7xl md:text-8xl font-black uppercase tracking-tight text-black">
+              Скоро<br />открытие
+            </h1>
+            <p className="text-2xl text-slate-700 font-medium">
+              Магазин НаКорте скоро откроется
+            </p>
+            <div className="w-32 h-1 bg-black mx-auto"></div>
+            <button
+              onClick={onBack}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-800 text-white font-medium text-sm rounded-full hover:bg-black transition-all"
+            >
+              <ArrowLeft size={16} />
+              Вернуться на главную
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Основной контент магазина с grayscale фильтром */}
+      <div style={{ filter: 'grayscale(100%)' }}>
+        {/* Header */}
+        <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
            <div className="flex items-center gap-4">
              <button onClick={onBack} className="p-2 rounded-full hover:bg-slate-100 transition-colors"><ArrowLeft size={20}/></button>
              <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                TennisPro <span className="text-lime-500">Shop</span>
+                <span className="font-black uppercase tracking-wider">НАКОРТЕ</span> <span className="text-lime-500">Shop</span>
              </h1>
            </div>
            
@@ -302,6 +326,7 @@ const Shop: React.FC<ShopProps> = ({ onBack }) => {
                 </div>
             </div>
         )}
+      </div>
     </div>
   );
 };

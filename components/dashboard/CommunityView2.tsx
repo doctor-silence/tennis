@@ -192,7 +192,7 @@ const PartnerSearchPost = ({ post }: { post: any }) => (
 const TournamentMatchPost = ({ post, user, onUpdate }: { post: any, user: User, onUpdate: () => void }) => {
     const { content, author: organizer } = post;
     const { title: tournamentName, matchData } = content;
-    const { winner, loser, score, groupName } = matchData;
+    const { winner, loser, score, groupName, nextRound } = matchData;
 
     const [isLiked, setIsLiked] = useState(post.liked_by_user);
     const [currentLikes, setCurrentLikes] = useState(parseInt(post.likes_count) || 0);
@@ -248,6 +248,9 @@ const TournamentMatchPost = ({ post, user, onUpdate }: { post: any, user: User, 
                     </div>
                     <p className="font-bold text-sm mt-1">{winner}</p>
                     <p className="text-xs text-lime-600 font-bold">Победитель</p>
+                    {nextRound && nextRound !== 'Финал завершён' && (
+                        <p className="text-xs text-indigo-600 font-bold mt-1">→ Выход в {nextRound}</p>
+                    )}
                 </div>
                 <div className="text-center">
                     <p className="font-black text-2xl text-slate-800">{score}</p>

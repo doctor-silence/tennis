@@ -1623,7 +1623,6 @@ app.get('/api/tournaments', async (req, res) => {
             WHERE
                 t.user_id = $1 -- It's a tournament created by the current user
                 OR u.role = 'admin' -- It's a public tournament from an admin
-                OR (t.target_group_id IS NULL OR t.target_group_id = '') -- It's a global tournament not tied to a group
                 OR gm.user_id IS NOT NULL -- The current user is a member of the tournament's target group
             GROUP BY t.id, u.role, g.name
             ORDER BY t.start_date DESC NULLS LAST, t.id DESC
@@ -2114,23 +2113,29 @@ app.get('/api/lessons', async (req, res) => {
 
     try {
         const result = await pool.query('SELECT * FROM scheduled_lessons WHERE coach_id = $1', [coachId]);
-        res.json(result.rows.map(row => ({
-            id: row.id.toString(),
-            coachId: row.coach_id,
-            studentId: row.student_id,
-            studentName: row.student_name,
-            type: row.type,
-            startTime: row.start_time,
-            dayIndex: row.day_index,
-            date: row.date,
-            duration: row.duration,
-            status: row.status,
-            courtName: row.court_name,
-            useCannon: row.use_cannon,
-            useRacketRental: row.use_racket_rental,
-            courtCost: row.court_cost,
-            lessonPrice: row.lesson_price,
-        })));
+        res.json(result.rows.map(row => {
+            // Format date as YYYY-MM-DD string
+            const dateObj = new Date(row.date);
+            const formattedDate = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+            
+            return {
+                id: row.id.toString(),
+                coachId: row.coach_id,
+                studentId: row.student_id,
+                studentName: row.student_name,
+                type: row.type,
+                startTime: row.start_time,
+                dayIndex: row.day_index,
+                date: formattedDate,
+                duration: row.duration,
+                status: row.status,
+                courtName: row.court_name,
+                useCannon: row.use_cannon,
+                useRacketRental: row.use_racket_rental,
+                courtCost: row.court_cost,
+                lessonPrice: row.lesson_price,
+            };
+        }));
     } catch (err) {
         console.error("Get Lessons Error:", err);
         res.status(500).json({ error: 'Database error while fetching lessons' });
@@ -2145,6 +2150,7 @@ app.post('/api/lessons', async (req, res) => {
     } = req.body;
 
     console.log('Creating lesson with data:', req.body);
+    console.log('Date field received:', date, 'Type:', typeof date);
 
     try {
         const result = await pool.query(
@@ -2152,7 +2158,7 @@ app.post('/api/lessons', async (req, res) => {
                 coach_id, student_id, student_name, type, start_time, day_index, date,
                 duration, status, court_name, use_cannon, use_racket_rental, 
                 court_cost, lesson_price
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8, $9, $10, $11, $12, $13, $14)
              RETURNING *`,
             [
                 coachId, studentId, studentName, type, startTime, dayIndex, date,
@@ -2162,7 +2168,13 @@ app.post('/api/lessons', async (req, res) => {
         );
         
         const newLesson = result.rows[0];
+        console.log('Lesson created in DB:', newLesson);
+        console.log('Date stored in DB:', newLesson.date, 'Type:', typeof newLesson.date);
         await logSystemEvent('info', `Coach ${coachId} booked lesson for student ${studentId}`, 'CRM');
+
+        // Format date as YYYY-MM-DD string
+        const dateObj = new Date(newLesson.date);
+        const formattedDate = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
 
         res.status(201).json({
             id: newLesson.id.toString(),
@@ -2172,7 +2184,7 @@ app.post('/api/lessons', async (req, res) => {
             type: newLesson.type,
             startTime: newLesson.start_time,
             dayIndex: newLesson.day_index,
-            date: newLesson.date,
+            date: formattedDate,
             duration: newLesson.duration,
             status: newLesson.status,
             courtName: newLesson.court_name,
@@ -2211,7 +2223,7 @@ app.post('/api/lessons/recurring', async (req, res) => {
                     coach_id, student_id, student_name, type, start_time, day_index, date,
                     duration, status, court_name, use_cannon, use_racket_rental, 
                     court_cost, lesson_price
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8, $9, $10, $11, $12, $13, $14)
                  RETURNING *`,
                 [
                     coachId, studentId, studentName, type, startTime, dayIndex, date,
@@ -2221,6 +2233,11 @@ app.post('/api/lessons/recurring', async (req, res) => {
             );
             
             const newLesson = result.rows[0];
+            
+            // Format date as YYYY-MM-DD string
+            const dateObj = new Date(newLesson.date);
+            const formattedDate = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+            
             createdLessons.push({
                 id: newLesson.id.toString(),
                 coachId: newLesson.coach_id,
@@ -2229,7 +2246,7 @@ app.post('/api/lessons/recurring', async (req, res) => {
                 type: newLesson.type,
                 startTime: newLesson.start_time,
                 dayIndex: newLesson.day_index,
-                date: newLesson.date,
+                date: formattedDate,
                 duration: newLesson.duration,
                 status: newLesson.status,
                 courtName: newLesson.court_name,
@@ -2245,6 +2262,25 @@ app.post('/api/lessons/recurring', async (req, res) => {
     } catch (err) {
         console.error("Create Recurring Lessons Error:", err);
         res.status(500).json({ error: 'Database error while creating recurring lessons' });
+    }
+});
+
+// Delete a lesson
+app.delete('/api/lessons/:id', async (req, res) => {
+    const { id } = req.params;
+    
+    try {
+        const result = await pool.query('DELETE FROM scheduled_lessons WHERE id = $1 RETURNING *', [id]);
+        
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Lesson not found' });
+        }
+        
+        await logSystemEvent('info', `Deleted lesson ${id}`, 'CRM');
+        res.status(200).json({ message: 'Lesson deleted successfully' });
+    } catch (err) {
+        console.error("Delete Lesson Error:", err);
+        res.status(500).json({ error: 'Database error while deleting lesson' });
     }
 });
 

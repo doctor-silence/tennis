@@ -155,7 +155,9 @@ const PublicHeader = ({ onLogin, onRegister, onNavigate, transparent = false }: 
         <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
           <div className="w-4 h-4 rounded-full bg-lime-400"></div>
         </div>
-        <span className={`text-2xl font-bold tracking-tight ${transparent ? 'text-white' : 'text-slate-900'}`}>TennisPro</span>
+        <span className={`text-2xl font-black uppercase tracking-wider ${transparent ? 'text-white' : 'text-slate-900'}`}>
+          НАКОРТЕ
+        </span>
       </div>
       
       <nav className={`hidden md:flex items-center gap-8 text-sm font-bold uppercase tracking-wider ${transparent ? 'text-slate-300' : 'text-slate-500'}`}>
@@ -367,10 +369,12 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
               <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
                 <div className="w-3 h-3 rounded-full bg-lime-400"></div>
               </div>
-              <span className="text-xl font-bold text-slate-900">TennisPro</span>
+              <span className="text-xl font-black uppercase tracking-wider text-slate-900">
+                НАКОРТЕ
+              </span>
            </div>
            <div className="text-slate-500 text-sm font-medium">
-             &copy; 2024 TennisPro Russia. Все права защищены.
+             &copy; 2024 НаКорте. Все права защищены.
            </div>
            <div className="flex gap-6 text-slate-400">
              <a href="#" className="hover:text-slate-900">Instagram</a>
@@ -395,7 +399,7 @@ const ProPage = ({ onBack, onSubscribe }: { onBack: () => void, onSubscribe: () 
          
          <div className="relative z-10 max-w-4xl mx-auto px-4 animate-fade-in-up">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-lime-400/30 bg-lime-400/10 text-lime-400 text-xs font-bold uppercase tracking-wider mb-6">
-               <Crown size={14} /> TennisPro Premium
+               <Crown size={14} /> НаКорте Premium
             </div>
             <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6">
                РАСКРОЙ СВОЙ <br/>

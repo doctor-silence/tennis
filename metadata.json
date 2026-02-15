@@ -1,5 +1,5 @@
 {
-  "name": "TennisPro Russia",
+  "name": "НаКорте",
   "description": "Платформа для теннисистов РТТ и любителей. Поиск партнеров, тренеров и кортов.",
   "requestFramePermissions": [
     "microphone"

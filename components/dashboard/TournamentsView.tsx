@@ -255,6 +255,12 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
 
         // POST TO COMMUNITY FEED
         if (winner && loser && user) {
+            // Определяем название следующего раунда
+            let nextRoundName = '';
+            if (roundIdx < updated.rounds.length - 1) {
+                nextRoundName = updated.rounds[roundIdx + 1].name;
+            }
+
              await api.posts.create({
                 userId: user.id,
                 type: 'match',
@@ -268,7 +274,8 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
                         winner: winner.name,
                         loser: loser.name,
                         score: matchScore || 'Победа',
-                        groupName: selectedTournament.groupName || 'Общий турнир'
+                        groupName: selectedTournament.groupName || 'Общий турнир',
+                        nextRound: nextRoundName || 'Финал завершён'
                     }
                 }
             });

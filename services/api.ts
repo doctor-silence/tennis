@@ -676,6 +676,14 @@ export const api = {
                 if (!res.ok) throw new Error(json.error || 'Error creating recurring lessons');
                 return json;
             } catch (e) { throw e; }
+        },
+        delete: async (lessonId: string): Promise<void> => {
+            try {
+                const res = await fetch(`${API_URL}/lessons/${lessonId}`, {
+                    method: 'DELETE'
+                });
+                if (!res.ok) throw new Error('Failed to delete lesson');
+            } catch (e) { throw e; }
         }
     },
 
@@ -1371,18 +1379,6 @@ export const api = {
             if (!res.ok) {
                  const err = await res.json();
                  throw new Error(err.error || 'Failed to add comment');
-            }
-            return await res.json();
-        },
-        delete: async (postId: string, userId: string): Promise<{ success: boolean }> => {
-            const res = await fetch(`${API_URL}/posts/${postId}`, {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId })
-            });
-            if (!res.ok) {
-                 const err = await res.json();
-                 throw new Error(err.error || 'Failed to delete post');
             }
             return await res.json();
         },

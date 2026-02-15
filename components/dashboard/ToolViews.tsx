@@ -265,6 +265,7 @@ export const StudentsView = ({ user }: { user: User }) => {
     const [newNote, setNewNote] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [reportComment, setReportComment] = useState('');
+    const [lessonToDelete, setLessonToDelete] = useState<string | null>(null);
 
     const videoInputRef = useRef<HTMLInputElement>(null);
     const [selectedVideo, setSelectedVideo] = useState<any>(null);
@@ -301,17 +302,32 @@ export const StudentsView = ({ user }: { user: User }) => {
 
     const weekDates = useMemo(() => {
         const now = new Date();
-        now.setDate(now.getDate() + (weekOffset * 7)); // Apply week offset
-        const startOfWeek = now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1);
-        return DAYS_SHORT.map((day, i) => {
-            const d = new Date(now.getFullYear(), now.getMonth(), startOfWeek + i);
+        // Apply week offset first
+        now.setDate(now.getDate() + (weekOffset * 7));
+        
+        // Get Monday of the current week (getDay returns 0 for Sunday, 1 for Monday, etc.)
+        const dayOfWeek = now.getDay();
+        const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        
+        const dates = DAYS_SHORT.map((day, i) => {
+            const d = new Date(now);
+            d.setDate(now.getDate() + daysToMonday + i);
+            
+            // Format date manually to avoid timezone issues
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const dayNum = String(d.getDate()).padStart(2, '0');
+            const fullDate = `${year}-${month}-${dayNum}`;
+            
             return {
                 dayName: day,
                 dateNum: d.getDate(),
                 monthName: d.toLocaleString('ru', { month: 'short' }),
-                fullDate: d.toISOString().split('T')[0]
+                fullDate: fullDate
             };
         });
+        console.log('weekDates generated:', dates);
+        return dates;
     }, [weekOffset]);
 
     const finances = useMemo(() => {
@@ -530,6 +546,23 @@ export const StudentsView = ({ user }: { user: User }) => {
         setShowVideoModal(true);
     };
 
+    const handleDeleteLesson = async (lessonId: string) => {
+        setLessonToDelete(lessonId);
+    };
+
+    const confirmDeleteLesson = async () => {
+        if (!lessonToDelete) return;
+        
+        try {
+            await api.lessons.delete(lessonToDelete);
+            setLessons(prev => prev.filter(l => l.id !== lessonToDelete));
+            setLessonToDelete(null);
+        } catch (error) {
+            console.error('Failed to delete lesson:', error);
+            alert('Не удалось удалить тренировку');
+        }
+    };
+
     const handleBookLesson = async () => {
         if (!selectedSlot || !bookingStudentId) return;
         setIsSubmitting(true);
@@ -688,7 +721,7 @@ export const StudentsView = ({ user }: { user: User }) => {
                     <div className="text-5xl font-black">{students.length}</div>
                     <Button size="sm" className="bg-lime-400 text-slate-900 mt-6 rounded-2xl h-11 px-6 font-black uppercase text-[10px] tracking-widest hover:bg-white hover:text-slate-900" onClick={() => setShowAddStudentModal(true)}><Plus size={16} className="mr-1"/> Добавить</Button>
                 </div>
-                <div className="lg:col-span-1 bg-white rounded-[40px] p-8 border shadow-sm"><div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Активные абонементы</div><div className="text-4xl font-black text-slate-900">12</div></div>
+                <div className="lg:col-span-1 bg-white rounded-[40px] p-8 border shadow-sm"><div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Активные ученики</div><div className="text-4xl font-black text-slate-900">{new Set(lessons.map(l => l.studentId)).size}</div></div>
                 <div className="lg:col-span-2 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[40px] p-8 text-white flex items-center justify-between shadow-xl">
                     <div className="space-y-1"><div className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-200">Режим просмотра</div><h4 className="text-xl font-bold">Управление сеткой</h4></div>
                     <div className="flex bg-black/20 p-1.5 rounded-2xl backdrop-blur-xl border border-white/10">
@@ -753,15 +786,27 @@ export const StudentsView = ({ user }: { user: User }) => {
                                     {weekDates.map((dateObj, dayIdx) => {
                                         // Look up lesson by actual date only
                                         const lesson = lessonsLookup.get(`${dateObj.fullDate}-${time}`);
+                                        // Calculate correct day index from the actual date (Mon=0, Tue=1...Sun=6)
+                                        const dateForSlot = new Date(dateObj.fullDate);
+                                        const realDayIndex = (dateForSlot.getDay() + 6) % 7;
                                         return (
                                             <div key={`${dateObj.fullDate}-${time}`} className="h-32 border-b border-r relative group transition-all hover:bg-slate-50/80">
                                                 {lesson ? (
-                                                    <div className="absolute inset-2 p-3 rounded-2xl shadow-xl z-10 bg-white border-l-4 border-lime-400 cursor-pointer hover:shadow-2xl hover:scale-105 transition-all" onClick={() => { const student = students.find(s => s.id === lesson.studentId); if(student) { setSelectedStudent(student); setShowStudentDetails(true); setProfileTab('overview'); } }}>
-                                                        <div className="text-[8px] font-black uppercase text-slate-400">{lesson.type}</div>
-                                                        <div className="text-xs font-black text-slate-900 truncate">{lesson.studentName}</div>
+                                                    <div className="absolute inset-2 rounded-2xl shadow-xl z-10 bg-white border-l-4 border-lime-400 hover:shadow-2xl transition-all group/lesson">
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); handleDeleteLesson(lesson.id); }} 
+                                                            className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/lesson:opacity-100 transition-opacity hover:bg-red-600 z-20"
+                                                            title="Удалить тренировку"
+                                                        >
+                                                            <X size={14} />
+                                                        </button>
+                                                        <div className="p-3 cursor-pointer" onClick={() => { const student = students.find(s => s.id === lesson.studentId); if(student) { setSelectedStudent(student); setShowStudentDetails(true); setProfileTab('overview'); } }}>
+                                                            <div className="text-[8px] font-black uppercase text-slate-400">{lesson.type}</div>
+                                                            <div className="text-xs font-black text-slate-900 truncate">{lesson.studentName}</div>
+                                                        </div>
                                                     </div>
                                                 ) : (
-                                                    <button onClick={() => { setSelectedSlot({dayIndex: dayIdx, time: time, date: dateObj.fullDate}); setShowBookLessonModal(true); }} className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center text-indigo-400 transition-opacity"><Plus size={24}/></button>
+                                                    <button onClick={() => { console.log('Slot clicked:', {dayIdx, realDayIndex, time, dateObj, fullDate: dateObj.fullDate, dayName: dateObj.dayName, dateNum: dateObj.dateNum}); setSelectedSlot({dayIndex: realDayIndex, time: time, date: dateObj.fullDate}); setShowBookLessonModal(true); }} className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center text-indigo-400 transition-opacity"><Plus size={24}/></button>
                                                 )}
                                             </div>
                                         );
@@ -1014,7 +1059,7 @@ export const StudentsView = ({ user }: { user: User }) => {
             <Modal isOpen={showBookLessonModal} onClose={() => { setShowBookLessonModal(false); setBookingStudentId(''); }} title="Записать на тренировку" maxWidth="max-w-3xl">
                 <div className="space-y-8 py-2">
                     <div className="bg-[#0f172a] p-8 rounded-[40px] text-white relative overflow-hidden shadow-2xl">
-                        <div className="relative z-10"><div className="text-xs font-black text-lime-400 uppercase tracking-[0.3em] mb-2">{selectedSlot ? `${weekDates[selectedSlot.dayIndex].dayName}, ${selectedSlot.date}` : ''} • {selectedSlot?.time}</div><div className="text-3xl font-black italic uppercase tracking-tighter text-glow">Бронирование и оплата</div></div>
+                        <div className="relative z-10"><div className="text-xs font-black text-lime-400 uppercase tracking-[0.3em] mb-2">{selectedSlot ? `${new Date(selectedSlot.date).toLocaleDateString('ru', {weekday: 'short', day: 'numeric', month: 'short'})}` : ''} • {selectedSlot?.time}</div><div className="text-3xl font-black italic uppercase tracking-tighter text-glow">Бронирование и оплата</div></div>
                     </div>
                     
                     <div className="space-y-8">
@@ -1197,6 +1242,31 @@ export const StudentsView = ({ user }: { user: User }) => {
                         </div>
                     </div>
                 )}
+            </Modal>
+
+            {/* DELETE LESSON CONFIRMATION MODAL */}
+            <Modal isOpen={!!lessonToDelete} onClose={() => setLessonToDelete(null)} title="">
+                <div className="text-center py-8">
+                    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <AlertTriangle size={32} className="text-red-500" />
+                    </div>
+                    <h3 className="text-2xl font-black text-slate-900 mb-3">Удалить тренировку?</h3>
+                    <p className="text-slate-600 mb-8">Это действие нельзя будет отменить</p>
+                    <div className="flex gap-3 justify-center">
+                        <button 
+                            onClick={() => setLessonToDelete(null)}
+                            className="px-8 py-3 bg-slate-100 text-slate-900 rounded-2xl font-bold hover:bg-slate-200 transition-colors"
+                        >
+                            Отмена
+                        </button>
+                        <button 
+                            onClick={confirmDeleteLesson}
+                            className="px-8 py-3 bg-red-500 text-white rounded-2xl font-bold hover:bg-red-600 transition-colors"
+                        >
+                            Удалить
+                        </button>
+                    </div>
+                </div>
             </Modal>
         </div>
     );

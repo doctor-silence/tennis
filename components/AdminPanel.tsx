@@ -320,7 +320,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         <div className="w-4 h-4 bg-slate-900 rounded-sm"></div>
                     </div>
                     <div>
-                        <div className="font-bold tracking-tight text-lg">TennisPro</div>
+                        <div className="font-black uppercase tracking-wider text-lg text-white">
+                          НАКОРТЕ
+                        </div>
                         <div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Admin Panel</div>
                     </div>
                 </div>
