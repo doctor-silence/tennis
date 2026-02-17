@@ -319,21 +319,24 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({ user, onNo
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchAndReadNotifications = async () => {
+        const fetchNotifications = async () => {
             setLoading(true);
             const fetchedNotifications = await api.notifications.getAll(user.id);
             setNotifications(fetchedNotifications);
             setLoading(false);
-
-            const unreadIds = fetchedNotifications.filter(n => !n.is_read).map(n => n.id);
-            if (unreadIds.length > 0) {
-                await Promise.all(unreadIds.map(id => api.notifications.markAsRead(id)));
-                onNotificationsRead();
-            }
         };
 
-        fetchAndReadNotifications();
-    }, [user.id, onNotificationsRead]);
+        fetchNotifications();
+    }, [user.id]);
+
+    const handleMarkAllAsRead = async () => {
+        const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
+        if (unreadIds.length > 0) {
+            await Promise.all(unreadIds.map(id => api.notifications.markAsRead(id)));
+            setNotifications(notifications.map(n => ({ ...n, is_read: true })));
+            onNotificationsRead();
+        }
+    };
 
     const getIconForType = (type: string) => {
         switch (type) {
@@ -365,6 +368,17 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({ user, onNo
 
     return (
         <div className="max-w-2xl mx-auto space-y-4">
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-slate-900">Уведомления</h3>
+                {notifications.some(n => !n.is_read) && (
+                    <button
+                        onClick={handleMarkAllAsRead}
+                        className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold"
+                    >
+                        Отметить все как прочитанные
+                    </button>
+                )}
+            </div>
             {notifications.map(n => (
                 <div key={n.id} className={`bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex gap-4 ${n.is_read ? 'opacity-60' : ''}`}>
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
@@ -402,7 +416,7 @@ export const CommunityView = ({ user, onNavigate, onStartConversation, feedVersi
 );
 }
 
-export const LadderView = ({ user, challenges, setChallenges }: { user: User, challenges: Challenge[], setChallenges: React.Dispatch<React.SetStateAction<Challenge[]>> }) => {
+export const LadderView = ({ user, challenges, setChallenges, onChallengeCreated, onStartConversation }: { user: User, challenges: Challenge[], setChallenges: React.Dispatch<React.SetStateAction<Challenge[]>>, onChallengeCreated?: () => void, onStartConversation?: (partnerId: string) => void }) => {
     const [ranking, setRanking] = useState<LadderPlayer[]>([]);
     const [viewMode, setViewMode] = useState<'ranking' | 'challenges'>('ranking');
     const [selectedOpponent, setSelectedOpponent] = useState<LadderPlayer | null>(null);
@@ -415,14 +429,27 @@ export const LadderView = ({ user, challenges, setChallenges }: { user: User, ch
     const [winnerId, setWinnerId] = useState<string | null>(null);
     const [ladderType, setLadderType] = useState<'club_elo' | 'rtt_rating'>('club_elo');
     const [eventType, setEventType] = useState<'friendly' | 'cup' | 'masters'>('friendly');
+    const [rttCategory, setRttCategory] = useState<string>('Взрослые');
+    
+    const rttCategories = [
+        '9-10 лет',
+        'до 13 лет',
+        'до 15 лет',
+        'до 17 лет',
+        'до 19 лет',
+        'Взрослые'
+    ];
     
     useEffect(() => {
         const loadData = async () => {
-             const rankData = await api.ladder.getRankings(ladderType);
+             const rankData = await api.ladder.getRankings(
+                 ladderType,
+                 ladderType === 'rtt_rating' ? rttCategory : undefined
+             );
              setRanking(rankData);
         };
         loadData();
-    }, [ladderType]);
+    }, [ladderType, rttCategory]);
 
     const handleChallengeClick = (opponent: LadderPlayer) => {
         setSelectedOpponent(opponent);
@@ -439,23 +466,47 @@ export const LadderView = ({ user, challenges, setChallenges }: { user: User, ch
     };
 
     const confirmChallenge = async () => {
-        if (!selectedOpponent) return;
-
-        const challenger = ranking.find(p => p.userId === user.id);
-        if (!challenger) {
-            console.error("Could not find challenger in ranking list");
-            // Optionally, show an error to the user
+        if (!selectedOpponent) {
+            console.log("No opponent selected");
             return;
         }
 
+        // Try to find challenger in current ranking, or create from user data
+        let challenger = ranking.find(p => p.userId === user.id);
+        
+        if (!challenger) {
+            console.log("User not in current ranking view, creating challenger from user data");
+            // Create challenger object from current user
+            challenger = {
+                userId: user.id,
+                name: user.name,
+                avatar: user.avatar || '',
+                rank: 0, // Will be determined by backend
+                points: ladderType === 'rtt_rating' ? (user.rating || 0) : (user.xp || 0),
+                winRate: 0,
+                totalMatches: 0,
+                role: user.role,
+                level: user.level || 'beginner',
+                status: 'available'
+            };
+        }
+
+        console.log("Creating challenge:", { challenger, selectedOpponent, eventType });
+
         try {
             const newChallenge = await api.ladder.createChallenge(challenger, selectedOpponent, eventType);
+            console.log("Challenge created:", newChallenge);
             setChallenges([newChallenge, ...challenges]);
             setShowChallengeModal(false);
             setViewMode('challenges');
+            // Update notification count for the defender
+            console.log("Calling onChallengeCreated to update notification count");
+            if (onChallengeCreated) {
+                onChallengeCreated();
+            }
         } catch (error) {
             console.error("Failed to create challenge:", error);
-            // Optionally, show an error message to the user
+            alert("Ошибка при создании вызова: " + (error instanceof Error ? error.message : String(error)));
         }
     };
 
@@ -555,7 +606,7 @@ export const LadderView = ({ user, challenges, setChallenges }: { user: User, ch
                                 {ladderType === 'club_elo' ? 'Турнирная лестница клуба' : 'Официальный топ РТТ'}
                             </h3>
                             <p className="text-slate-300 text-xs uppercase tracking-wider">
-                                {ladderType === 'club_elo' ? 'Сезон: Октябрь 2024 • Общий зачет' : 'Категория: взрослые • Обновлено 21.10'}
+                                {ladderType === 'club_elo' ? 'Сезон: Октябрь 2024 • Общий зачет' : `Категория: ${rttCategory} • Обновлено 21.10`}
                             </p>
                         </div>
                         <div className="bg-white/10 px-4 py-2 rounded-xl text-center">
@@ -565,6 +616,26 @@ export const LadderView = ({ user, challenges, setChallenges }: { user: User, ch
                             <div className="text-[10px] font-bold text-slate-300 uppercase">Твой ранг</div>
                         </div>
                     </div>
+                    
+                    {ladderType === 'rtt_rating' && (
+                        <div className="px-6 py-4 bg-gradient-to-r from-orange-50 to-amber-50 border-b border-orange-200">
+                            <div className="flex gap-2 flex-wrap">
+                                {rttCategories.map(cat => (
+                                    <button
+                                        key={cat}
+                                        onClick={() => setRttCategory(cat)}
+                                        className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all ${
+                                            rttCategory === cat
+                                                ? 'bg-orange-600 text-white shadow-lg'
+                                                : 'bg-white text-slate-700 hover:bg-orange-100'
+                                        }`}
+                                    >
+                                        {cat}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
                             <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs">
@@ -641,7 +712,12 @@ export const LadderView = ({ user, challenges, setChallenges }: { user: User, ch
                             <div key={c.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-6">
                                 <div className="flex items-center gap-8 w-full md:w-auto">
                                     <div className="text-center w-24">
-                                        <div className="font-bold text-slate-900 text-sm">{c.challengerName}</div>
+                                        <div 
+                                            className="font-bold text-slate-900 text-sm cursor-pointer hover:text-indigo-600 transition-colors"
+                                            onClick={() => onStartConversation && onStartConversation(c.challengerId)}
+                                        >
+                                            {c.challengerName}
+                                        </div>
                                         <div className="text-xs text-slate-400">Претендент</div>
                                     </div>
                                     <div className="flex flex-col items-center px-4">
@@ -654,7 +730,12 @@ export const LadderView = ({ user, challenges, setChallenges }: { user: User, ch
                                         </div>
                                     </div>
                                     <div className="text-center w-24">
-                                        <div className="font-bold text-slate-900 text-sm">{c.defenderName}</div>
+                                        <div 
+                                            className="font-bold text-slate-900 text-sm cursor-pointer hover:text-indigo-600 transition-colors"
+                                            onClick={() => onStartConversation && onStartConversation(c.defenderId)}
+                                        >
+                                            {c.defenderName}
+                                        </div>
                                         <div className="text-xs text-slate-400">Защитник</div>
                                     </div>
                                 </div>

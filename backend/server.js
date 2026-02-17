@@ -6,6 +6,7 @@ const OpenAI = require('openai');
 const bcrypt = require('bcryptjs');
 const pool = require('./db');
 const initDb = require('./initDb');
+const rttParser = require('./rttParser');
 
 const app = express();
 const server = http.createServer(app);
@@ -59,7 +60,7 @@ app.get('/api/health', async (req, res) => {
 
 // Register
 app.post('/api/auth/register', async (req, res) => {
-    const { name, email, password, city, role, age, rating, level, rttRank, rttCategory } = req.body;
+    const { name, email, password, city, role, age, rating, level, rttRank, rttCategory, rni } = req.body;
     
     try {
         if (!password || password.length < 6) {
@@ -75,9 +76,9 @@ app.post('/api/auth/register', async (req, res) => {
         const defaultAvatar = `https://ui-avatars.com/api/?name=${name.replace(' ', '+')}&background=random&color=fff`;
         
         const result = await pool.query(
-            `INSERT INTO users (name, email, password, city, avatar, role, rating, age, level, rtt_rank, rtt_category, xp) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0) 
-             RETURNING id, name, email, role, city, avatar, rating, age, level, rtt_rank, rtt_category, xp`,
+            `INSERT INTO users (name, email, password, city, avatar, role, rating, age, level, rtt_rank, rtt_category, rni, xp) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 0) 
+             RETURNING id, name, email, role, city, avatar, rating, age, level, rtt_rank, rtt_category, rni, xp`,
             [
                 name, 
                 email, 
@@ -89,7 +90,8 @@ app.post('/api/auth/register', async (req, res) => {
                 age || null,
                 level || '',
                 rttRank || 0,
-                rttCategory || null
+                rttCategory || null,
+                rni || null
             ]
         );
 
@@ -151,6 +153,74 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (err) {
         console.error("❌ Login Error:", err);
         res.status(500).json({ error: 'Ошибка при входе: ' + err.message });
+    }
+});
+
+// --- RTT INTEGRATION API ROUTES ---
+
+// Get player data by RNI
+app.post('/api/rtt/verify', async (req, res) => {
+    const { rni } = req.body;
+    
+    try {
+        if (!rni) {
+            return res.status(400).json({ error: 'РНИ обязателен для проверки' });
+        }
+
+        const result = await rttParser.getPlayerByRNI(rni);
+        
+        if (result.success) {
+            await logSystemEvent('info', `RTT verification successful for RNI: ${rni}`, 'RTT');
+            res.json(result);
+        } else {
+            await logSystemEvent('warning', `RTT verification failed for RNI: ${rni} - ${result.error}`, 'RTT');
+            res.status(404).json(result);
+        }
+
+    } catch (err) {
+        console.error("❌ RTT Verification Error:", err);
+        await logSystemEvent('error', `RTT verification error: ${err.message}`, 'RTT');
+        res.status(500).json({ 
+            success: false,
+            error: 'Ошибка при проверке РНИ: ' + err.message 
+        });
+    }
+});
+
+// Search players in RTT
+app.get('/api/rtt/search', async (req, res) => {
+    const { query } = req.query;
+    
+    try {
+        if (!query || query.length < 2) {
+            return res.status(400).json({ error: 'Минимум 2 символа для поиска' });
+        }
+
+        const result = await rttParser.searchPlayers(query);
+        res.json(result);
+
+    } catch (err) {
+        console.error("❌ RTT Search Error:", err);
+        res.status(500).json({ 
+            success: false,
+            error: 'Ошибка при поиске: ' + err.message 
+        });
+    }
+});
+
+// Check RTT service availability
+app.get('/api/rtt/status', async (req, res) => {
+    try {
+        const isAvailable = await rttParser.checkAvailability();
+        res.json({ 
+            available: isAvailable,
+            message: isAvailable ? 'RTT сервис доступен' : 'RTT сервис недоступен'
+        });
+    } catch (err) {
+        res.status(500).json({ 
+            available: false,
+            message: 'Ошибка проверки статуса RTT'
+        });
     }
 });
 
@@ -804,16 +874,27 @@ app.get('/api/partners', async (req, res) => {
 // --- LADDER ROUTES ---
 
 app.get('/api/ladder/rankings', async (req, res) => {
-    const { type } = req.query; // 'club_elo' or 'rtt_rating'
+    const { type, category } = req.query; // 'club_elo' or 'rtt_rating' and optional category
 
     try {
         let orderByClause = '';
         let whereClause = 'WHERE u.role != \'admin\'' ;
+        let selectPointsClause = 'u.xp as points'; // Default to XP for club players
         const queryParams = [];
 
         if (type === 'rtt_rating') {
-            orderByClause = 'ORDER BY u.rtt_rank ASC, u.rtt_category ASC, u.rating DESC'; // For professional (RTT) players
-            whereClause += ' AND u.rtt_rank IS NOT NULL AND u.rtt_rank > 0'; // Only show players with an RTT rank
+            orderByClause = 'ORDER BY u.rating DESC, u.name ASC'; // For professional (RTT) players, sort by rating
+            whereClause += ' AND u.role = \'rtt_pro\''; // Only show RTT professional players
+            selectPointsClause = 'u.rating as points'; // Use RTT rating as points
+            
+            // Add category filter if specified
+            if (category && category !== 'Взрослые') {
+                queryParams.push(category);
+                whereClause += ` AND u.rtt_category = $${queryParams.length}`;
+            } else if (category === 'Взрослые') {
+                // For Взрослые, show players without category or with "Взрослые"
+                whereClause += ' AND (u.rtt_category IS NULL OR u.rtt_category = \'Взрослые\' OR u.rtt_category = \'\')';
+            }
         } else { // Default to 'club_elo'
             orderByClause = 'ORDER BY u.xp DESC, u.rating DESC, u.name ASC'; // For amateur (Club ELO) players
         }
@@ -821,7 +902,7 @@ app.get('/api/ladder/rankings', async (req, res) => {
         // Get all users ordered by rank
         const usersResult = await pool.query(`
             SELECT 
-                u.id, u.name, u.avatar, u.xp as points, u.role, u.level, u.rating, u.rtt_rank, u.rtt_category,
+                u.id, u.name, u.avatar, ${selectPointsClause}, u.role, u.level, u.rating, u.rtt_rank, u.rtt_category,
                 COUNT(m.id) AS total_matches,
                 COUNT(m.id) FILTER (WHERE m.result = 'win') AS wins
             FROM users u
@@ -946,10 +1027,11 @@ app.post('/api/ladder/challenges', async (req, res) => {
         const defender = await pool.query('SELECT name FROM users WHERE id = $1', [newChallenge.defender_id]);
 
         // Create notification for the defender
-        await pool.query(
-            `INSERT INTO notifications (user_id, type, message, reference_id) VALUES ($1, $2, $3, $4)`,
+        const notificationResult = await pool.query(
+            `INSERT INTO notifications (user_id, type, message, reference_id, is_read) VALUES ($1, $2, $3, $4, FALSE) RETURNING *`,
             [parsedDefenderId, 'new_challenge', `${challenger.rows[0].name} бросил(а) вам вызов!`, newChallenge.id]
         );
+        console.log("Notification created for user:", parsedDefenderId, notificationResult.rows[0]);
 
         res.status(201).json({
             id: newChallenge.id.toString(),
@@ -1194,7 +1276,9 @@ app.get('/api/notifications/unread-count/:userId', async (req, res) => {
             'SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND is_read = FALSE',
             [parsedUserId]
         );
-        res.json({ count: parseInt(result.rows[0].count, 10) });
+        const count = parseInt(result.rows[0].count, 10);
+        console.log(`Unread count for user ${parsedUserId}:`, count);
+        res.json({ count });
     } catch (err) {
         console.error("Fetch Unread Count Error:", err);
         res.status(500).json({ error: 'Failed to fetch unread notification count' });

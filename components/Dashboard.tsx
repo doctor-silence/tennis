@@ -38,9 +38,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
 
   const fetchUnreadCount = () => {
     api.notifications.getUnreadCount(user.id).then(data => {
+        console.log("Unread count fetched:", data.count);
+        console.log("Setting unreadLadderNotifications to:", data.count);
         setUnreadLadderNotifications(data.count);
+        console.log("State should now be:", data.count);
+    }).catch(err => {
+        console.error("Failed to fetch unread count:", err);
     });
   }
+
+  // Debug: log state changes
+  useEffect(() => {
+    console.log("unreadLadderNotifications state changed to:", unreadLadderNotifications);
+  }, [unreadLadderNotifications]);
 
   useEffect(() => {
     api.messages.getConversations(user.id).then(data => {
@@ -120,7 +130,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
         students: <StudentsView user={user} />,
         tournaments: <TournamentsView user={user} onTournamentUpdate={incrementFeedVersion} />,
         video_analysis: <VideoAnalysisView />,
-        ladder: <LadderView user={user} challenges={challenges} setChallenges={setChallenges} />,
+        ladder: <LadderView user={user} challenges={challenges} setChallenges={setChallenges} onChallengeCreated={fetchUnreadCount} onStartConversation={handleStartConversation} />,
         community: <CommunityView user={user} onNavigate={handleNavigate} onStartConversation={handleStartConversation} feedVersion={feedVersion} />,
         my_applications: <MyApplications user={user} />,
     };
@@ -154,8 +164,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
            <div className="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700">
              <div className="w-3 h-3 rounded-full bg-lime-400"></div>
            </div>
-           <span className="font-black uppercase tracking-wider text-white">
-             НАКОРТЕ
+           <span className="font-black tracking-wider text-white">
+             НаКорте
            </span>
          </div>
          <div className="flex gap-3">
@@ -188,11 +198,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
                 <p className="text-slate-500 text-sm mt-1">Добро пожаловать, {user.name}</p>
               </div>
               <div className="hidden md:flex items-center gap-4">
-                 <button onClick={() => setActiveTab('notifications')} className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors shadow-sm relative ${activeTab === 'notifications' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
+                 <button onClick={() => {
+                   console.log("Bell clicked, unreadLadderNotifications:", unreadLadderNotifications);
+                   setActiveTab('notifications');
+                 }} className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors shadow-sm relative ${activeTab === 'notifications' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
                    <Bell size={20} />
-                   {unreadLadderNotifications > 0 &&
-                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-                   }
+                   {(() => {
+                     console.log("Rendering badge, unreadLadderNotifications:", unreadLadderNotifications, "Show badge:", unreadLadderNotifications > 0);
+                     return unreadLadderNotifications > 0 && (
+                       <span className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 rounded-full border-2 border-white flex items-center justify-center z-10">
+                         <span className="text-white text-xs font-bold">{unreadLadderNotifications}</span>
+                       </span>
+                     );
+                   })()}
                  </button>
               </div>
            </header>

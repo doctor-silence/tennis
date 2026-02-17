@@ -212,18 +212,18 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
              </div>
           </div>
           
-          <div className="px-8 pb-8">
-               <div className="flex flex-col sm:flex-row items-start sm:items-end gap-6 -mt-16 sm:-mt-6 relative z-10">
-                   <div className="relative">
+          <div className="px-8 pb-8 pt-6">
+               <div className="flex flex-col sm:flex-row items-start gap-6 -mt-24 sm:-mt-6 relative z-10">
+                   <div className="relative flex-shrink-0 -mt-20 sm:-mt-0">
                       <img src={user.avatar || `https://ui-avatars.com/api/?name=${user.name}`} alt={user.name} className="w-32 h-32 rounded-3xl object-cover border-4 border-white shadow-md bg-slate-100" />
                    </div>
                    
-                   <div className="flex-1 pt-2 sm:pt-0">
-                       <div className="flex items-center justify-between">
-                           <div>
-                               <div className="flex items-center gap-2 mb-1">
-                                 <h2 className="text-3xl font-bold text-slate-900">{user.name}</h2>
-                                 {(user.role === 'rtt_pro' || user.role === 'coach') && <CheckCircle2 className="text-blue-500 fill-blue-100" size={24} />}
+                   <div className="flex-1 w-full sm:pt-0">
+                       <div className="flex items-start justify-between gap-4">
+                           <div className="min-w-0 flex-1">
+                               <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                 <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 break-words">{user.name}</h2>
+                                 {(user.role === 'rtt_pro' || user.role === 'coach') && <CheckCircle2 className="text-blue-500 fill-blue-100 flex-shrink-0" size={24} />}
                                </div>
                                <p className="text-slate-500 font-medium flex items-center gap-2"><MapPin size={16}/> {user.city}</p>
                            </div>

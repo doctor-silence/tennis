@@ -173,7 +173,7 @@ const Shop: React.FC<ShopProps> = ({ onBack }) => {
            <div className="flex items-center gap-4">
              <button onClick={onBack} className="p-2 rounded-full hover:bg-slate-100 transition-colors"><ArrowLeft size={20}/></button>
              <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                <span className="font-black uppercase tracking-wider">НАКОРТЕ</span> <span className="text-lime-500">Shop</span>
+                <span className="font-black tracking-wider">НаКорте</span> <span className="text-lime-500">Shop</span>
              </h1>
            </div>
            

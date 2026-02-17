@@ -61,8 +61,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogo
            <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center shadow-lg border border-slate-700">
              <div className="w-4 h-4 rounded-full bg-lime-400 shadow-[0_0_10px_rgba(163,230,53,0.5)]"></div>
            </div>
-          <span className="text-2xl font-black uppercase tracking-wider text-white">
-            НАКОРТЕ
+          <span className="text-2xl font-black tracking-wider text-white">
+            НаКорте
           </span>
         </div>
         

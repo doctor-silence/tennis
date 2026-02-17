@@ -441,6 +441,55 @@ export const api = {
         }
     },
 
+    rtt: {
+        // Проверка РНИ и получение данных спортсмена
+        verifyRNI: async (rni: string): Promise<any> => {
+            try {
+                const res = await fetch(`${API_URL}/rtt/verify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rni })
+                });
+                const data = await res.json();
+                return data;
+            } catch (error) {
+                console.error('RTT verification error:', error);
+                return {
+                    success: false,
+                    error: 'Ошибка подключения к сервису РТТ'
+                };
+            }
+        },
+        
+        // Поиск спортсменов по имени
+        searchPlayers: async (query: string): Promise<any> => {
+            try {
+                const res = await fetch(`${API_URL}/rtt/search?query=${encodeURIComponent(query)}`);
+                const data = await res.json();
+                return data;
+            } catch (error) {
+                console.error('RTT search error:', error);
+                return {
+                    success: false,
+                    error: 'Ошибка поиска'
+                };
+            }
+        },
+        
+        // Проверка доступности сервиса РТТ
+        checkStatus: async (): Promise<any> => {
+            try {
+                const res = await fetch(`${API_URL}/rtt/status`);
+                return await res.json();
+            } catch (error) {
+                return {
+                    available: false,
+                    message: 'Сервис недоступен'
+                };
+            }
+        }
+    },
+
     support: {
         getConversations: async (): Promise<Conversation[]> => {
             const res = await fetch(`${API_URL}/support/conversations`);
@@ -1215,9 +1264,13 @@ export const api = {
     },
 
     ladder: {
-        getRankings: async (ladderType: 'club_elo' | 'rtt_rating'): Promise<LadderPlayer[]> => {
+        getRankings: async (ladderType: 'club_elo' | 'rtt_rating', category?: string): Promise<LadderPlayer[]> => {
             try {
-                const res = await fetch(`${API_URL}/ladder/rankings?type=${ladderType}`);
+                let url = `${API_URL}/ladder/rankings?type=${ladderType}`;
+                if (category) {
+                    url += `&category=${encodeURIComponent(category)}`;
+                }
+                const res = await fetch(url);
                 if (!res.ok) throw new Error('Failed to fetch ladder rankings');
                 return await res.json();
             } catch (e) {
@@ -1262,18 +1315,33 @@ export const api = {
         },
         createChallenge: async (challenger: LadderPlayer, defender: LadderPlayer, eventType: 'friendly' | 'cup' | 'masters'): Promise<Challenge> => {
             try {
+                console.log("API createChallenge called with:", { challenger, defender, eventType });
+                const payload = { 
+                    challengerId: challenger.userId, 
+                    defenderId: defender.userId,
+                    eventType: eventType
+                };
+                console.log("Sending payload:", payload);
+                
                 const res = await fetch(`${API_URL}/ladder/challenges`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        challengerId: challenger.userId, 
-                        defenderId: defender.userId,
-                        eventType: eventType
-                    })
+                    body: JSON.stringify(payload)
                 });
-                if (!res.ok) throw new Error('Failed to create challenge');
-                return await res.json();
+                
+                console.log("Response status:", res.status);
+                
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    console.error("API error response:", errorText);
+                    throw new Error(`Failed to create challenge: ${res.status} ${errorText}`);
+                }
+                
+                const result = await res.json();
+                console.log("Challenge created successfully:", result);
+                return result;
             } catch (e) {
+                console.error("Backend error:", e);
                 console.warn("Backend offline or failed to create challenge. Returning mock data.");
                 return {
                     id: Math.random().toString(),
@@ -1445,9 +1513,15 @@ export const api = {
     notifications: {
         getUnreadCount: async (userId: string): Promise<{ count: number }> => {
             try {
+                console.log("Fetching unread count for user:", userId);
                 const res = await fetch(`${API_URL}/notifications/unread-count/${userId}`);
-                if (!res.ok) throw new Error('Failed to fetch unread notification count');
-                return await res.json();
+                if (!res.ok) {
+                    console.error("Failed to fetch unread count, status:", res.status);
+                    throw new Error('Failed to fetch unread notification count');
+                }
+                const result = await res.json();
+                console.log("Unread count response:", result);
+                return result;
             } catch (e) {
                 console.error("Get unread notifications error:", e);
                 return { count: 0 };

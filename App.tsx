@@ -156,7 +156,7 @@ const PublicHeader = ({ onLogin, onRegister, onNavigate, transparent = false }: 
           <div className="w-4 h-4 rounded-full bg-lime-400"></div>
         </div>
         <span className={`text-2xl font-black uppercase tracking-wider ${transparent ? 'text-white' : 'text-slate-900'}`}>
-          НАКОРТЕ
+          НА<span className="text-3xl">К</span>орте
         </span>
       </div>
       
@@ -369,8 +369,8 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
               <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
                 <div className="w-3 h-3 rounded-full bg-lime-400"></div>
               </div>
-              <span className="text-xl font-black uppercase tracking-wider text-slate-900">
-                НАКОРТЕ
+              <span className="text-xl font-black tracking-wider text-slate-900">
+                На<span className="text-2xl">К</span>орте
               </span>
            </div>
            <div className="text-slate-500 text-sm font-medium">
@@ -399,7 +399,7 @@ const ProPage = ({ onBack, onSubscribe }: { onBack: () => void, onSubscribe: () 
          
          <div className="relative z-10 max-w-4xl mx-auto px-4 animate-fade-in-up">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-lime-400/30 bg-lime-400/10 text-lime-400 text-xs font-bold uppercase tracking-wider mb-6">
-               <Crown size={14} /> НаКорте Premium
+               <Crown size={14} /> НаКОрте Premium
             </div>
             <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6">
                РАСКРОЙ СВОЙ <br/>
@@ -513,6 +513,9 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () =>
   const [rttAgeCategory, setRttAgeCategory] = useState('Взрослые');
   const [rttPoints, setRttPoints] = useState(''); // Очки классификации
   const [rttRank, setRttRank] = useState('');     // Рейтинг в категории (позиция)
+  const [rni, setRni] = useState('');             // РНИ (Регистрационный номер игрока)
+  const [rniVerifying, setRniVerifying] = useState(false);
+  const [rniVerified, setRniVerified] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -549,6 +552,41 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () =>
     }
   };
 
+  const handleRNIVerification = async () => {
+    if (!rni || rni.length < 4) {
+      setError('Введите корректный РНИ (минимум 4 символа)');
+      return;
+    }
+
+    setRniVerifying(true);
+    setError('');
+
+    try {
+      const result = await api.rtt.verifyRNI(rni);
+      
+      if (result.success && result.data) {
+        // Автозаполнение данных из РТТ
+        const player = result.data;
+        setName(player.name);
+        setCity(player.city || city);
+        setAge(player.age?.toString() || age);
+        setRttPoints(player.rating?.points?.toString() || '');
+        setRttRank(player.rating?.rank?.toString() || '');
+        setRttAgeCategory(player.rating?.category || 'Взрослые');
+        setRniVerified(true);
+        setError('');
+      } else {
+        setError(result.error || 'РНИ не найден в базе РТТ');
+        setRniVerified(false);
+      }
+    } catch (err: any) {
+      setError('Ошибка проверки РНИ');
+      setRniVerified(false);
+    } finally {
+      setRniVerifying(false);
+    }
+  };
+
   const handleRegisterStep1 = (e: React.FormEvent) => {
       e.preventDefault();
       if(password.length < 6) {
@@ -568,6 +606,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () =>
         // Validation
         if (!name || !city || !age) throw new Error("Заполните основные данные профиля");
         if (role === 'rtt_pro') {
+            if (!rni) throw new Error("Укажите РНИ для профи РТТ");
             if (!rttPoints) throw new Error("Укажите очки классификации");
             if (!rttRank) throw new Error("Укажите позицию в рейтинге");
         }
@@ -583,7 +622,8 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () =>
             // Mapping new RTT fields
             rating: role === 'rtt_pro' ? parseInt(rttPoints) : 0, // Points
             rttRank: role === 'rtt_pro' ? parseInt(rttRank) : 0,   // Position
-            rttCategory: role === 'rtt_pro' ? rttAgeCategory : undefined
+            rttCategory: role === 'rtt_pro' ? rttAgeCategory : undefined,
+            rni: role === 'rtt_pro' ? rni : undefined
         };
         const user = await api.auth.register(payload);
         onComplete(user);
@@ -786,11 +826,55 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () =>
                     {role === 'rtt_pro' && (
                         <div className="bg-slate-800/30 p-4 rounded-xl border border-slate-700 space-y-4 animate-fade-in-up">
                             <div>
+                                <label className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2 block flex items-center gap-2">
+                                    <ShieldCheck size={14}/> РНИ (Регистрационный номер игрока)
+                                </label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text" 
+                                        value={rni}
+                                        onChange={(e) => {
+                                            setRni(e.target.value.replace(/\D/g, ''));
+                                            setRniVerified(false);
+                                        }}
+                                        className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white outline-none focus:border-amber-400 placeholder:text-slate-600"
+                                        placeholder="53699" 
+                                        maxLength={10}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleRNIVerification}
+                                        disabled={rniVerifying || !rni}
+                                        className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
+                                            rniVerified 
+                                                ? 'bg-green-500 text-white' 
+                                                : 'bg-amber-400 text-slate-900 hover:bg-amber-300 disabled:opacity-50 disabled:cursor-not-allowed'
+                                        }`}
+                                    >
+                                        {rniVerifying ? (
+                                            <Loader2 className="animate-spin" size={20} />
+                                        ) : rniVerified ? (
+                                            <Check size={20} />
+                                        ) : (
+                                            'Проверить'
+                                        )}
+                                    </button>
+                                </div>
+                                <p className="text-[10px] text-slate-500 mt-2 leading-tight">
+                                    {rniVerified 
+                                        ? '✓ РНИ подтвержден. Данные загружены из базы РТТ.' 
+                                        : 'Введите регистрационный номер игрока (только цифры).'
+                                    }
+                                </p>
+                            </div>
+
+                            <div>
                                 <label className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2 block flex items-center gap-2"><ListOrdered size={14}/> Возрастная категория</label>
                                 <select 
                                     value={rttAgeCategory}
                                     onChange={(e) => setRttAgeCategory(e.target.value)}
                                     className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white outline-none focus:border-amber-400"
+                                    disabled={rniVerified}
                                 >
                                     {rttAgeCategories.map(c => <option key={c} value={c}>{c}</option>)}
                                 </select>
@@ -804,7 +888,8 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () =>
                                         value={rttPoints}
                                         onChange={(e) => setRttPoints(e.target.value)}
                                         className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white outline-none focus:border-amber-400 placeholder:text-slate-600"
-                                        placeholder="1450" 
+                                        placeholder="1450"
+                                        disabled={rniVerified}
                                     />
                                 </div>
                                 <div>
@@ -814,11 +899,17 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () =>
                                         value={rttRank}
                                         onChange={(e) => setRttRank(e.target.value)}
                                         className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white outline-none focus:border-amber-400 placeholder:text-slate-600"
-                                        placeholder="№ 123" 
+                                        placeholder="№ 123"
+                                        disabled={rniVerified}
                                     />
                                 </div>
                             </div>
-                            <p className="text-[10px] text-slate-500 leading-tight">Данные будут проверены через базу РТТ.</p>
+                            <p className="text-[10px] text-slate-500 leading-tight">
+                                {rniVerified 
+                                    ? 'Данные проверены через базу РТТ.' 
+                                    : 'Данные будут проверены через базу РТТ.'
+                                }
+                            </p>
                         </div>
                     )}
 
