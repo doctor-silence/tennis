@@ -2,7 +2,7 @@
 import React from 'react';
 import { 
   User as UserIcon, Search, MapPin, MessageSquare, LogOut, 
-  Bot, Video, BookOpen, Swords, Globe, Users, Trophy, Mail
+  Bot, Video, BookOpen, Swords, Globe, Users, Trophy, Mail, BarChart3
 } from 'lucide-react';
 import { User, DashboardTab } from '../../types';
 
@@ -68,6 +68,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogo
         
         <nav className="space-y-2 overflow-y-auto max-h-[calc(100vh-200px)] hide-scrollbar pb-4">
           <SidebarItem icon={<UserIcon size={20} />} label="Мой Профиль" active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
+          {user.role === 'rtt_pro' && (
+            <SidebarItem icon={<BarChart3 size={20} />} label="Статистика РТТ" active={activeTab === 'rtt_stats'} onClick={() => setActiveTab('rtt_stats')} />
+          )}
           <SidebarItem icon={<Search size={20} />} label="Поиск Партнера" active={activeTab === 'search'} onClick={() => setActiveTab('search')} />
           <SidebarItem icon={<MapPin size={20} />} label="Бронирование" active={activeTab === 'courts'} onClick={() => setActiveTab('courts')} />
           <SidebarItem icon={<Swords size={20} />} label="Турнирная лестница" active={activeTab === 'ladder'} onClick={() => setActiveTab('ladder')} badge={ladderNotifications > 0 && ladderNotifications} />
@@ -76,7 +79,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogo
             <SidebarItem icon={<Mail size={20} />} label="Мои заявки" active={activeTab === 'my_applications'} onClick={() => setActiveTab('my_applications')} />
           )}
           <SidebarItem icon={<BookOpen size={20} />} label="Тактика" active={activeTab === 'tactics'} onClick={() => setActiveTab('tactics')} />
-          <SidebarItem icon={<Video size={20} />} label="Видео-анализ" active={activeTab === 'video_analysis'} onClick={() => {}} inDevelopment={true} />
           <SidebarItem icon={<MessageSquare size={20} />} label="Сообщения" active={activeTab === 'messages'} onClick={() => setActiveTab('messages')} badge={unreadCount > 0 && unreadCount} />
           <SidebarItem icon={<Bot size={20} />} label="AI Тренер" active={activeTab === 'ai_coach'} onClick={() => setActiveTab('ai_coach')} isSpecial />
           {user.role === 'coach' && (
@@ -85,10 +87,12 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogo
               <SidebarItem icon={<Trophy size={20} />} label="Мои Турниры" active={activeTab === 'tournaments'} onClick={() => setActiveTab('tournaments')} />
             </>
           )}
+          <SidebarItem icon={<Video size={20} />} label="Видео-анализ" active={activeTab === 'video_analysis'} onClick={() => {}} inDevelopment={true} />
         </nav>
       </div>
       
-      <div className="mt-auto p-6 border-t border-slate-800">
+      
+      <div className="p-6 border-t border-slate-800">
         <button onClick={onLogout} className="flex items-center gap-3 text-slate-400 hover:text-white transition-colors w-full px-4 py-2 rounded-lg hover:bg-slate-800">
           <LogOut size={20} />
           <span className="font-medium">Выйти из системы</span>

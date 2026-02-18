@@ -487,6 +487,36 @@ export const api = {
                     message: 'Сервис недоступен'
                 };
             }
+        },
+        
+        // Получить полную статистику игрока (турниры и матчи)
+        getPlayerStats: async (rni: string): Promise<any> => {
+            try {
+                const res = await fetch(`${API_URL}/rtt/stats/${rni}`);
+                const data = await res.json();
+                return data;
+            } catch (error) {
+                console.error('RTT stats error:', error);
+                return {
+                    success: false,
+                    error: 'Ошибка получения статистики'
+                };
+            }
+        },
+
+        // Получить детальную информацию о турнире
+        getTournamentDetails: async (url: string): Promise<any> => {
+            try {
+                const res = await fetch(`${API_URL}/rtt/tournament?url=${encodeURIComponent(url)}`);
+                const data = await res.json();
+                return data;
+            } catch (error) {
+                console.error('RTT tournament details error:', error);
+                return {
+                    success: false,
+                    error: 'Ошибка получения информации о турнире'
+                };
+            }
         }
     },
 

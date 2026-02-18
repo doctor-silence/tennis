@@ -112,6 +112,128 @@ const StickerPanel = ({ onSelectSticker, onClose }: { onSelectSticker: (sticker:
 
 // --- STICKER FEATURE END ---
 
+// RTT Stats Modal Component
+interface RttStatsModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    partnerId: string;
+    partnerName: string;
+}
+
+const RttStatsModal: React.FC<RttStatsModalProps> = ({ isOpen, onClose, partnerId, partnerName }) => {
+    const [loading, setLoading] = useState(true);
+    const [rttData, setRttData] = useState<any>(null);
+
+    useEffect(() => {
+        if (isOpen) {
+            // Fetch RTT stats for partner
+            setLoading(true);
+            // TODO: Add API call to fetch RTT tournament applications and matches
+            setTimeout(() => {
+                setRttData({
+                    applications: [
+                        { id: 1, tournament: 'Кубок Новосибирска', date: '15.03.2026', status: 'accepted' },
+                        { id: 2, tournament: 'Открытый чемпионат', date: '22.03.2026', status: 'pending' },
+                    ],
+                    matches: [
+                        { id: 1, opponent: 'Иванов А.', score: '6:3, 6:4', result: 'win', date: '10.02.2026' },
+                        { id: 2, opponent: 'Петров Б.', score: '4:6, 6:3, 6:7', result: 'loss', date: '05.02.2026' },
+                        { id: 3, opponent: 'Сидоров В.', score: '6:2, 6:1', result: 'win', date: '01.02.2026' },
+                    ]
+                });
+                setLoading(false);
+            }, 500);
+        }
+    }, [isOpen, partnerId]);
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+            <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+                <div className="bg-gradient-to-r from-orange-500 to-amber-500 p-6 text-white">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <h2 className="text-2xl font-black mb-1">Статистика РТТ</h2>
+                            <p className="text-orange-100">{partnerName}</p>
+                        </div>
+                        <button onClick={onClose} className="text-white/80 hover:text-white">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                    {loading ? (
+                        <div className="flex justify-center py-12">
+                            <Loader2 className="animate-spin text-orange-500" size={40} />
+                        </div>
+                    ) : (
+                        <div className="space-y-6">
+                            {/* Tournament Applications */}
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    Заявки на турниры
+                                </h3>
+                                <div className="space-y-3">
+                                    {rttData?.applications.map((app: any) => (
+                                        <div key={app.id} className="bg-slate-50 rounded-xl p-4 flex justify-between items-center">
+                                            <div>
+                                                <div className="font-bold text-slate-900">{app.tournament}</div>
+                                                <div className="text-sm text-slate-500">{app.date}</div>
+                                            </div>
+                                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                                app.status === 'accepted' ? 'bg-green-100 text-green-700' :
+                                                app.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                                'bg-red-100 text-red-700'
+                                            }`}>
+                                                {app.status === 'accepted' ? 'Принята' : app.status === 'pending' ? 'Ожидание' : 'Отклонена'}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Match History */}
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                    </svg>
+                                    История матчей
+                                </h3>
+                                <div className="space-y-3">
+                                    {rttData?.matches.map((match: any) => (
+                                        <div key={match.id} className="bg-slate-50 rounded-xl p-4">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <div className="font-bold text-slate-900">vs {match.opponent}</div>
+                                                    <div className="text-sm text-slate-500">{match.date}</div>
+                                                </div>
+                                                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                                    match.result === 'win' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                                }`}>
+                                                    {match.result === 'win' ? 'Победа' : 'Поражение'}
+                                                </span>
+                                            </div>
+                                            <div className="text-lg font-bold text-orange-600">{match.score}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 interface MessagesViewProps {
     user: User;
@@ -134,6 +256,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
     const [newMessage, setNewMessage] = useState('');
     const [loadingMessages, setLoadingMessages] = useState(false);
     const [showStickerPanel, setShowStickerPanel] = useState(false);
+    const [showRttStats, setShowRttStats] = useState(false);
     const messagesEndRef = useRef<null | HTMLDivElement>(null);
 
 
@@ -246,9 +369,33 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
             <div className="flex-1 flex flex-col">
                 {activeConversation ? (
                     <>
-                        <div className="p-4 border-b border-slate-100 flex items-center gap-3">
-                            <img src={activeConversation.partnerAvatar} className="w-8 h-8 rounded-full" alt=""/>
-                            <h3 className="font-bold">{activeConversation.partnerName}</h3>
+                        <div className="p-4 border-b border-slate-100">
+                            <div className="flex items-center gap-3 mb-3">
+                                <img src={activeConversation.partnerAvatar} className="w-8 h-8 rounded-full" alt=""/>
+                                <h3 className="font-bold">{activeConversation.partnerName}</h3>
+                            </div>
+                            {activeConversation.partnerRole === 'rtt_pro' && (
+                                <div 
+                                    onClick={() => setShowRttStats(true)}
+                                    className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl p-3 cursor-pointer hover:shadow-lg transition-shadow"
+                                >
+                                    <div className="flex items-center justify-between text-white">
+                                        <div>
+                                            <div className="text-xs font-bold uppercase opacity-90">Статистика РТТ</div>
+                                            <div className="text-lg font-black">{activeConversation.partnerRating || 0} pts</div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-xs opacity-90">Ранг</div>
+                                            <div className="text-xl font-black">#{activeConversation.partnerRttRank || '-'}</div>
+                                        </div>
+                                        <div className="bg-white/20 w-10 h-10 rounded-full flex items-center justify-center">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         <div className="flex-1 p-6 overflow-y-scroll bg-slate-50/50">
                             <div className="space-y-4">
@@ -305,6 +452,16 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                     </div>
                 )}
             </div>
+            
+            {/* RTT Stats Modal */}
+            {showRttStats && activeConversation && (
+                <RttStatsModal 
+                    isOpen={showRttStats}
+                    onClose={() => setShowRttStats(false)}
+                    partnerId={activeConversation.partnerId}
+                    partnerName={activeConversation.partnerName}
+                />
+            )}
         </div>
     );
 };

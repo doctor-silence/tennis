@@ -208,6 +208,67 @@ app.get('/api/rtt/search', async (req, res) => {
     }
 });
 
+// Get player full stats (tournaments and matches)
+app.get('/api/rtt/stats/:rni', async (req, res) => {
+    const { rni } = req.params;
+    
+    try {
+        if (!rni) {
+            return res.status(400).json({ error: 'РНИ обязателен' });
+        }
+
+        // Получаем базовые данные игрока
+        const playerData = await rttParser.getPlayerByRNI(rni);
+        
+        if (!playerData.success) {
+            return res.status(404).json(playerData);
+        }
+
+        // Получаем турниры и матчи
+        const statsData = await rttParser.getPlayerTournamentsAndMatches(rni);
+
+        res.json({
+            success: true,
+            data: {
+                ...playerData.data,
+                tournaments: statsData.data.tournaments,
+                matches: statsData.data.matches
+            }
+        });
+
+    } catch (err) {
+        console.error("❌ RTT Stats Error:", err);
+        res.status(500).json({ 
+            success: false,
+            error: 'Ошибка при получении статистики: ' + err.message 
+        });
+    }
+});
+
+// Get tournament details
+app.get('/api/rtt/tournament', async (req, res) => {
+    try {
+        const { url } = req.query;
+        
+        if (!url) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'URL турнира не указан' 
+            });
+        }
+
+        console.log("🎾 Запрос детальной информации о турнире:", url);
+        const result = await rttParser.getTournamentDetails(url);
+        res.json(result);
+    } catch (err) {
+        console.error("❌ RTT Tournament Error:", err);
+        res.status(500).json({ 
+            success: false,
+            error: 'Ошибка при получении информации о турнире: ' + err.message 
+        });
+    }
+});
+
 // Check RTT service availability
 app.get('/api/rtt/status', async (req, res) => {
     try {
@@ -2551,6 +2612,9 @@ app.get('/api/conversations', async (req, res) => {
                 p.id as "partnerId",
                 p.name as "partnerName",
                 p.avatar as "partnerAvatar",
+                p.role as "partnerRole",
+                p.rating as "partnerRating",
+                p.rtt_rank as "partnerRttRank",
                 (SELECT text FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as "lastMessage",
                 (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND is_read = FALSE AND sender_id != $1) as "unread"
             FROM conversations c
@@ -2560,7 +2624,14 @@ app.get('/api/conversations', async (req, res) => {
             ORDER BY c.updated_at DESC
         `, [userId, SUPPORT_ADMIN_ID]);
         
-        res.json(result.rows.map(r => ({ ...r, id: r.id.toString(), partnerId: r.partnerId.toString(), unread: parseInt(r.unread) })));
+        res.json(result.rows.map(r => ({ 
+            ...r, 
+            id: r.id.toString(), 
+            partnerId: r.partnerId.toString(), 
+            unread: parseInt(r.unread),
+            partnerRating: r.partnerRating || 0,
+            partnerRttRank: r.partnerRttRank || null
+        })));
     } catch (err) {
         console.error("Fetch Conversations Error:", err);
         res.status(500).json({ error: 'Failed to fetch conversations' });

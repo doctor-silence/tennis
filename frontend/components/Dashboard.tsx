@@ -18,6 +18,7 @@ import { MessagesView, NotificationsView, LadderView, CommunityView } from './da
 import { TacticsView, VideoAnalysisView, StudentsView } from './dashboard/ToolViews';
 import { TournamentsView } from './dashboard/TournamentsView';
 import { MyApplications } from './dashboard/MyApplications';
+import { RttStatsView } from './dashboard/RttStatsView';
 
 interface DashboardProps {
   user: User;
@@ -133,6 +134,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
         ladder: <LadderView user={user} challenges={challenges} setChallenges={setChallenges} onChallengeCreated={fetchUnreadCount} onStartConversation={handleStartConversation} />,
         community: <CommunityView user={user} onNavigate={handleNavigate} onStartConversation={handleStartConversation} feedVersion={feedVersion} />,
         my_applications: <MyApplications user={user} />,
+        rtt_stats: <RttStatsView user={user} />,
     };
 
     return (
@@ -193,6 +195,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
                    activeTab === 'messages' ? 'Сообщения' :
                    activeTab === 'my_applications' ? 'Мои Заявки' :
                    activeTab === 'notifications' ? 'Уведомления' :
+                   activeTab === 'rtt_stats' ? 'Статистика РТТ' :
                    activeTab}
                 </h1>
                 <p className="text-slate-500 text-sm mt-1">Добро пожаловать, {user.name}</p>
