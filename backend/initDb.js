@@ -302,7 +302,38 @@ const initDb = async () => {
     `);
     console.log('✅ Table "notifications" checked.');
 
-    // 13. Create Post-related Tables
+    // 13. Create Groups Table (MUST BE BEFORE posts table!)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS groups (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        avatar TEXT,
+        location VARCHAR(255),
+        contact VARCHAR(255),
+        creator_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS location VARCHAR(255);`);
+    await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS contact VARCHAR(255);`);
+    await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS members_count INTEGER DEFAULT 0;`);
+    await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS creator_id INTEGER REFERENCES users(id) ON DELETE SET NULL;`);
+    console.log('✅ Table "groups" checked.');
+    
+    // Create group_members table
+    await client.query(`
+        CREATE TABLE IF NOT EXISTS group_members (
+            group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            role VARCHAR(20) NOT NULL DEFAULT 'member',
+            joined_at TIMESTAMPTZ DEFAULT NOW(),
+            PRIMARY KEY (group_id, user_id)
+        );
+    `);
+    console.log('✅ "group_members" table created or already exists.');
+
+    // 14. Create Post-related Tables (AFTER groups table!)
     await client.query(`
       CREATE TABLE IF NOT EXISTS posts (
         id SERIAL PRIMARY KEY,
@@ -314,7 +345,6 @@ const initDb = async () => {
       );
     `);
     console.log('✅ "posts" table created or already exists.');
-    await client.query(`ALTER TABLE posts ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id) ON DELETE CASCADE;`);
     
     await client.query(`
       CREATE TABLE IF NOT EXISTS post_likes (
@@ -335,25 +365,6 @@ const initDb = async () => {
       );
     `);
     console.log('✅ "post_comments" table created or already exists.');
-
-    // 14. Create Groups Table
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS groups (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        description TEXT,
-        avatar TEXT,
-        location VARCHAR(255),
-        contact VARCHAR(255),
-        creator_id INTEGER REFERENCES users(id) ON DELETE SET NULL, -- New column
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS location VARCHAR(255);`);
-    await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS contact VARCHAR(255);`);
-    await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS members_count INTEGER DEFAULT 0;`);
-    await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS creator_id INTEGER REFERENCES users(id) ON DELETE SET NULL;`); // New migration
-    console.log('✅ Table "groups" checked.');
     
     // Create group_members table
     await client.query(`
