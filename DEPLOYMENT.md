@@ -348,23 +348,55 @@ upstream backend {
     keepalive 64;
 }
 
-# HTTP Server - редирект на HTTPS (после настройки SSL)
+# HTTP Server - редирект на HTTPS
 server {
     listen 80;
     listen [::]:80;
-    server_name yourdomain.com www.yourdomain.com;
+    server_name onthecourt.ru www.onthecourt.ru;
     
     # Для Let's Encrypt
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
     
-    # Временно разрешаем HTTP (закомментируйте после настройки SSL)
+    # Редирект на HTTPS
+    return 301 https://$server_name$request_uri;
+}
+
+# HTTPS Server
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name onthecourt.ru www.onthecourt.ru;
+
+    # SSL сертификаты (Let's Encrypt)
+    ssl_certificate /etc/letsencrypt/live/onthecourt.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/onthecourt.ru/privkey.pem;
+
+    # SSL настройки
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # Security headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    # Frontend
     location / {
-        root /var/www/tennispro/frontend/dist;
+        root /var/www/tennispro/tennis/frontend/dist;
         try_files $uri $uri/ /index.html;
+        
+        # Cache static assets
+        location ~* \.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
     }
-    
+
+    # Backend API
     location /api {
         proxy_pass http://backend;
         proxy_http_version 1.1;
@@ -375,8 +407,14 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_cache_bypass $http_upgrade;
+        
+        # Timeouts
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
     }
-    
+
+    # WebSocket
     location /socket.io {
         proxy_pass http://backend;
         proxy_http_version 1.1;
@@ -385,79 +423,13 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        
+        # WebSocket timeouts
+        proxy_connect_timeout 7d;
+        proxy_send_timeout 7d;
+        proxy_read_timeout 7d;
     }
-    
-    # Раскомментируйте после настройки SSL:
-    # return 301 https://$server_name$request_uri;
 }
-
-# HTTPS Server (раскомментируйте после настройки SSL)
-# server {
-#     listen 443 ssl http2;
-#     listen [::]:443 ssl http2;
-#     server_name yourdomain.com www.yourdomain.com;
-#
-#     # SSL сертификаты (Let's Encrypt)
-#     ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
-#     ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
-#
-#     # SSL настройки
-#     ssl_protocols TLSv1.2 TLSv1.3;
-#     ssl_ciphers HIGH:!aNULL:!MD5;
-#     ssl_prefer_server_ciphers on;
-#
-#     # Security headers
-#     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-#     add_header X-Frame-Options "SAMEORIGIN" always;
-#     add_header X-Content-Type-Options "nosniff" always;
-#     add_header X-XSS-Protection "1; mode=block" always;
-#
-#     # Frontend
-#     location / {
-#         root /var/www/tennispro/frontend/dist;
-#         try_files $uri $uri/ /index.html;
-#         
-#         # Cache static assets
-#         location ~* \.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$ {
-#             expires 1y;
-#             add_header Cache-Control "public, immutable";
-#         }
-#     }
-#
-#     # Backend API
-#     location /api {
-#         proxy_pass http://backend;
-#         proxy_http_version 1.1;
-#         proxy_set_header Upgrade $http_upgrade;
-#         proxy_set_header Connection 'upgrade';
-#         proxy_set_header Host $host;
-#         proxy_set_header X-Real-IP $remote_addr;
-#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-#         proxy_set_header X-Forwarded-Proto $scheme;
-#         proxy_cache_bypass $http_upgrade;
-#         
-#         # Timeouts
-#         proxy_connect_timeout 60s;
-#         proxy_send_timeout 60s;
-#         proxy_read_timeout 60s;
-#     }
-#
-#     # WebSocket
-#     location /socket.io {
-#         proxy_pass http://backend;
-#         proxy_http_version 1.1;
-#         proxy_set_header Upgrade $http_upgrade;
-#         proxy_set_header Connection "upgrade";
-#         proxy_set_header Host $host;
-#         proxy_set_header X-Real-IP $remote_addr;
-#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-#         
-#         # WebSocket timeouts
-#         proxy_connect_timeout 7d;
-#         proxy_send_timeout 7d;
-#         proxy_read_timeout 7d;
-#     }
-# }
 ```
 
 ### 7.2 Активация конфигурации

@@ -570,9 +570,9 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () =>
         setName(player.name);
         setCity(player.city || city);
         setAge(player.age?.toString() || age);
-        setRttPoints(player.rating?.points?.toString() || '');
-        setRttRank(player.rating?.rank?.toString() || '');
-        setRttAgeCategory(player.rating?.category || 'Взрослые');
+        setRttPoints(player.points?.toString() || '');
+        setRttRank(player.rank?.toString() || '');
+        setRttAgeCategory(player.category || 'Взрослые');
         setRniVerified(true);
         setError('');
       } else {
