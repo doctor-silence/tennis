@@ -2,6 +2,27 @@ const pool = require('./db');
 const bcrypt = require('bcryptjs');
 
 const initDb = async () => {
+  // 🚨 ЗАЩИТА: Предотвращение случайной переинициализации на продакшене
+  if (process.env.NODE_ENV === 'production') {
+    console.error('\n❌ КРИТИЧЕСКАЯ ОШИБКА: initDb.js запрещён на продакшене!');
+    console.error('📋 Этот скрипт создаёт таблицы заново и может удалить данные.');
+    console.error('🔧 Для изменения схемы БД используйте миграции или ручной SQL.');
+    console.error('');
+    console.error('Если вы ДЕЙСТВИТЕЛЬНО хотите переинициализировать БД:');
+    console.error('  1. Создайте резервную копию: pg_dump -U admin tennis_pro > backup.sql');
+    console.error('  2. Установите: FORCE_INIT_DB=true в окружении');
+    console.error('  3. Запустите снова: FORCE_INIT_DB=true node initDb.js');
+    console.error('');
+    
+    if (process.env.FORCE_INIT_DB !== 'true') {
+      process.exit(1);
+    } else {
+      console.warn('⚠️  FORCE_INIT_DB=true обнаружен. Продолжаем инициализацию...');
+      console.warn('⚠️  Вы действуете на свой страх и риск!');
+      console.warn('');
+    }
+  }
+
   const client = await pool.connect();
   try {
     console.log('🔄 Initializing database...');
@@ -485,9 +506,10 @@ const initDb = async () => {
     // We only seed if the courts table is empty
     const courtCount = await pool.query('SELECT count(*) FROM courts');
     if (parseInt(courtCount.rows[0].count) === 0) {
-        console.log('🌱 Заполнение расширенного списка московских кортов...');
+        console.log('🌱 Заполнение кортов по всей России...');
         
         const courts = [
+            // === МОСКВА ===
             {
                 name: 'Мультиспорт (Лужники)',
                 address: 'ул. Лужники, 24, стр. 10, Москва',
@@ -541,6 +563,270 @@ const initDb = async () => {
                 rating: 4.8,
                 image: 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=1200&auto=format&fit=crop',
                 website: 'http://cska-tennis.ru/'
+            },
+            
+            // === САНКТ-ПЕТЕРБУРГ ===
+            {
+                name: 'СК "Петербургский"',
+                address: 'Петровский пр., 20, Санкт-Петербург',
+                surface: ['hard', 'clay'],
+                price: 3000,
+                rating: 4.9,
+                image: 'https://images.unsplash.com/photo-1622547748225-3fc4abd2cca0?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://peterburgsky.ru'
+            },
+            {
+                name: 'Теннисный центр "Динамо"',
+                address: 'Дибуновская ул., 32, Санкт-Петербург',
+                surface: ['carpet', 'hard'],
+                price: 2500,
+                rating: 4.7,
+                image: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://dynamo-spb.ru'
+            },
+            {
+                name: 'Orange Fitness',
+                address: 'Выборгское ш., 15, Санкт-Петербург',
+                surface: ['hard'],
+                price: 2800,
+                rating: 4.6,
+                image: 'https://images.unsplash.com/photo-1575217985390-3375c3dbb908?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://orangefitness.ru'
+            },
+            
+            // === СОЧИ ===
+            {
+                name: 'Теннисная академия Сочи',
+                address: 'Олимпийский пр., 21, Сочи',
+                surface: ['hard', 'clay'],
+                price: 3500,
+                rating: 5.0,
+                image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://tennis-sochi.ru'
+            },
+            {
+                name: 'Красная Поляна Теннис Клуб',
+                address: 'пос. Красная Поляна, Сочи',
+                surface: ['hard'],
+                price: 4000,
+                rating: 4.8,
+                image: 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://krasnayapolyana-tennis.ru'
+            },
+            
+            // === КАЗАНЬ ===
+            {
+                name: 'Теннисный центр "Ак Барс"',
+                address: 'ул. Петербургская, 52, Казань',
+                surface: ['hard', 'carpet'],
+                price: 2200,
+                rating: 4.7,
+                image: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://akbars-tennis.ru'
+            },
+            {
+                name: 'Теннисный клуб "Олимп"',
+                address: 'ул. Оренбургский тракт, 5, Казань',
+                surface: ['hard'],
+                price: 1800,
+                rating: 4.5,
+                image: 'https://images.unsplash.com/photo-1575217985390-3375c3dbb908?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://olimp-kazan.ru'
+            },
+            
+            // === ЕКАТЕРИНБУРГ ===
+            {
+                name: 'Теннисный центр "Антей"',
+                address: 'ул. Щербакова, 4, Екатеринбург',
+                surface: ['hard', 'carpet'],
+                price: 2000,
+                rating: 4.6,
+                image: 'https://images.unsplash.com/photo-1622547748225-3fc4abd2cca0?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://antey-tennis.ru'
+            },
+            {
+                name: 'СК "Уралочка"',
+                address: 'ул. Ерёмина, 10, Екатеринбург',
+                surface: ['carpet'],
+                price: 1900,
+                rating: 4.5,
+                image: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://uralochka.ru'
+            },
+            
+            // === КРАСНОДАР ===
+            {
+                name: 'Теннисный клуб "Олимп"',
+                address: 'ул. Красных Партизан, 122, Краснодар',
+                surface: ['hard', 'clay'],
+                price: 2200,
+                rating: 4.7,
+                image: 'https://images.unsplash.com/photo-1620202755294-8531732e7071?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://olimp-krasnodar.ru'
+            },
+            {
+                name: 'Теннисный центр "Галактика"',
+                address: 'ул. Автолюбителей, 25, Краснодар',
+                surface: ['hard'],
+                price: 2000,
+                rating: 4.6,
+                image: 'https://images.unsplash.com/photo-1575217985390-3375c3dbb908?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://galaktika-tennis.ru'
+            },
+            
+            // === НОВОСИБИРСК ===
+            {
+                name: 'Теннисный центр "Сибирь"',
+                address: 'ул. Большевистская, 101, Новосибирск',
+                surface: ['hard', 'carpet'],
+                price: 1800,
+                rating: 4.5,
+                image: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://sibir-tennis.ru'
+            },
+            {
+                name: 'СК "Локомотив"',
+                address: 'ул. Шамшурина, 28, Новосибирск',
+                surface: ['carpet'],
+                price: 1600,
+                rating: 4.4,
+                image: 'https://images.unsplash.com/photo-1622547748225-3fc4abd2cca0?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://lokomotiv-nsk.ru'
+            },
+            
+            // === НИЖНИЙ НОВГОРОД ===
+            {
+                name: 'Теннисный клуб "Чемпион"',
+                address: 'ул. Бетанкура, 1, Нижний Новгород',
+                surface: ['hard', 'carpet'],
+                price: 1900,
+                rating: 4.6,
+                image: 'https://images.unsplash.com/photo-1575217985390-3375c3dbb908?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://champion-nn.ru'
+            },
+            {
+                name: 'СК "Волга"',
+                address: 'пр. Гагарина, 23, Нижний Новгород',
+                surface: ['hard'],
+                price: 1700,
+                rating: 4.5,
+                image: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://volga-tennis.ru'
+            },
+            
+            // === РОСТОВ-НА-ДОНУ ===
+            {
+                name: 'Теннисный центр "Дон"',
+                address: 'пр. Космонавтов, 31, Ростов-на-Дону',
+                surface: ['hard', 'clay'],
+                price: 2000,
+                rating: 4.6,
+                image: 'https://images.unsplash.com/photo-1620202755294-8531732e7071?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://don-tennis.ru'
+            },
+            {
+                name: 'СК "Олимпиец"',
+                address: 'ул. Добровольского, 2, Ростов-на-Дону',
+                surface: ['hard'],
+                price: 1800,
+                rating: 4.5,
+                image: 'https://images.unsplash.com/photo-1575217985390-3375c3dbb908?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://olimpiec-rostov.ru'
+            },
+            
+            // === САМАРА ===
+            {
+                name: 'Теннисный центр "Самара-Теннис"',
+                address: 'ул. Демократическая, 45, Самара',
+                surface: ['hard', 'carpet'],
+                price: 1800,
+                rating: 4.5,
+                image: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://samara-tennis.ru'
+            },
+            {
+                name: 'СК "Крылья Советов"',
+                address: 'пр. Кирова, 165, Самара',
+                surface: ['hard'],
+                price: 1700,
+                rating: 4.4,
+                image: 'https://images.unsplash.com/photo-1622547748225-3fc4abd2cca0?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://krylya-tennis.ru'
+            },
+            
+            // === УФА ===
+            {
+                name: 'Теннисный клуб "Агидель"',
+                address: 'ул. Цюрупы, 122, Уфа',
+                surface: ['hard', 'carpet'],
+                price: 1600,
+                rating: 4.5,
+                image: 'https://images.unsplash.com/photo-1575217985390-3375c3dbb908?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://agidel-tennis.ru'
+            },
+            {
+                name: 'СК "Салават"',
+                address: 'пр. Октября, 132, Уфа',
+                surface: ['carpet'],
+                price: 1500,
+                rating: 4.3,
+                image: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://salavat-ufa.ru'
+            },
+            
+            // === ЧЕЛЯБИНСК ===
+            {
+                name: 'Теннисный центр "Метеор"',
+                address: 'ул. Воровского, 27, Челябинск',
+                surface: ['hard', 'carpet'],
+                price: 1700,
+                rating: 4.5,
+                image: 'https://images.unsplash.com/photo-1622547748225-3fc4abd2cca0?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://meteor-tennis.ru'
+            },
+            
+            // === ОМСК ===
+            {
+                name: 'Теннисный клуб "Сибирь"',
+                address: 'ул. 10 лет Октября, 195, Омск',
+                surface: ['hard', 'carpet'],
+                price: 1600,
+                rating: 4.4,
+                image: 'https://images.unsplash.com/photo-1575217985390-3375c3dbb908?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://sibir-omsk.ru'
+            },
+            
+            // === ТЮМЕНЬ ===
+            {
+                name: 'Теннисный центр "Тюмень-Арена"',
+                address: 'ул. Мельникайте, 120, Тюмень',
+                surface: ['hard', 'carpet'],
+                price: 1800,
+                rating: 4.6,
+                image: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://tyumen-arena.ru'
+            },
+            
+            // === ВЛАДИВОСТОК ===
+            {
+                name: 'Теннисный клуб "Динамо"',
+                address: 'ул. Светланская, 50, Владивосток',
+                surface: ['hard', 'carpet'],
+                price: 2200,
+                rating: 4.7,
+                image: 'https://images.unsplash.com/photo-1622547748225-3fc4abd2cca0?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://dynamo-vl.ru'
+            },
+            
+            // === КАЛИНИНГРАД ===
+            {
+                name: 'Теннисный центр "Балтика"',
+                address: 'ул. Гостиная, 2, Калининград',
+                surface: ['hard', 'carpet'],
+                price: 1900,
+                rating: 4.6,
+                image: 'https://images.unsplash.com/photo-1575217985390-3375c3dbb908?q=80&w=1200&auto=format&fit=crop',
+                website: 'https://baltika-tennis.ru'
             }
         ];
 

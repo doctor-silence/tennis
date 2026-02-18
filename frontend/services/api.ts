@@ -2,7 +2,7 @@ import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Matc
 import * as THREE from 'three'; // Import THREE for Vector3 deserialization
 
 // Frontend API Service
-const API_URL = 'http://localhost:3001/api';
+const API_URL = import.meta.env.DEV ? 'http://localhost:3001/api' : 'https://onthecourt.ru/api';
 
 // --- MOCK DATA FALLBACKS (For Demo/Offline Mode) ---
 
