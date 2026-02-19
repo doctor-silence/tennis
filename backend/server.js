@@ -5,7 +5,7 @@ const http = require('http');
 const OpenAI = require('openai');
 const bcrypt = require('bcryptjs');
 const pool = require('./db');
-const initDb = require('./initDb');
+// const initDb = require('./initDb');
 const rttParser = require('./rttParser');
 
 const app = express();
@@ -2823,8 +2823,6 @@ app.get('/api/groups/:groupId/members', async (req, res) => {
 // Start Server and Init DB
 server.listen(PORT, async () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`🔌 Attempting to connect to DB at ${process.env.DB_HOST || 'localhost'}...`);
-    await initDb();
 });
 
 // --- TOURNAMENT AND GROUPS ROUTES ---
