@@ -2,3 +2,29 @@ EMERGENCY_RECOVERY.md
 FIX_DB_CONNECTION.md
 RECOVERY_PLAN.md
 backend/*.sh
+
+# Database initialization scripts - DO NOT deploy to production
+initDb.js
+createTacticsTable.js
+clearTactics.js
+fixCorruptedTournaments.js
+scanAllDatabases.js
+setAllUsersPublic.js
+checkProductionDb.js
+test-db-connection.js
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Node modules
+node_modules/
+
+# Logs
+logs/
+*.log
+
+# Database dumps
+*.sql
+backup*.sql

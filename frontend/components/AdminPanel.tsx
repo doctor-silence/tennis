@@ -188,6 +188,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                 if (!courtData.image || courtData.image.trim() === '') {
                     courtData.image = COURT_IMAGES[Math.floor(Math.random() * COURT_IMAGES.length)];
                 }
+                console.log('🏟️ Saving court:', courtData.id, 'Image:', courtData.image ? `${courtData.image.substring(0, 50)}... (${courtData.image.length} chars)` : 'NO IMAGE');
                 await api.admin.saveCourt(courtData);
                 await loadData();
                 setIsCourtModalOpen(false);
@@ -868,8 +869,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                     onChange={(e) => {
                                         const file = e.target.files?.[0];
                                         if (file) {
+                                            console.log('📸 File selected:', file.name, file.size, 'bytes');
                                             const reader = new FileReader();
                                             reader.onloadend = () => {
+                                                console.log('✅ File converted to base64, length:', (reader.result as string).length);
                                                 setEditingCourt({...editingCourt, image: reader.result as string});
                                             };
                                             reader.readAsDataURL(file);
