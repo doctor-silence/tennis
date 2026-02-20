@@ -140,7 +140,11 @@ const Scene = ({ trajectories, setTrajectories, activeColor, activeArcHeight }) 
 
 // --- UI Компоненты ---
 
-const ControlsWrapper = ({ children }) => <div className="absolute bottom-4 left-4 z-10 flex items-end gap-3">{children}</div>;
+const ControlsWrapper = ({ children }) => (
+    <div className="flex items-center gap-2 flex-wrap justify-center px-3 py-2 bg-slate-50 border-t border-slate-200">
+        {children}
+    </div>
+);
 
 const ColorPicker = ({ activeColor, setActiveColor, disabled }) => (
     <div className={`bg-white/80 backdrop-blur-sm p-2 rounded-xl flex gap-2 shadow-lg border border-slate-200 ${disabled ? 'opacity-50' : ''}`}>
@@ -174,20 +178,22 @@ const TennisCourt3D = ({ user, trajectories, setTrajectories }: TennisCourt3DPro
     const [activeArcHeight, setActiveArcHeight] = useState<number>(ARC_HEIGHTS.LOW);
     
     return (
-        <div className="w-full h-full bg-slate-100 rounded-3xl overflow-hidden relative">
-            <Suspense fallback={<div className="w-full h-full flex items-center justify-center text-slate-500">Загрузка...</div>}>
-                <Canvas style={canvasStyles} camera={{ position: [0, 15, 20], fov: 50 }} shadows>
-                    <Scene trajectories={trajectories} setTrajectories={setTrajectories} activeColor={activeColor} activeArcHeight={activeArcHeight} />
-                </Canvas>
-            </Suspense>
+        <div className="w-full h-full bg-slate-100 rounded-3xl overflow-hidden flex flex-col">
+            <div className="flex-1 min-h-0 relative">
+                <Suspense fallback={<div className="w-full h-full flex items-center justify-center text-slate-500">Загрузка...</div>}>
+                    <Canvas style={canvasStyles} camera={{ position: [0, 15, 20], fov: 50 }} shadows>
+                        <Scene trajectories={trajectories} setTrajectories={setTrajectories} activeColor={activeColor} activeArcHeight={activeArcHeight} />
+                    </Canvas>
+                </Suspense>
+            </div>
             <ControlsWrapper>
                 <ColorPicker activeColor={activeColor} setActiveColor={setActiveColor} disabled={false} />
                 <ArcPicker activeHeight={activeArcHeight} setArcHeight={setActiveArcHeight} disabled={false} />
+                <Button variant="secondary" size="sm" onClick={() => setTrajectories([])} disabled={trajectories.length === 0}>
+                    <Eraser size={16} className="mr-2"/>
+                    Очистить
+                </Button>
             </ControlsWrapper>
-            <Button variant="secondary" size="sm" className="absolute bottom-4 right-4 z-10" onClick={() => setTrajectories([])} disabled={trajectories.length === 0}>
-                <Eraser size={16} className="mr-2"/>
-                Очистить
-            </Button>
         </div>
     );
 };
