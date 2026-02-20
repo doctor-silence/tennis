@@ -1,4 +1,4 @@
-export type ViewState = 'landing' | 'auth' | 'dashboard' | 'pro' | 'shop' | 'admin';
+export type ViewState = 'landing' | 'auth' | 'dashboard' | 'pro' | 'shop' | 'admin' | 'news';
 export type DashboardTab = 'profile' | 'search' | 'courts' | 'ai_coach' | 'messages' | 'notifications' | 'tactics' | 'students' | 'tournaments' | 'video_analysis' | 'ladder' | 'community' | 'my_applications' | 'rtt_stats';
 
 export interface User {
@@ -330,4 +330,17 @@ export interface TournamentApplication {
   user_name?: string;
   user_avatar?: string;
   user_level?: string;
+}
+
+export interface NewsArticle {
+  id: string;
+  title: string;
+  summary: string;
+  content: string;
+  image: string;
+  author: string;
+  category: 'tournament' | 'player' | 'training' | 'equipment' | 'general';
+  published_at: string;
+  is_published: boolean;
+  views?: number;
 }

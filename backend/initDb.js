@@ -27,7 +27,8 @@ const initDb = async () => {
   try {
     console.log('🔄 Initializing database...');
 
-    await client.query('BEGIN');
+    // DDL runs outside a single transaction — each statement is independent.
+    // This way a failure on one table/column never blocks the rest from running.
 
     // 1. Create Partners Table
     await client.query(`
@@ -439,7 +440,24 @@ const initDb = async () => {
     `);
     console.log('✅ Table "tournament_applications" checked.');
 
-    await client.query('COMMIT');
+    // 17. Create News Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS news (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(500) NOT NULL,
+        summary TEXT NOT NULL,
+        content TEXT NOT NULL,
+        image TEXT DEFAULT '',
+        author VARCHAR(200) DEFAULT 'Редакция',
+        category VARCHAR(50) DEFAULT 'general',
+        is_published BOOLEAN DEFAULT TRUE,
+        views INTEGER DEFAULT 0,
+        published_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await client.query(`ALTER TABLE news ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0;`);
+    console.log('✅ Table "news" checked.');
 
     // --- SEED DATA ---
     
@@ -916,7 +934,6 @@ const initDb = async () => {
 
     console.log('🚀 Инициализация базы данных завершена.');
   } catch (error) {
-    await client.query('ROLLBACK');
     console.error('❌ Ошибка инициализации базы данных:', error);
   } finally {
     client.release();
