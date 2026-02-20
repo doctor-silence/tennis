@@ -7,7 +7,7 @@ interface TournamentBannerProps {
 
 const TournamentBanner: React.FC<TournamentBannerProps> = ({ activeCount = 0 }) => {
   return (
-    <div className="relative w-full h-64 bg-[#0a0a0c] rounded-[50px] overflow-hidden flex items-center px-12 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.7)] border border-white/5 group">
+    <div className="relative w-full h-48 md:h-64 bg-[#0a0a0c] rounded-[30px] md:rounded-[50px] overflow-hidden flex items-center px-6 md:px-12 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.7)] border border-white/5 group">
       
       {/* 1. BACKGROUND GRID (THE NET) */}
       <div className="absolute inset-0 pointer-events-none">
@@ -39,7 +39,7 @@ const TournamentBanner: React.FC<TournamentBannerProps> = ({ activeCount = 0 }) 
       {/* 3. MAIN CONTENT */}
       <div className="relative z-10 w-full flex items-center justify-between mt-10">
         <div className="max-w-2xl">
-          <h2 className="text-6xl md:text-7xl font-black italic uppercase tracking-tighter leading-[0.9] text-white mb-6">
+          <h2 className="text-3xl md:text-6xl lg:text-7xl font-black italic uppercase tracking-tighter leading-[0.9] text-white mb-3 md:mb-6">
             ТВОЯ <span className="text-lime-400 text-glow">CETKA</span> —<br/>
             ТВОИ ПРАВИЛА
           </h2>

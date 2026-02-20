@@ -1495,12 +1495,12 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated,
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div className="lg:col-span-2">
-                <div className="flex space-x-2 mb-6">
+                <div className="flex gap-2 mb-6 overflow-x-auto pb-1 scrollbar-none" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                     {['Все события', 'Группы', 'Результаты матчей', 'Поиск игры', 'Барахолка'].map(tab => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`px-5 py-2 text-sm font-bold rounded-full transition-colors ${activeTab === tab ? 'bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+                            className={`px-4 py-2 text-sm font-bold rounded-full transition-colors whitespace-nowrap flex-shrink-0 ${activeTab === tab ? 'bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
                         >
                             {tab}
                         </button>
@@ -1508,29 +1508,32 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated,
                 </div>
                 
                 { activeTab !== 'Группы' && <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6">
-                    <div className="flex gap-4 items-center">
-                        <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full" />
+                    <div className="flex gap-3 items-center">
+                        <img src={user.avatar} alt={user.name} className="w-9 h-9 rounded-full flex-shrink-0" />
                         <input 
                             type="text" 
                             placeholder="Что нового?" 
-                            className="flex-1 bg-transparent outline-none"
+                            className="flex-1 bg-transparent outline-none min-w-0 text-sm"
                             value={postText}
                             onChange={(e) => setPostText(e.target.value)}
                              onFocus={() => setPostType('text')}
                         />
-                        <div className="flex items-center gap-4 text-slate-400">
+                    </div>
+                    <div className="flex items-center justify-between mt-3">
+                        <div className="flex items-center gap-1 text-slate-400">
                              <Tooltip text="Поиск партнера">
-                                 <button onClick={() => setPostType(postType === 'partner_search' ? 'text' : 'partner_search')} className={`p-2 rounded-full transition-colors ${postType === 'partner_search' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Swords size={20}/></button>
+                                 <button onClick={() => setPostType(postType === 'partner_search' ? 'text' : 'partner_search')} className={`p-2 rounded-full transition-colors ${postType === 'partner_search' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Swords size={18}/></button>
                              </Tooltip>
                              <Tooltip text="Результат матча">
-                                 <button onClick={() => setPostType(postType === 'match_result' ? 'text' : 'match_result')} className={`p-2 rounded-full transition-colors ${postType === 'match_result' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Trophy size={20}/></button>
+                                 <button onClick={() => setPostType(postType === 'match_result' ? 'text' : 'match_result')} className={`p-2 rounded-full transition-colors ${postType === 'match_result' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Trophy size={18}/></button>
                              </Tooltip>
                              <Tooltip text="Создать группу">
-                                <button onClick={() => setPostType(postType === 'group' ? 'text' : 'group')} className={`p-2 rounded-full transition-colors ${postType === 'group' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Users size={20}/></button>
+                                <button onClick={() => setPostType(postType === 'group' ? 'text' : 'group')} className={`p-2 rounded-full transition-colors ${postType === 'group' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Users size={18}/></button>
                              </Tooltip>
-                                                         <Tooltip text="Продать вещь">
-                                                            <button onClick={() => setPostType(postType === 'marketplace' ? 'text' : 'marketplace')} className={`p-2 rounded-full transition-colors ${postType === 'marketplace' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><ShoppingCart size={20}/></button>
-                                                         </Tooltip>                        </div>
+                             <Tooltip text="Продать вещь">
+                                <button onClick={() => setPostType(postType === 'marketplace' ? 'text' : 'marketplace')} className={`p-2 rounded-full transition-colors ${postType === 'marketplace' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><ShoppingCart size={18}/></button>
+                             </Tooltip>
+                        </div>
                         <Button onClick={() => handlePublishPost({text: postText})} disabled={!postText.trim()}>Опубликовать</Button>
                     </div>
                      {postType === 'partner_search' && <PartnerSearchForm onPublish={handlePublishPost} />}
@@ -1549,7 +1552,7 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated,
                     loadingFeed ? <Loader2 className="animate-spin text-slate-400 mx-auto" /> : <Feed activeTab={activeTab} feedItems={feedItems} user={user} onUpdate={fetchFeed} onStartConversation={onStartConversation} />
                 )}
             </div>
-            <div className="space-y-6">
+            <div className="hidden lg:block space-y-6">
                 <TournamentsWidget user={user} onNavigate={onNavigate} myGroups={myGroups} />
                 <TopPlayersWidget onNavigate={onNavigate} />
                 <GroupsWidget onGroupClickForModal={setSelectedGroupForModal} myGroups={myGroups} />

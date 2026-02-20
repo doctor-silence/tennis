@@ -363,16 +363,16 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
             {!selectedTournament ? (
                 <>
                     <TournamentBanner activeCount={tournaments.length} />
-                    <div className="flex justify-between items-center bg-white p-8 rounded-[40px] border shadow-sm mt-8">
-                        <div><h2 className="text-3xl font-black text-slate-900 italic uppercase">Турниры</h2><p className="text-slate-400 font-bold uppercase text-[10px]">Управление сетками</p></div>
-                        <div className="flex items-center gap-4">
-                            <Button className="h-14 px-8 rounded-2xl" onClick={() => setIsCreateModalOpen(true)}><Plus size={20} className="mr-2"/> Новый турнир</Button>
+                    <div className="flex flex-wrap justify-between items-center bg-white p-4 md:p-8 rounded-[30px] md:rounded-[40px] border shadow-sm mt-4 md:mt-8 gap-3">
+                        <div><h2 className="text-xl md:text-3xl font-black text-slate-900 italic uppercase">Турниры</h2><p className="text-slate-400 font-bold uppercase text-[10px]">Управление сетками</p></div>
+                        <div className="flex items-center gap-3">
+                            <Button className="h-11 px-4 md:px-8 rounded-2xl text-sm" onClick={() => setIsCreateModalOpen(true)}><Plus size={18} className="mr-1.5"/> Новый турнир</Button>
                             <div className="relative">
-                                <Button variant="secondary" className="h-14 px-8 rounded-2xl" onClick={() => setIsApplicationsModalOpen(true)}>
-                                    <Mail size={20} className="mr-2"/> Заявки
+                                <Button variant="secondary" className="h-11 px-4 md:px-8 rounded-2xl text-sm" onClick={() => setIsApplicationsModalOpen(true)}>
+                                    <Mail size={18} className="mr-1.5"/> Заявки
                                 </Button>
                                 {totalPendingApplications > 0 && (
-                                    <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center">
+                                    <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
                                         {totalPendingApplications}
                                     </div>
                                 )}
@@ -381,46 +381,43 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {tournaments.map(t => (
-                            <div key={t.id} onClick={() => setSelectedTournament(t)} className="relative bg-white rounded-[35px] border p-8 hover:shadow-xl transition-all cursor-pointer group hover:border-lime-400">
+                            <div key={t.id} onClick={() => setSelectedTournament(t)} className="relative bg-white rounded-[25px] border p-5 hover:shadow-xl transition-all cursor-pointer group hover:border-lime-400">
                                 {t.user_id === user.id && t.pending_applications_count && t.pending_applications_count > 0 && (
-                                    <div className="absolute top-4 right-4 bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center">
+                                    <div className="absolute top-3 right-3 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
                                         {t.pending_applications_count}
                                     </div>
                                 )}
-                                <div className="flex justify-between mb-4">
+                                <div className="flex justify-between mb-3">
                                     <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase ${t.status === 'live' ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'}`}>{t.status}</span>
                                     <span className="text-xs font-bold text-slate-300">{formatDate(t.start_date)}</span>
                                 </div>
-                                <h3 className="text-xl font-black text-slate-900 mb-6">{t.name}</h3>
-                                {t.groupName && <div className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-4">Группа: {t.groupName}</div>}
-                                <div className="flex items-center text-slate-400 gap-4"><Users size={16}/><span className="text-xs font-bold">{(t.rounds[0]?.matches.length || 0) * 2} игроков</span></div>
+                                <h3 className="text-base font-black text-slate-900 mb-3">{t.name}</h3>
+                                {t.groupName && <div className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-3">Группа: {t.groupName}</div>}
+                                <div className="flex items-center text-slate-400 gap-2"><Users size={14}/><span className="text-xs font-bold">{(t.rounds[0]?.matches.length || 0) * 2} игроков</span></div>
                             </div>
                         ))}
                     </div>
                 </>
             ) : (
                 <div className="space-y-6">
-                    <div className="bg-slate-900 p-8 rounded-[40px] text-white flex justify-between items-center shadow-2xl relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12 pointer-events-none"><Trophy size={160}/></div>
-                        <div className="flex items-center gap-6 relative z-10">
-                            <button onClick={() => setSelectedTournament(null)} className="p-3 hover:bg-white/10 rounded-xl text-white/50 hover:text-white transition-all"><ChevronLeft size={24}/></button>
-                            <div>
-                                <h2 className="text-2xl font-black uppercase italic tracking-tighter">{selectedTournament.name}</h2>
-                                <div className="flex items-center gap-3 mt-1">
-                                    <p className="text-lime-400 text-xs font-black uppercase tracking-widest">{selectedTournament.groupName || 'Частный кубок'}</p>
-                                    <p className="text-white/40 text-xs font-bold uppercase tracking-widest">• {formatDate(selectedTournament.start_date)} • {selectedTournament.prize_pool}</p>
-                                </div>
+                    <div className="bg-slate-900 p-5 md:p-8 rounded-[30px] md:rounded-[40px] text-white shadow-2xl relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-6 opacity-10 rotate-12 pointer-events-none"><Trophy size={120}/></div>
+                        <div className="flex items-center gap-3 relative z-10 mb-3">
+                            <button onClick={() => setSelectedTournament(null)} className="p-2 hover:bg-white/10 rounded-xl text-white/50 hover:text-white transition-all shrink-0"><ChevronLeft size={22}/></button>
+                            <div className="min-w-0">
+                                <h2 className="text-lg md:text-2xl font-black uppercase italic tracking-tighter truncate">{selectedTournament.name}</h2>
+                                <p className="text-lime-400 text-[10px] font-black uppercase tracking-widest truncate">{selectedTournament.groupName || 'Частный кубок'} • {formatDate(selectedTournament.start_date)} • {selectedTournament.prize_pool}</p>
                             </div>
                         </div>
-                        <div className="flex gap-3 relative z-10">
+                        <div className="flex gap-2 relative z-10 flex-wrap">
                             {selectedTournament.status === 'draft' && (
                                 <>
-                                    <Button variant="glass" onClick={() => setIsBulkAddOpen(true)} className="rounded-2xl h-12"><ListChecks size={20} className="mr-2"/> Жеребьевка</Button>
-                                    <Button className="bg-lime-400 text-slate-900 hover:bg-white rounded-2xl h-12 font-black uppercase tracking-widest text-[10px]" onClick={handleStartTournament}><Play size={18} fill="currentColor" className="mr-2"/> Начать</Button>
+                                    <Button variant="glass" onClick={() => setIsBulkAddOpen(true)} className="rounded-2xl h-10 text-sm"><ListChecks size={18} className="mr-1.5"/> Жеребьевка</Button>
+                                    <Button className="bg-lime-400 text-slate-900 hover:bg-white rounded-2xl h-10 font-black uppercase tracking-widest text-[10px]" onClick={handleStartTournament}><Play size={16} fill="currentColor" className="mr-1.5"/> Начать</Button>
                                 </>
                             )}
                             {selectedTournament.status === 'live' && (
-                                <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/20 px-6 py-2 rounded-2xl">
+                                <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-2xl">
                                     <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></div>
                                     <span className="font-black text-emerald-500 text-[10px] uppercase tracking-widest italic">Live Tournament</span>
                                 </div>

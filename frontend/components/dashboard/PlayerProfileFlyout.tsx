@@ -26,7 +26,7 @@ const PlayerProfileFlyout = ({ profile, onClose }: { profile: PlayerProfile, onC
     return (
         <div className="fixed inset-0 bg-black/60 z-40 animate-fade-in" onClick={onClose}>
             <div 
-                className="fixed right-0 top-0 h-full w-[480px] bg-white shadow-2xl z-50 flex flex-col animate-slide-in-from-right"
+                className="fixed right-0 top-0 h-full w-full sm:w-[480px] bg-white shadow-2xl z-50 flex flex-col animate-slide-in-from-right"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="p-6 border-b border-slate-200 flex items-center justify-between">
