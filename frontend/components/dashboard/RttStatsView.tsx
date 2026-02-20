@@ -115,22 +115,22 @@ export const RttStatsView = ({ user }: { user: User }) => {
                         </div>
 
                         {/* Stats Grid */}
-                        <div className="grid grid-cols-4 gap-3">
-                            <div className="bg-gradient-to-br from-orange-500 to-amber-500 text-white rounded-xl p-4 text-center shadow-lg">
-                                <div className="text-3xl font-black mb-1">{playerData.data.points}</div>
-                                <div className="text-xs font-bold uppercase opacity-90">Очки РТТ</div>
+                        <div className="grid grid-cols-4 gap-2">
+                            <div className="bg-gradient-to-br from-orange-500 to-amber-500 text-white rounded-xl p-2 text-center shadow-lg flex flex-col justify-between min-h-[90px]">
+                                <div className="text-xl font-black leading-tight break-all">{playerData.data.points}</div>
+                                <div className="text-[10px] font-bold uppercase opacity-90 leading-tight mt-1">Очки РТТ</div>
                             </div>
-                            <div className="bg-gradient-to-br from-blue-500 to-indigo-500 text-white rounded-xl p-4 text-center shadow-lg">
-                                <div className="text-3xl font-black mb-1">#{playerData.data.rank}</div>
-                                <div className="text-xs font-bold uppercase opacity-90">Позиция</div>
+                            <div className="bg-gradient-to-br from-blue-500 to-indigo-500 text-white rounded-xl p-2 text-center shadow-lg flex flex-col justify-between min-h-[90px]">
+                                <div className="text-xl font-black leading-tight break-all">#{playerData.data.rank}</div>
+                                <div className="text-[10px] font-bold uppercase opacity-90 leading-tight mt-1">Позиция</div>
                             </div>
-                            <div className="bg-gradient-to-br from-green-500 to-emerald-500 text-white rounded-xl p-4 text-center shadow-lg">
-                                <div className="text-3xl font-black mb-1">{winRate}%</div>
-                                <div className="text-xs font-bold uppercase opacity-90">Побед в матчах</div>
+                            <div className="bg-gradient-to-br from-green-500 to-emerald-500 text-white rounded-xl p-2 text-center shadow-lg flex flex-col justify-between min-h-[90px]">
+                                <div className="text-xl font-black leading-tight break-all">{winRate}%</div>
+                                <div className="text-[10px] font-bold uppercase opacity-90 leading-tight mt-1">Побед в матчах</div>
                             </div>
-                            <div className="bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-xl p-4 text-center shadow-lg">
-                                <div className="text-3xl font-black mb-1">{totalMatches}</div>
-                                <div className="text-xs font-bold uppercase opacity-90">Матчей</div>
+                            <div className="bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-xl p-2 text-center shadow-lg flex flex-col justify-between min-h-[90px]">
+                                <div className="text-xl font-black leading-tight break-all">{totalMatches}</div>
+                                <div className="text-[10px] font-bold uppercase opacity-90 leading-tight mt-1">Матчей</div>
                             </div>
                         </div>
                     </div>
@@ -273,33 +273,32 @@ export const RttStatsView = ({ user }: { user: User }) => {
                                                 ? 'bg-green-50 border-green-200 hover:bg-green-100' 
                                                 : 'bg-red-50 border-red-200 hover:bg-red-100'
                                         }`}>
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-3 mb-2">
-                                                        <div className="font-bold text-lg text-slate-900">vs {match.opponent}</div>
-                                                        {match.opponentPoints && (
-                                                            <span className="text-sm px-2 py-1 bg-slate-200 text-slate-700 rounded font-medium">
-                                                                {match.opponentPoints} очков
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <div className="text-sm text-slate-600 space-y-1">
-                                                        {match.opponentAge && match.opponentCity && (
-                                                            <div>👤 {match.opponentAge} • {match.opponentCity}</div>
-                                                        )}
-                                                        <div>🏆 {match.tournament}</div>
-                                                        {match.ageGroup && <div>📊 {match.ageGroup}</div>}
-                                                        {match.city && <div>📍 {match.city}</div>}
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <span className={`inline-block px-4 py-2 rounded-full text-xs font-bold mb-2 ${
-                                                        match.result === 'win' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-                                                    }`}>
-                                                        {match.result === 'win' ? 'Победа' : 'Поражение'}
+                                            {/* Верхняя строка: бейдж + дата */}
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold shrink-0 ${
+                                                    match.result === 'win' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                                                }`}>
+                                                    {match.result === 'win' ? 'Победа' : 'Поражение'}
+                                                </span>
+                                                <div className="text-sm text-slate-500 ml-2 shrink-0">{match.date}</div>
+                                            </div>
+                                            {/* ФИО + очки соперника */}
+                                            <div className="flex items-start gap-2 mb-2">
+                                                <div className="font-bold text-base text-slate-900 leading-tight">vs {match.opponent}</div>
+                                                {match.opponentPoints && (
+                                                    <span className="text-xs px-2 py-0.5 bg-slate-200 text-slate-700 rounded font-medium shrink-0">
+                                                        {match.opponentPoints} очков
                                                     </span>
-                                                    <div className="text-sm text-slate-500 mt-1">{match.date}</div>
-                                                </div>
+                                                )}
+                                            </div>
+                                            {/* Детали */}
+                                            <div className="text-sm text-slate-600 space-y-0.5">
+                                                {match.opponentAge && match.opponentCity && (
+                                                    <div>👤 {match.opponentAge} • {match.opponentCity}</div>
+                                                )}
+                                                <div>🏆 {match.tournament}</div>
+                                                {match.ageGroup && <div>📊 {match.ageGroup}</div>}
+                                                {match.city && <div>📍 {match.city}</div>}
                                             </div>
                                             <div className="text-xl font-black text-orange-600 mt-2">{match.score}</div>
                                         </div>
