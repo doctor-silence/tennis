@@ -381,10 +381,11 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
     const activeConversation = conversations.find(c => c.id === activeConversationId);
 
     return (
-        <div className="flex h-[600px] bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="w-1/3 border-r border-slate-100 flex flex-col flex-shrink-0">
+        <div className="flex bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden" style={{height: 'calc(100vh - 200px)', minHeight: '500px'}}>
+            {/* Список диалогов — на мобильном скрывается если выбран диалог */}
+            <div className={`${activeConversationId ? 'hidden md:flex' : 'flex'} w-full md:w-1/3 border-r border-slate-100 flex-col flex-shrink-0`}>
                 <div className="p-4 border-b border-slate-100 font-bold text-lg">Сообщения</div>
-                <div className="flex-1 overflow-y-scroll">
+                <div className="flex-1 overflow-y-auto">
                     {loadingConversations ? (
                         <div className="p-4 text-center text-slate-400">Загрузка...</div>
                     ) : (
@@ -398,14 +399,14 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                                     <img src={convo.partnerAvatar} className="w-10 h-10 rounded-full" alt={convo.partnerName}/>
                                     {convo.isPro && <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-slate-900 border-2 border-white rounded-full" title="Pro"></div>}
                                 </div>
-                                <div className="flex-1 overflow-hidden">
+                                <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-start">
-                                        <div className="font-bold text-sm">{convo.partnerName}</div>
-                                        <div className="text-[10px] text-slate-400 font-medium">{convo.timestamp}</div>
+                                        <div className="font-bold text-sm truncate">{convo.partnerName}</div>
+                                        <div className="text-[10px] text-slate-400 font-medium ml-1 shrink-0">{convo.timestamp}</div>
                                     </div>
-                                    <div className="flex justify-between items-start">
+                                    <div className="flex justify-between items-center">
                                         <p className="text-xs text-slate-500 truncate">{(convo.lastMessage || '').startsWith('::sticker:') ? '[Стикер]' : (convo.lastMessage || '')}</p>
-                                        {convo.unread > 0 && <span className="bg-lime-500 text-slate-900 text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full ml-2">{convo.unread}</span>}
+                                        {convo.unread > 0 && <span className="bg-lime-500 text-slate-900 text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full ml-2 shrink-0">{convo.unread}</span>}
                                     </div>
                                 </div>
                             </div>
@@ -413,13 +414,21 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                     )}
                 </div>
             </div>
-            <div className="flex-1 flex flex-col">
+            {/* Диалог — на мобильном занимает весь экран */}
+            <div className={`${activeConversationId ? 'flex' : 'hidden md:flex'} flex-1 flex-col min-w-0`}>
                 {activeConversation ? (
                     <>
-                        <div className="p-4 border-b border-slate-100">
-                            <div className="flex items-center gap-3 mb-3">
-                                <img src={activeConversation.partnerAvatar} className="w-8 h-8 rounded-full" alt=""/>
-                                <h3 className="font-bold">{activeConversation.partnerName}</h3>
+                        <div className="p-3 border-b border-slate-100">
+                            <div className="flex items-center gap-3">
+                                {/* Кнопка "Назад" только на мобильном */}
+                                <button 
+                                    className="md:hidden w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 shrink-0"
+                                    onClick={() => onConversationSelect(null as any)}
+                                >
+                                    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                                </button>
+                                <img src={activeConversation.partnerAvatar} className="w-8 h-8 rounded-full shrink-0" alt=""/>
+                                <h3 className="font-bold text-sm truncate">{activeConversation.partnerName}</h3>
                             </div>
                             {activeConversation.partnerRole === 'rtt_pro' && (
                                 <div 
@@ -444,7 +453,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                                 </div>
                             )}
                         </div>
-                        <div className="flex-1 p-6 overflow-y-scroll bg-slate-50/50">
+                        <div className="flex-1 p-4 overflow-y-auto bg-slate-50/50">
                             <div className="space-y-4">
                                 {loadingMessages ? (
                                     <div className="flex justify-center items-center h-full"><Loader2 className="animate-spin text-slate-400"/></div>

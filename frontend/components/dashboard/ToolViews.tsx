@@ -715,18 +715,21 @@ export const StudentsView = ({ user }: { user: User }) => {
                 )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="lg:col-span-1 bg-slate-900 rounded-[40px] p-8 text-white relative overflow-hidden group shadow-2xl transition-all hover:scale-[1.02]">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="lg:col-span-1 bg-slate-900 rounded-[30px] p-6 text-white relative overflow-hidden group shadow-2xl">
                     <div className="text-[10px] font-black uppercase tracking-[0.3em] text-lime-400 mb-2">База учеников</div>
-                    <div className="text-5xl font-black">{students.length}</div>
-                    <Button size="sm" className="bg-lime-400 text-slate-900 mt-6 rounded-2xl h-11 px-6 font-black uppercase text-[10px] tracking-widest hover:bg-white hover:text-slate-900" onClick={() => setShowAddStudentModal(true)}><Plus size={16} className="mr-1"/> Добавить</Button>
+                    <div className="text-4xl font-black">{students.length}</div>
+                    <Button size="sm" className="bg-lime-400 text-slate-900 mt-4 rounded-2xl h-10 px-4 font-black uppercase text-[10px] tracking-widest" onClick={() => setShowAddStudentModal(true)}><Plus size={14} className="mr-1"/> Добавить</Button>
                 </div>
-                <div className="lg:col-span-1 bg-white rounded-[40px] p-8 border shadow-sm"><div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Активные ученики</div><div className="text-4xl font-black text-slate-900">{new Set(lessons.map(l => l.studentId)).size}</div></div>
-                <div className="lg:col-span-2 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[40px] p-8 text-white flex items-center justify-between shadow-xl">
-                    <div className="space-y-1"><div className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-200">Режим просмотра</div><h4 className="text-xl font-bold">Управление сеткой</h4></div>
-                    <div className="flex bg-black/20 p-1.5 rounded-2xl backdrop-blur-xl border border-white/10">
-                        <button onClick={() => setViewMode('list')} className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'list' ? 'bg-white text-indigo-900 shadow-lg' : 'text-white/60'}`}>Список</button>
-                        <button onClick={() => setViewMode('schedule')} className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'schedule' ? 'bg-white text-indigo-900 shadow-lg' : 'text-white/60'}`}>Сетка</button>
+                <div className="lg:col-span-1 bg-white rounded-[30px] p-6 border shadow-sm"><div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Активные ученики</div><div className="text-4xl font-black text-slate-900">{new Set(lessons.map(l => l.studentId)).size}</div></div>
+                <div className="col-span-2 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[30px] p-5 text-white flex items-center justify-between shadow-xl gap-3">
+                    <div className="space-y-0.5 min-w-0">
+                        <div className="text-[9px] font-black uppercase tracking-[0.2em] text-indigo-200">Режим просмотра</div>
+                        <h4 className="text-sm md:text-xl font-bold truncate">Управление сеткой</h4>
+                    </div>
+                    <div className="flex bg-black/20 p-1 rounded-xl backdrop-blur-xl border border-white/10 shrink-0">
+                        <button onClick={() => setViewMode('list')} className={`px-3 md:px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'list' ? 'bg-white text-indigo-900 shadow-lg' : 'text-white/60'}` }>Список</button>
+                        <button onClick={() => setViewMode('schedule')} className={`px-3 md:px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'schedule' ? 'bg-white text-indigo-900 shadow-lg' : 'text-white/60'}`}>Сетка</button>
                     </div>
                 </div>
             </div>
@@ -821,43 +824,42 @@ export const StudentsView = ({ user }: { user: User }) => {
             {/* PLAYER PROFILE 360 MODAL */}
             <Modal isOpen={showStudentDetails} onClose={() => setShowStudentDetails(false)} title="Профиль игрока 360" maxWidth="max-w-4xl">
                 {selectedStudent && (
-                    <div className="flex flex-col h-[750px] -m-6 overflow-hidden">
-                        <div className="bg-slate-900 p-10 text-white shrink-0">
-                            <div className="flex items-center gap-8">
-                                <img src={selectedStudent.avatar} className="w-24 h-24 rounded-[35px] border-4 border-white/20 shadow-2xl object-cover" />
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-3 mb-2"><h3 className="text-3xl font-black">{selectedStudent.name}</h3><span className="bg-lime-400 text-slate-900 text-[10px] font-black px-2 py-1 rounded-lg">LVL {getLevel(selectedStudent.xp)}</span></div>
-                                    <div className="flex items-center gap-6">
-                                        <div className="flex items-center gap-2 text-slate-400 text-sm font-bold uppercase tracking-widest"><Activity size={16} className="text-lime-400"/> {selectedStudent.level}</div>
-                                        <div className="flex items-center gap-2 text-slate-400 text-sm font-bold uppercase tracking-widest"><Zap size={16} className="text-amber-400"/> {selectedStudent.xp} XP</div>
+                    <div className="flex flex-col -m-6 overflow-hidden" style={{height: 'min(750px, 85vh)'}}>
+                        <div className="bg-slate-900 p-4 md:p-10 text-white shrink-0">
+                            <div className="flex items-center gap-4 md:gap-8">
+                                <img src={selectedStudent.avatar} className="w-14 h-14 md:w-24 md:h-24 rounded-2xl md:rounded-[35px] border-4 border-white/20 shadow-2xl object-cover shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1 flex-wrap"><h3 className="text-lg md:text-3xl font-black truncate">{selectedStudent.name}</h3><span className="bg-lime-400 text-slate-900 text-[10px] font-black px-2 py-1 rounded-lg shrink-0">LVL {getLevel(selectedStudent.xp)}</span></div>
+                                    <div className="flex items-center gap-3 flex-wrap">
+                                        <div className="flex items-center gap-1 text-slate-400 text-xs font-bold uppercase"><Activity size={14} className="text-lime-400"/> {selectedStudent.level}</div>
+                                        <div className="flex items-center gap-1 text-slate-400 text-xs font-bold uppercase"><Zap size={14} className="text-amber-400"/> {selectedStudent.xp} XP</div>
                                     </div>
                                 </div>
-                                <div className="text-right flex flex-col gap-3">
-                                    <div className={`text-3xl font-black ${selectedStudent.balance < 0 ? 'text-red-400' : 'text-lime-400'}`}>{selectedStudent.balance.toLocaleString()} ₽</div>
-                                                                         <button onClick={() => {
-                                                                            if (!selectedStudent) return;
-                                                                            const defaultComment = `"${selectedStudent.name} показывает отличную дисциплину. В этом месяце мы сделали большой упор на стабильность подачи. Получен бейдж «Марафонец» — гордимся!"`;
-                                                                            setReportComment(defaultComment);
-                                                                            setShowReportModal(true);
-                                                                        }} className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2.5 rounded-xl border border-white/10 text-xs font-black uppercase tracking-widest transition-all"><FileText size={16}/> Отчет</button>
-                                    
+                                <div className="text-right flex flex-col gap-2 shrink-0">
+                                    <div className={`text-xl md:text-3xl font-black ${selectedStudent.balance < 0 ? 'text-red-400' : 'text-lime-400'}`}>{selectedStudent.balance.toLocaleString()} ₽</div>
+                                    <button onClick={() => {
+                                        if (!selectedStudent) return;
+                                        const defaultComment = `"${selectedStudent.name} показывает отличную дисциплину. В этом месяце мы сделали большой упор на стабильность подачи. Получен бейдж «Марафонец» — гордимся!"`;
+                                        setReportComment(defaultComment);
+                                        setShowReportModal(true);
+                                    }} className="flex items-center justify-center gap-1 bg-white/10 hover:bg-white/20 px-3 py-2 rounded-xl border border-white/10 text-[10px] font-black uppercase tracking-widest transition-all"><FileText size={14}/> <span className="hidden sm:inline">Отчет</span></button>
                                 </div>
                             </div>
 
-                            <div className="flex gap-8 mt-10 border-b border-white/10">
+                            <div className="flex gap-2 md:gap-8 mt-4 md:mt-10 border-b border-white/10 overflow-x-auto pb-0" style={{scrollbarWidth:'none'}}>
                                 {[
-                                    { id: 'overview', label: 'Обзор & XP', icon: <Trophy size={16}/> },
-                                    { id: 'gear', label: 'Инвентарь', icon: <Layers size={16}/> },
-                                    { id: 'diary', label: 'Дневник', icon: <Notebook size={16}/> },
-                                    { id: 'goals', label: 'Цели', icon: <Target size={16}/> },
-                                    { id: 'video', label: 'Видео', icon: <Video size={16}/> },
+                                    { id: 'overview', label: 'Обзор & XP', icon: <Trophy size={14}/> },
+                                    { id: 'gear', label: 'Инвентарь', icon: <Layers size={14}/> },
+                                    { id: 'diary', label: 'Дневник', icon: <Notebook size={14}/> },
+                                    { id: 'goals', label: 'Цели', icon: <Target size={14}/> },
+                                    { id: 'video', label: 'Видео', icon: <Video size={14}/> },
                                 ].map(tab => (
-                                    <button key={tab.id} onClick={() => setProfileTab(tab.id as any)} className={`pb-4 text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all relative ${profileTab === tab.id ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}>{tab.icon} {tab.label}{profileTab === tab.id && <div className="absolute bottom-0 left-0 w-full h-1 bg-lime-400 rounded-t-full"></div>}</button>
+                                    <button key={tab.id} onClick={() => setProfileTab(tab.id as any)} className={`pb-3 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all relative whitespace-nowrap shrink-0 ${profileTab === tab.id ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}>{tab.icon} {tab.label}{profileTab === tab.id && <div className="absolute bottom-0 left-0 w-full h-1 bg-lime-400 rounded-t-full"></div>}</button>
                                 ))}
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-10 bg-slate-50/50 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto p-4 md:p-10 bg-slate-50/50 custom-scrollbar">
                             {profileTab === 'overview' && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12 animate-fade-in-up">
                                     <div className="space-y-10">

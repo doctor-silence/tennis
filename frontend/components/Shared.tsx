@@ -97,11 +97,19 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = "max-w-lg",
 };
 
 
-export const NavButton = ({ active, onClick, icon }: any) => (
+export const NavButton = ({ active, onClick, icon, label, badge }: any) => (
   <button 
     onClick={onClick} 
-    className={`p-2 rounded-xl transition-colors ${active ? 'bg-slate-900 text-lime-400' : 'text-slate-400 hover:bg-slate-50'}`}
+    className={`relative flex flex-col items-center gap-0.5 flex-1 py-1 transition-colors ${active ? 'text-lime-500' : 'text-slate-400 hover:text-slate-600'}`}
   >
-    {icon}
+    <span className={`relative flex items-center justify-center w-7 h-7 rounded-xl transition-colors ${active ? 'bg-slate-900' : ''}`}>
+      {icon}
+      {badge > 0 && (
+        <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center border border-white">
+          {badge > 9 ? '9+' : badge}
+        </span>
+      )}
+    </span>
+    {label && <span className={`text-[10px] font-semibold leading-none ${active ? 'text-lime-500' : 'text-slate-400'}`}>{label}</span>}
   </button>
 );

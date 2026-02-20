@@ -203,20 +203,22 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-2 space-y-6">
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="h-32 bg-slate-900 w-full relative">
+          <div className="h-28 bg-slate-900 w-full relative">
              <div className="absolute top-0 right-0 w-full h-full overflow-hidden">
                  <div className="absolute top-[-50%] right-[-10%] w-64 h-64 bg-lime-400/20 rounded-full blur-[60px]"></div>
              </div>
-             <div className="absolute top-6 right-6 z-10">
-                 <Button variant="glass" size="sm" onClick={() => setShowEditModal(true)}>Редактировать</Button>
-             </div>
           </div>
           
-          <div className="px-8 pb-8 pt-6">
-               <div className="flex flex-col sm:flex-row items-start gap-6 -mt-24 sm:-mt-6 relative z-10">
-                   <div className="relative flex-shrink-0 -mt-20 sm:-mt-0">
-                      <img src={user.avatar || `https://ui-avatars.com/api/?name=${user.name}`} alt={user.name} className="w-32 h-32 rounded-3xl object-cover border-4 border-white shadow-md bg-slate-100" />
+          <div className="px-4 sm:px-8 pb-6 sm:pb-8">
+               <div className="flex items-end justify-between -mt-12 mb-4">
+                   <div className="relative flex-shrink-0">
+                      <img src={user.avatar || `https://ui-avatars.com/api/?name=${user.name}`} alt={user.name} className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl object-cover border-4 border-white shadow-md bg-slate-100" />
                    </div>
+                   <div className="mb-1">
+                       <Button variant="secondary" size="sm" onClick={() => setShowEditModal(true)}>Редактировать</Button>
+                   </div>
+               </div>
+               <div className="flex flex-col relative z-10">
                    
                    <div className="flex-1 w-full sm:pt-0">
                        <div className="flex items-start justify-between gap-4">
