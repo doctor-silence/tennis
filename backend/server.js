@@ -968,7 +968,7 @@ app.get('/api/ladder/rankings', async (req, res) => {
         // Get all users ordered by rank
         const usersResult = await pool.query(`
             SELECT 
-                u.id, u.name, u.avatar, ${selectPointsClause}, u.role, u.level, u.rating, u.rtt_rank, u.rtt_category,
+                u.id, u.name, u.avatar, ${selectPointsClause}, u.role, u.level, u.rating, u.rtt_rank, u.rtt_category, u.rni,
                 COUNT(m.id) AS total_matches,
                 COUNT(m.id) FILTER (WHERE m.result = 'win') AS wins
             FROM users u
@@ -984,10 +984,26 @@ app.get('/api/ladder/rankings', async (req, res) => {
         );
         const defendingPlayerIds = new Set(activeChallengesResult.rows.map(r => r.defender_id));
 
-        // Map to LadderPlayer structure
-        const ladderPlayers = usersResult.rows.map((row, index) => {
-            const totalMatches = parseInt(row.total_matches, 10) || 0;
-            const wins = parseInt(row.wins, 10) || 0;
+        // Map to LadderPlayer structure and fetch RTT stats if needed
+        const ladderPlayers = await Promise.all(usersResult.rows.map(async (row, index) => {
+            let totalMatches = parseInt(row.total_matches, 10) || 0;
+            let wins = parseInt(row.wins, 10) || 0;
+            
+            // For RTT players, try to get real stats from RTT API
+            if (type === 'rtt_rating' && row.rni) {
+                try {
+                    const rttStats = await rttParser.getPlayerTournamentsAndMatches(row.rni);
+                    if (rttStats.success && rttStats.data.matches) {
+                        const rttMatches = rttStats.data.matches;
+                        totalMatches = rttMatches.length;
+                        wins = rttMatches.filter(m => m.result === 'win').length;
+                    }
+                } catch (err) {
+                    console.warn(`Failed to fetch RTT stats for ${row.name} (RNI: ${row.rni}):`, err.message);
+                    // Fallback to DB data
+                }
+            }
+            
             const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
 
             return {
@@ -1001,7 +1017,7 @@ app.get('/api/ladder/rankings', async (req, res) => {
                 winRate: winRate,
                 status: defendingPlayerIds.has(row.id) ? 'defending' : 'idle'
             };
-        });
+        }));
         
         res.json(ladderPlayers);
     } catch (err) {

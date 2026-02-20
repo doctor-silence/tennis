@@ -123,26 +123,53 @@ interface RttStatsModalProps {
 const RttStatsModal: React.FC<RttStatsModalProps> = ({ isOpen, onClose, partnerId, partnerName }) => {
     const [loading, setLoading] = useState(true);
     const [rttData, setRttData] = useState<any>(null);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (isOpen) {
-            // Fetch RTT stats for partner
-            setLoading(true);
-            // TODO: Add API call to fetch RTT tournament applications and matches
-            setTimeout(() => {
-                setRttData({
-                    applications: [
-                        { id: 1, tournament: 'Кубок Новосибирска', date: '15.03.2026', status: 'accepted' },
-                        { id: 2, tournament: 'Открытый чемпионат', date: '22.03.2026', status: 'pending' },
-                    ],
-                    matches: [
-                        { id: 1, opponent: 'Иванов А.', score: '6:3, 6:4', result: 'win', date: '10.02.2026' },
-                        { id: 2, opponent: 'Петров Б.', score: '4:6, 6:3, 6:7', result: 'loss', date: '05.02.2026' },
-                        { id: 3, opponent: 'Сидоров В.', score: '6:2, 6:1', result: 'win', date: '01.02.2026' },
-                    ]
-                });
-                setLoading(false);
-            }, 500);
+        if (isOpen && partnerId) {
+            const fetchRttStats = async () => {
+                setLoading(true);
+                setError(null);
+                try {
+                    // Получаем пользователя и его RNI
+                    const userResponse = await api.admin.getUsers();
+                    const targetUser = userResponse.find((u: any) => u.id === partnerId);
+                    
+                    if (!targetUser?.rni) {
+                        setError('У игрока не указан РНИ');
+                        setLoading(false);
+                        return;
+                    }
+
+                    // Получаем статистику из RTT
+                    const stats = await api.rtt.getPlayerStats(targetUser.rni);
+                    
+                    if (stats.success) {
+                        // Подсчитываем статистику матчей
+                        const matches = stats.data.matches || [];
+                        const wins = matches.filter((m: any) => m.result === 'win').length;
+                        const total = matches.length;
+                        const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
+
+                        setRttData({
+                            ...stats.data,
+                            matchesCount: total,
+                            winRate: winRate,
+                            wins: wins,
+                            losses: total - wins
+                        });
+                    } else {
+                        setError('Не удалось загрузить данные РТТ');
+                    }
+                } catch (err: any) {
+                    console.error('Error fetching RTT stats:', err);
+                    setError('Ошибка загрузки данных');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            fetchRttStats();
         }
     }, [isOpen, partnerId]);
 
@@ -170,62 +197,82 @@ const RttStatsModal: React.FC<RttStatsModalProps> = ({ isOpen, onClose, partnerI
                         <div className="flex justify-center py-12">
                             <Loader2 className="animate-spin text-orange-500" size={40} />
                         </div>
+                    ) : error ? (
+                        <div className="text-center py-12 text-slate-500">{error}</div>
                     ) : (
                         <div className="space-y-6">
-                            {/* Tournament Applications */}
-                            <div>
-                                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                                    <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                    Заявки на турниры
-                                </h3>
-                                <div className="space-y-3">
-                                    {rttData?.applications.map((app: any) => (
-                                        <div key={app.id} className="bg-slate-50 rounded-xl p-4 flex justify-between items-center">
-                                            <div>
-                                                <div className="font-bold text-slate-900">{app.tournament}</div>
-                                                <div className="text-sm text-slate-500">{app.date}</div>
-                                            </div>
-                                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                                app.status === 'accepted' ? 'bg-green-100 text-green-700' :
-                                                app.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                                'bg-red-100 text-red-700'
-                                            }`}>
-                                                {app.status === 'accepted' ? 'Принята' : app.status === 'pending' ? 'Ожидание' : 'Отклонена'}
-                                            </span>
-                                        </div>
-                                    ))}
+                            {/* Статистика в карточках */}
+                            <div className="grid grid-cols-3 gap-4">
+                                <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl p-4 text-center">
+                                    <div className="text-3xl font-black text-orange-600">{rttData?.matchesCount || 0}</div>
+                                    <div className="text-sm font-bold text-slate-600 mt-1">МАТЧЕЙ</div>
+                                </div>
+                                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-4 text-center">
+                                    <div className="text-3xl font-black text-green-600">{rttData?.winRate || 0}%</div>
+                                    <div className="text-sm font-bold text-slate-600 mt-1">ВИНРЕЙТ</div>
+                                </div>
+                                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-4 text-center">
+                                    <div className="text-3xl font-black text-blue-600">{rttData?.wins || 0}-{rttData?.losses || 0}</div>
+                                    <div className="text-sm font-bold text-slate-600 mt-1">В/П</div>
                                 </div>
                             </div>
 
-                            {/* Match History */}
-                            <div>
-                                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                                    <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                    </svg>
-                                    История матчей
-                                </h3>
-                                <div className="space-y-3">
-                                    {rttData?.matches.map((match: any) => (
-                                        <div key={match.id} className="bg-slate-50 rounded-xl p-4">
-                                            <div className="flex justify-between items-start mb-2">
+                            {/* Tournament Applications */}
+                            {rttData?.tournaments && rttData.tournaments.length > 0 && (
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                        <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        Турниры
+                                    </h3>
+                                    <div className="space-y-3">
+                                        {rttData.tournaments.slice(0, 10).map((tournament: any, idx: number) => (
+                                            <div key={idx} className="bg-slate-50 rounded-xl p-4 flex justify-between items-center">
                                                 <div>
-                                                    <div className="font-bold text-slate-900">vs {match.opponent}</div>
-                                                    <div className="text-sm text-slate-500">{match.date}</div>
+                                                    <div className="font-bold text-slate-900">{tournament.name}</div>
+                                                    <div className="text-sm text-slate-500">{tournament.date}</div>
                                                 </div>
-                                                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                                    match.result === 'win' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                                }`}>
-                                                    {match.result === 'win' ? 'Победа' : 'Поражение'}
-                                                </span>
+                                                {tournament.place && (
+                                                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
+                                                        {tournament.place} место
+                                                    </span>
+                                                )}
                                             </div>
-                                            <div className="text-lg font-bold text-orange-600">{match.score}</div>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
+
+                            {/* Match History */}
+                            {rttData?.matches && rttData.matches.length > 0 && (
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                        <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                        </svg>
+                                        История матчей
+                                    </h3>
+                                    <div className="space-y-3">
+                                        {rttData.matches.slice(0, 15).map((match: any, idx: number) => (
+                                            <div key={idx} className="bg-slate-50 rounded-xl p-4">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div>
+                                                        <div className="font-bold text-slate-900">vs {match.opponent}</div>
+                                                        <div className="text-sm text-slate-500">{match.date}</div>
+                                                    </div>
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                                        match.result === 'win' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                                    }`}>
+                                                        {match.result === 'win' ? 'Победа' : 'Поражение'}
+                                                    </span>
+                                                </div>
+                                                {match.score && <div className="text-lg font-bold text-orange-600">{match.score}</div>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

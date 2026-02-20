@@ -23,7 +23,8 @@ import {
     ChevronDown,
     Shield,
     Trophy,
-    MessageSquare
+    MessageSquare,
+    ExternalLink
 } from 'lucide-react';
 import AdminTournamentsView from './dashboard/AdminTournamentsView';
 import AdminSupportChat from './dashboard/AdminSupportChat';
@@ -63,7 +64,13 @@ const CITIES = [
     'Омск',
     'Тюмень',
     'Владивосток',
-    'Калининград'
+    'Калининград',
+    'Пермь',
+    'Воронеж',
+    'Красноярск',
+    'Астрахань',
+    'Архангельск',
+    'Волгоград'
 ];
 
 type AdminGroup = Group & { creator_name: string; members_count: number };
@@ -591,6 +598,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                              <th className="px-6 py-4">Адрес</th>
                                              <th className="px-6 py-4">Покрытие</th>
                                              <th className="px-6 py-4">Цена</th>
+                                             <th className="px-6 py-4">Сайт</th>
                                              <th className="px-6 py-4 text-right">Действия</th>
                                          </tr>
                                      </thead>
@@ -615,6 +623,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                                      </span>
                                                  </td>
                                                  <td className="px-6 py-4 font-bold">{c.pricePerHour} ₽/ч</td>
+                                                 <td className="px-6 py-4">
+                                                     {c.website ? (
+                                                         <a href={c.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1">
+                                                             <ExternalLink size={14}/>
+                                                             Сайт
+                                                         </a>
+                                                     ) : (
+                                                         <span className="text-slate-400 text-sm">—</span>
+                                                     )}
+                                                 </td>
                                                  <td className="px-6 py-4 text-right">
                                                      <div className="flex justify-end gap-2">
                                                          <button onClick={() => { setEditingCourt({ ...c, surface: Array.isArray(c.surface) ? c.surface : [c.surface] }); setIsCourtModalOpen(true); }} className="p-2 hover:bg-slate-200 rounded-lg text-slate-600"><Edit size={16}/></button>
@@ -870,10 +888,40 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                         const file = e.target.files?.[0];
                                         if (file) {
                                             console.log('📸 File selected:', file.name, file.size, 'bytes');
+                                            
+                                            // Compress image before upload
                                             const reader = new FileReader();
-                                            reader.onloadend = () => {
-                                                console.log('✅ File converted to base64, length:', (reader.result as string).length);
-                                                setEditingCourt({...editingCourt, image: reader.result as string});
+                                            reader.onload = (event) => {
+                                                const img = new Image();
+                                                img.onload = () => {
+                                                    const canvas = document.createElement('canvas');
+                                                    const MAX_WIDTH = 1200;
+                                                    const MAX_HEIGHT = 1200;
+                                                    let width = img.width;
+                                                    let height = img.height;
+
+                                                    if (width > height) {
+                                                        if (width > MAX_WIDTH) {
+                                                            height *= MAX_WIDTH / width;
+                                                            width = MAX_WIDTH;
+                                                        }
+                                                    } else {
+                                                        if (height > MAX_HEIGHT) {
+                                                            width *= MAX_HEIGHT / height;
+                                                            height = MAX_HEIGHT;
+                                                        }
+                                                    }
+
+                                                    canvas.width = width;
+                                                    canvas.height = height;
+                                                    const ctx = canvas.getContext('2d');
+                                                    ctx?.drawImage(img, 0, 0, width, height);
+                                                    
+                                                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                                                    console.log('✅ Image compressed, length:', compressedDataUrl.length);
+                                                    setEditingCourt({...editingCourt, image: compressedDataUrl});
+                                                };
+                                                img.src = event.target?.result as string;
                                             };
                                             reader.readAsDataURL(file);
                                         }
