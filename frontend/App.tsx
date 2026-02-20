@@ -390,7 +390,48 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
 // ... ProPage and AuthPage components (same as before) ...
 const ProPage = ({ onBack, onSubscribe }: { onBack: () => void, onSubscribe: () => void }) => {
   return (
-    <div className="bg-slate-900 min-h-screen text-white">
+    <div className="bg-slate-900 min-h-screen text-white relative" style={{overflow: 'hidden', maxHeight: '100vh'}}>
+
+      {/* ⚠️ BETA DIAGONAL TAPE */}
+      <div className="fixed inset-0 z-[9999] pointer-events-none overflow-hidden">
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            width: '200vw',
+            transform: 'translate(-50%, -50%) rotate(-35deg)',
+            background: 'repeating-linear-gradient(90deg, #facc15 0px, #facc15 60px, #111111 60px, #111111 120px)',
+            padding: '20px 0',
+            boxShadow: '0 0 80px 20px rgba(250,204,21,0.2), 0 0 0 2px rgba(250,204,21,0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            overflow: 'hidden',
+            backdropFilter: 'none',
+          }}
+        >
+          <span
+            style={{
+              display: 'block',
+              width: '100%',
+              fontSize: '15px',
+              fontWeight: 900,
+              letterSpacing: '0.2em',
+              textTransform: 'uppercase',
+              whiteSpace: 'nowrap',
+              textAlign: 'center',
+              background: 'repeating-linear-gradient(90deg, #111111 0px, #111111 60px, #facc15 60px, #facc15 120px)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              filter: 'drop-shadow(0 0 8px rgba(250,204,21,0.8))',
+            }}
+          >
+            {'⚠  БЕТА-ТЕСТИРОВАНИЕ  —  ВЕСЬ ФУНКЦИОНАЛ БЕСПЛАТНЫЙ  ⚠                    '.repeat(3)}
+          </span>
+        </div>
+      </div>
+
       <PublicHeader onLogin={onSubscribe} onRegister={onSubscribe} onNavigate={(page: any) => page === 'landing' ? onBack() : null} transparent={true} />
       
       {/* Hero */}
@@ -443,7 +484,7 @@ const ProPage = ({ onBack, onSubscribe }: { onBack: () => void, onSubscribe: () 
                   <li className="flex items-center gap-2"><Check size={16} className="text-lime-600"/> Безлимитный AI Тренер</li>
                   <li className="flex items-center gap-2"><Check size={16} className="text-lime-600"/> Расширенная статистика матчей</li>
                   <li className="flex items-center gap-2"><Check size={16} className="text-lime-600"/> Приоритет в турнирах</li>
-                  <li className="flex items-center gap-2"><Check size={16} className="text-lime-600"/> Скидка 10% на корты</li>
+
                </ul>
                <Button variant="primary" className="w-full bg-slate-900 text-white shadow-xl shadow-slate-900/20" onClick={onSubscribe}>Попробовать бесплатно</Button>
                <p className="text-center text-xs text-slate-400 mt-4">7 дней бесплатно, отмена в любое время</p>
