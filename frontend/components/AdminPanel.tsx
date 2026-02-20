@@ -24,12 +24,15 @@ import {
     Shield,
     Trophy,
     MessageSquare,
-    ExternalLink
+    ExternalLink,
+    Newspaper,
+    Eye,
+    EyeOff
 } from 'lucide-react';
 import AdminTournamentsView from './dashboard/AdminTournamentsView';
 import AdminSupportChat from './dashboard/AdminSupportChat';
 import Button from './Button';
-import { User, Product, SystemLog, Court, Group, Tournament } from '../types';
+import { User, Product, SystemLog, Court, Group, Tournament, NewsArticle } from '../types';
 import { api } from '../services/api';
 
 interface AdminPanelProps {
@@ -76,7 +79,7 @@ const CITIES = [
 type AdminGroup = Group & { creator_name: string; members_count: number };
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups' | 'tournaments' | 'support'>('support');
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups' | 'tournaments' | 'support' | 'news'>('support');
     
     // Data State
     const [stats, setStats] = useState({ revenue: 0, activeUsers: 0, newSignups: 0, serverLoad: 0 });
@@ -86,6 +89,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [groups, setGroups] = useState<AdminGroup[]>([]);
     const [logs, setLogs] = useState<SystemLog[]>([]);
     const [tournaments, setTournaments] = useState<Tournament[]>([]);
+    const [news, setNews] = useState<NewsArticle[]>([]);
     
     // Modals
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -97,6 +101,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [editingGroup, setEditingGroup] = useState<Partial<Group> | null>(null);
     const [isTournamentModalOpen, setIsTournamentModalOpen] = useState(false);
     const [editingTournament, setEditingTournament] = useState<Partial<Tournament> | null>(null);
+    const [isNewsModalOpen, setIsNewsModalOpen] = useState(false);
+    const [editingNews, setEditingNews] = useState<Partial<NewsArticle> | null>(null);
     
     // User Edit State
     const [editingUser, setEditingUser] = useState<(Partial<User> & { password?: string }) | null>(null);
@@ -108,7 +114,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     // Confirmation Modal State
     const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState<boolean>(false);
     const [itemToDeleteId, setItemToDeleteId] = useState<string | null>(null);
-    const [deleteActionType, setDeleteActionType] = useState<'court' | 'user' | 'product' | 'group' | 'tournament' | null>(null);
+    const [deleteActionType, setDeleteActionType] = useState<'court' | 'user' | 'product' | 'group' | 'tournament' | 'news' | null>(null);
 
     // Initial Data Load
     useEffect(() => {
@@ -144,6 +150,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             const t = await api.admin.getTournaments();
             if(Array.isArray(t)) setTournaments(t);
         }
+        if (activeTab === 'news') {
+            const n = await api.news.adminGetAll();
+            if(Array.isArray(n)) setNews(n);
+        }
     };
 
 
@@ -157,6 +167,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             else if (deleteActionType === 'user') await api.admin.deleteUser(itemToDeleteId);
             else if (deleteActionType === 'group') await api.admin.deleteGroup(itemToDeleteId, user.id);
             else if (deleteActionType === 'tournament') await api.admin.deleteTournament(itemToDeleteId);
+            else if (deleteActionType === 'news') await api.news.delete(itemToDeleteId);
             
             await loadData(); // Reload data after deletion
         } catch (e: any) {
@@ -318,6 +329,57 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
         setShowConfirmDeleteModal(true);
     };
 
+    // News Handlers
+    const handleAddNews = () => {
+        setEditingNews({
+            title: '',
+            summary: '',
+            content: '',
+            image: '',
+            author: 'Редакция НаКорте',
+            category: 'general',
+            is_published: true,
+        });
+        setIsNewsModalOpen(true);
+    };
+
+    const handleEditNews = (article: NewsArticle) => {
+        setEditingNews({ ...article });
+        setIsNewsModalOpen(true);
+    };
+
+    const handleSaveNews = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingNews) return;
+        try {
+            if (editingNews.id) {
+                await api.news.update(editingNews.id, editingNews);
+            } else {
+                await api.news.create(editingNews);
+            }
+            await loadData();
+            setIsNewsModalOpen(false);
+            setEditingNews(null);
+        } catch (e: any) {
+            alert('Ошибка сохранения: ' + e.message);
+        }
+    };
+
+    const handleDeleteNews = (id: string) => {
+        setDeleteActionType('news');
+        setItemToDeleteId(id);
+        setShowConfirmDeleteModal(true);
+    };
+
+    const handleToggleNewsPublished = async (article: NewsArticle) => {
+        try {
+            await api.news.update(article.id, { is_published: !article.is_published });
+            await loadData();
+        } catch (e: any) {
+            alert('Ошибка: ' + e.message);
+        }
+    };
+
 
     return (
         <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
@@ -341,6 +403,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                     <SidebarLink icon={<Shield size={20}/>} label="Группы" active={activeTab === 'groups'} onClick={() => setActiveTab('groups')} />
                     <SidebarLink icon={<Trophy size={20}/>} label="Турниры" active={activeTab === 'tournaments'} onClick={() => setActiveTab('tournaments')} />
                     <SidebarLink icon={<MessageSquare size={20}/>} label="Поддержка" active={activeTab === 'support'} onClick={() => setActiveTab('support')} />
+                    <SidebarLink icon={<Newspaper size={20}/>} label="Новости" active={activeTab === 'news'} onClick={() => setActiveTab('news')} />
                     <SidebarLink icon={<Map size={20}/>} label="Корты" active={activeTab === 'courts'} onClick={() => setActiveTab('courts')} />
                     <SidebarLink icon={<ShoppingBag size={20}/>} label="Магазин" active={activeTab === 'shop'} onClick={() => setActiveTab('shop')} />
                     <SidebarLink icon={<Terminal size={20}/>} label="Системные логи" active={activeTab === 'logs'} onClick={() => setActiveTab('logs')} />
@@ -372,6 +435,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         {activeTab === 'shop' && 'Управление товарами'}
                         {activeTab === 'courts' && 'Управление кортами'}
                         {activeTab === 'logs' && 'Системный мониторинг'}
+                        {activeTab === 'news' && 'Управление новостями'}
                     </h2>
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-xs font-bold border border-green-200">
@@ -393,7 +457,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
 
                             {/* Charts Area (Mocked with CSS) */}
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><h3 className="font-bold text-lg mb-6">Динамика продаж</h3><div className="h-64 flex items-end justify-between gap-2">{[40, 65, 45, 80, 55, 90, 70, 85, 60, 75, 95, 100].map((h, i) => (<div key={i} className="w-full bg-slate-100 rounded-t-lg relative group overflow-hidden"><div className="absolute bottom-0 w-full bg-slate-900 group-hover:bg-lime-500 transition-colors duration-300" style={{ height: `${h}%` }}></div></div>))}< /div><div className="flex justify-between mt-4 text-xs text-slate-400 font-bold uppercase"><span>Янв</span><span>Май</span><span>Дек</span></div></div>
+                                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><h3 className="font-bold text-lg mb-6">Динамика продаж</h3><div className="h-64 flex items-end justify-between gap-2">{[40, 65, 45, 80, 55, 90, 70, 85, 60, 75, 95, 100].map((h, i) => (<div key={i} className="w-full bg-slate-100 rounded-t-lg relative group overflow-hidden"><div className="absolute bottom-0 w-full bg-slate-900 group-hover:bg-lime-500 transition-colors duration-300" style={{ height: `${h}%` }}></div></div>))}</div><div className="flex justify-between mt-4 text-xs text-slate-400 font-bold uppercase"><span>Янв</span><span>Май</span><span>Дек</span></div></div>
                                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><h3 className="font-bold text-lg mb-6">Распределение подписок</h3><div className="space-y-4"><div className="space-y-2"><div className="flex justify-between text-sm font-medium"><span>Amateur (Free)</span><span className="text-slate-500">65%</span></div><div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-slate-300 w-[65%]"></div></div></div><div className="space-y-2"><div className="flex justify-between text-sm font-medium"><span>PRO Player</span><span className="text-slate-500">25%</span></div><div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-lime-400 w-[25%]"></div></div></div><div className="space-y-2"><div className="flex justify-between text-sm font-medium"><span>Coach PRO</span><span className="text-slate-500">10%</span></div><div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-slate-900 w-[10%]"></div></div></div></div></div>
                             </div>
                         </div>
@@ -413,6 +477,67 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
 
                     {activeTab === 'support' && (
                         <AdminSupportChat user={user} />
+                    )}
+
+                    {activeTab === 'news' && (
+                        <div className="animate-fade-in-up space-y-4">
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                <div className="p-4 border-b border-slate-200 flex justify-between items-center">
+                                    <h3 className="font-bold">Всего статей: {news.length}</h3>
+                                    <Button size="sm" onClick={handleAddNews} className="gap-2">
+                                        <Plus size={16}/> Добавить новость
+                                    </Button>
+                                </div>
+                                <div className="divide-y divide-slate-100">
+                                    {news.length === 0 && (
+                                        <div className="p-8 text-center text-slate-400">
+                                            <Newspaper size={40} className="mx-auto mb-2 opacity-40" />
+                                            <p>Новостей пока нет</p>
+                                        </div>
+                                    )}
+                                    {news.map(article => (
+                                        <div key={article.id} className="flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-colors">
+                                            <img
+                                                src={article.image}
+                                                alt={article.title}
+                                                className="w-16 h-12 object-cover rounded-lg flex-shrink-0"
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-0.5">
+                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${article.is_published ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                        {article.is_published ? 'Опубликовано' : 'Черновик'}
+                                                    </span>
+                                                    <span className="text-xs text-slate-400">{article.category}</span>
+                                                </div>
+                                                <p className="font-semibold text-slate-900 text-sm truncate">{article.title}</p>
+                                                <p className="text-xs text-slate-400">{article.author} · {new Date(article.published_at).toLocaleDateString('ru-RU')} · {article.views ?? 0} просм.</p>
+                                            </div>
+                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                                <button
+                                                    onClick={() => handleToggleNewsPublished(article)}
+                                                    className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+                                                    title={article.is_published ? 'Скрыть' : 'Опубликовать'}
+                                                >
+                                                    {article.is_published ? <EyeOff size={16}/> : <Eye size={16}/>}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleEditNews(article)}
+                                                    className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-lime-600 transition-colors"
+                                                >
+                                                    <Edit size={16}/>
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteNews(article.id)}
+                                                    className="p-2 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
+                                                >
+                                                    <Trash2 size={16}/>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
                     )}
 
                     {activeTab === 'groups' && (
@@ -1027,6 +1152,97 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         )}
 
                         <Button type="submit" className="w-full mt-4">Сохранить</Button>
+                    </form>
+                )}
+            </Modal>
+
+            {/* News Modal */}
+            <Modal isOpen={isNewsModalOpen} onClose={() => { setIsNewsModalOpen(false); setEditingNews(null); }} title={editingNews?.id ? 'Редактировать новость' : 'Добавить новость'}>
+                {editingNews && (
+                    <form onSubmit={handleSaveNews} className="space-y-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Заголовок *</label>
+                            <input
+                                type="text"
+                                required
+                                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-lime-400"
+                                value={editingNews.title || ''}
+                                onChange={e => setEditingNews({...editingNews, title: e.target.value})}
+                                placeholder="Заголовок новости"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Краткое описание *</label>
+                            <textarea
+                                required
+                                rows={2}
+                                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-lime-400 resize-none"
+                                value={editingNews.summary || ''}
+                                onChange={e => setEditingNews({...editingNews, summary: e.target.value})}
+                                placeholder="Краткое описание (анонс)"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Полный текст *</label>
+                            <textarea
+                                required
+                                rows={6}
+                                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-lime-400 resize-none"
+                                value={editingNews.content || ''}
+                                onChange={e => setEditingNews({...editingNews, content: e.target.value})}
+                                placeholder="Полный текст статьи"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">URL изображения</label>
+                            <input
+                                type="url"
+                                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-lime-400"
+                                value={editingNews.image || ''}
+                                onChange={e => setEditingNews({...editingNews, image: e.target.value})}
+                                placeholder="https://..."
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Категория</label>
+                                <select
+                                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-lime-400"
+                                    value={editingNews.category || 'general'}
+                                    onChange={e => setEditingNews({...editingNews, category: e.target.value as NewsArticle['category']})}
+                                >
+                                    <option value="tournament">Турниры</option>
+                                    <option value="player">Игроки</option>
+                                    <option value="training">Тренировки</option>
+                                    <option value="equipment">Инвентарь</option>
+                                    <option value="general">Общее</option>
+                                </select>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Автор</label>
+                                <input
+                                    type="text"
+                                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-lime-400"
+                                    value={editingNews.author || ''}
+                                    onChange={e => setEditingNews({...editingNews, author: e.target.value})}
+                                    placeholder="Имя автора"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="news-published"
+                                checked={editingNews.is_published ?? true}
+                                onChange={e => setEditingNews({...editingNews, is_published: e.target.checked})}
+                                className="w-4 h-4 rounded accent-lime-500"
+                            />
+                            <label htmlFor="news-published" className="text-sm font-medium text-slate-700">Опубликовать сразу</label>
+                        </div>
+                        <Button type="submit" className="w-full mt-2">
+                            <Save size={16} className="mr-2" />
+                            {editingNews.id ? 'Сохранить изменения' : 'Создать новость'}
+                        </Button>
                     </form>
                 )}
             </Modal>

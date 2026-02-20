@@ -1,4 +1,4 @@
-import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Match, Product, PlayerProfile, Trajectory, Conversation, ChatMessage, MarketplaceItem, CrmStats, Skill, Lesson, Tournament, Group } from '../types';
+import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Match, Product, PlayerProfile, Trajectory, Conversation, ChatMessage, MarketplaceItem, CrmStats, Skill, Lesson, Tournament, Group, NewsArticle } from '../types';
 import * as THREE from 'three'; // Import THREE for Vector3 deserialization
 
 // Frontend API Service
@@ -387,6 +387,57 @@ const MOCK_GROUPS: Group[] = [
 ];
 
 let MOCK_TOURNAMENTS: Tournament[] = [];
+
+let MOCK_NEWS: NewsArticle[] = [
+    {
+        id: 'news-1',
+        title: 'Янник Синнер выиграл Australian Open 2025',
+        summary: 'Итальянский теннисист завоевал второй титул Australian Open подряд, одержав победу в захватывающем финале.',
+        content: 'Янник Синнер одержал историческую победу на Australian Open 2025. Итальянец в финале показал блестящий теннис — мощные подачи, точные выходы к сетке и великолепные удары с задней линии. Синнер стал первым итальянцем, выигравшим этот турнир дважды подряд. Болельщики со всего мира следили за этим захватывающим матчем.',
+        image: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1200&auto=format&fit=crop',
+        author: 'Редакция НаКорте',
+        category: 'tournament',
+        published_at: '2025-01-26T10:00:00Z',
+        is_published: true,
+        views: 1842
+    },
+    {
+        id: 'news-2',
+        title: 'Топ-5 упражнений для улучшения подачи',
+        summary: 'Профессиональные тренеры рассказывают о ключевых упражнениях, которые помогут вывести вашу подачу на новый уровень.',
+        content: 'Подача — это один из самых важных элементов в теннисе. Чтобы улучшить её, тренеры рекомендуют следующие упражнения:\n\n1. Подброс мяча без удара — отрабатывайте точность подброса.\n2. Подача в зону — работайте над точностью попадания в корт.\n3. Подача в движении — имитируйте игровую ситуацию.\n4. Силовые упражнения для плеч и корпуса.\n5. Видеоанализ — записывайте свою подачу и анализируйте технику.',
+        image: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1200&auto=format&fit=crop',
+        author: 'Антон Петров, тренер',
+        category: 'training',
+        published_at: '2025-01-20T09:00:00Z',
+        is_published: true,
+        views: 3210
+    },
+    {
+        id: 'news-3',
+        title: 'Обзор новой ракетки Wilson Blade v9',
+        summary: 'Мы протестировали новинку от Wilson — одну из самых ожидаемых ракеток сезона. Делимся впечатлениями.',
+        content: 'Wilson Blade v9 — это эволюция легендарной серии, которая стала ещё более манёвренной и отзывчивой. Новая ракетка получила обновлённую раму с улучшенным плетением и новым материалом Carbon Mapping. В игре она ощущается очень комфортно: хороший контроль мяча, достаточная мощь и отличная обратная связь.',
+        image: 'https://images.unsplash.com/photo-1617083934555-52951271b273?q=80&w=1200&auto=format&fit=crop',
+        author: 'Сергей Волков',
+        category: 'equipment',
+        published_at: '2025-01-15T14:00:00Z',
+        is_published: true,
+        views: 956
+    },
+    {
+        id: 'news-4',
+        title: 'Карлос Алькарас — новый кумир поколения Z',
+        summary: 'Испанский вундеркинд продолжает покорять мировой теннис. Разбираемся, в чём секрет его успеха.',
+        content: 'Карлос Алькарас — феномен современного тенниса. В 21 год он уже имеет четыре титула Большого шлема и занимает первую строчку мирового рейтинга. Его стиль игры отличается невероятной физической подготовкой, разнообразием ударов и умением держать нерв в самых сложных ситуациях.',
+        image: 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=1200&auto=format&fit=crop',
+        author: 'Редакция НаКорте',
+        category: 'player',
+        published_at: '2025-01-10T11:00:00Z',
+        is_published: true,
+        views: 4780
+    }
+];
 
 
 const handleResponse = async (res: Response) => {
@@ -1289,6 +1340,96 @@ export const api = {
             } catch (e) {
                 console.error(e);
                 throw e;
+            }
+        }
+    },
+
+    news: {
+        getAll: async (): Promise<NewsArticle[]> => {
+            try {
+                const res = await fetch(`${API_URL}/news`);
+                if (!res.ok) throw new Error('Failed to fetch news');
+                return await res.json();
+            } catch (e) {
+                console.warn('Backend offline. Returning mock news.');
+                return MOCK_NEWS.filter(n => n.is_published);
+            }
+        },
+        getOne: async (id: string): Promise<NewsArticle | null> => {
+            try {
+                const res = await fetch(`${API_URL}/news/${id}`);
+                if (!res.ok) throw new Error('Failed to fetch news article');
+                return await res.json();
+            } catch (e) {
+                return MOCK_NEWS.find(n => n.id === id) || null;
+            }
+        },
+        create: async (article: Partial<NewsArticle>): Promise<NewsArticle> => {
+            try {
+                const res = await fetch(`${API_URL}/news`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(article)
+                });
+                const json = await res.json();
+                if (!res.ok) throw new Error(json.error || 'Failed to create news');
+                return json;
+            } catch (e) {
+                console.warn('Backend offline. Creating mock news.');
+                const newArticle: NewsArticle = {
+                    id: `news-${Date.now()}`,
+                    title: article.title || '',
+                    summary: article.summary || '',
+                    content: article.content || '',
+                    image: article.image || '',
+                    author: article.author || 'Редакция',
+                    category: article.category || 'general',
+                    published_at: new Date().toISOString(),
+                    is_published: article.is_published ?? true,
+                    views: 0,
+                    ...article
+                };
+                MOCK_NEWS.unshift(newArticle);
+                return newArticle;
+            }
+        },
+        update: async (id: string, article: Partial<NewsArticle>): Promise<NewsArticle> => {
+            try {
+                const res = await fetch(`${API_URL}/news/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(article)
+                });
+                const json = await res.json();
+                if (!res.ok) throw new Error(json.error || 'Failed to update news');
+                return json;
+            } catch (e) {
+                console.warn('Backend offline. Updating mock news.');
+                const idx = MOCK_NEWS.findIndex(n => n.id === id);
+                if (idx !== -1) {
+                    MOCK_NEWS[idx] = { ...MOCK_NEWS[idx], ...article };
+                    return MOCK_NEWS[idx];
+                }
+                throw new Error('News not found');
+            }
+        },
+        delete: async (id: string): Promise<void> => {
+            try {
+                const res = await fetch(`${API_URL}/news/${id}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error('Failed to delete news');
+            } catch (e) {
+                console.warn('Backend offline. Deleting mock news.');
+                MOCK_NEWS = MOCK_NEWS.filter(n => n.id !== id);
+            }
+        },
+        adminGetAll: async (): Promise<NewsArticle[]> => {
+            try {
+                const res = await fetch(`${API_URL}/admin/news`);
+                if (!res.ok) throw new Error('Failed to fetch all news');
+                return await res.json();
+            } catch (e) {
+                console.warn('Backend offline. Returning all mock news.');
+                return MOCK_NEWS;
             }
         }
     },

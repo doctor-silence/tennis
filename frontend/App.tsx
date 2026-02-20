@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ViewState, User } from './types';
+import { ViewState, User, NewsArticle } from './types';
 import Dashboard from './components/Dashboard';
 import Button from './components/Button';
 import Shop from './components/Shop';
@@ -25,7 +25,11 @@ import {
   ListOrdered,
   Medal,
   Loader2,
-  Briefcase
+  Briefcase,
+  Newspaper,
+  Clock,
+  Eye,
+  ChevronLeft
 } from 'lucide-react';
 
 const App = () => {
@@ -140,6 +144,10 @@ const App = () => {
       {view === 'admin' && currentUser && (
           <AdminPanel user={currentUser} onLogout={handleLogout} />
       )}
+
+      {view === 'news' && (
+          <NewsPage onBack={() => handleNavigate('landing')} onLogin={() => handleAuthNavigate('login')} onRegister={() => handleAuthNavigate('register')} onNavigate={handleNavigate} />
+      )}
     </div>
   );
 };
@@ -161,6 +169,9 @@ const PublicHeader = ({ onLogin, onRegister, onNavigate, transparent = false }: 
       </div>
       
       <nav className={`hidden md:flex items-center gap-8 text-sm font-bold uppercase tracking-wider ${transparent ? 'text-slate-300' : 'text-slate-500'}`}>
+        <button onClick={() => onNavigate('news')} className={`hover:text-lime-500 transition-colors flex items-center gap-1 ${transparent ? 'hover:text-white' : ''}`}>
+           Новости
+        </button>
         <button onClick={() => onNavigate('shop')} className={`hover:text-lime-500 transition-colors flex items-center gap-1 ${transparent ? 'hover:text-white' : ''}`}>
            Магазин
         </button>
@@ -178,6 +189,290 @@ const PublicHeader = ({ onLogin, onRegister, onNavigate, transparent = false }: 
 );
 
 // --- Landing Page Components ---
+
+// --- News Section for Landing ---
+const CATEGORY_COLORS_LANDING: Record<string, string> = {
+    tournament: 'bg-amber-100 text-amber-700',
+    player: 'bg-blue-100 text-blue-700',
+    training: 'bg-lime-100 text-lime-700',
+    equipment: 'bg-purple-100 text-purple-700',
+    general: 'bg-slate-100 text-slate-600',
+};
+const CATEGORY_LABELS_LANDING: Record<string, string> = {
+    tournament: 'Турниры',
+    player: 'Игроки',
+    training: 'Тренировки',
+    equipment: 'Инвентарь',
+    general: 'Общее',
+};
+
+const NewsSection = ({ onRegisterClick, onNavigateToNews }: { onRegisterClick: () => void, onNavigateToNews: () => void }) => {
+    const [articles, setArticles] = useState<NewsArticle[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        api.news.getAll().then(data => {
+            setArticles(data.slice(0, 3));
+            setLoading(false);
+        }).catch(() => setLoading(false));
+    }, []);
+
+    if (loading || articles.length === 0) return null;
+
+    const [featured, ...rest] = articles;
+
+    return (
+        <section className="py-24 bg-slate-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex items-end justify-between mb-12">
+                    <div>
+                        <span className="text-lime-600 font-bold tracking-wider uppercase text-xs">Последние новости</span>
+                        <h2 className="text-4xl font-bold text-slate-900 mt-2">Мир тенниса</h2>
+                    </div>
+                    <button
+                        onClick={onNavigateToNews}
+                        className="hidden sm:flex items-center gap-2 text-slate-600 hover:text-lime-600 font-bold transition-colors text-sm"
+                    >
+                        Все новости <ArrowRight size={16} />
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Featured */}
+                    <div
+                        className="lg:col-span-2 relative rounded-2xl overflow-hidden cursor-pointer group h-72 lg:h-auto"
+                        onClick={onNavigateToNews}
+                    >
+                        <img src={featured.image} alt={featured.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                        <div className="absolute bottom-0 left-0 right-0 p-6">
+                            <span className={`inline-block text-xs font-bold px-2.5 py-1 rounded-full mb-2 ${CATEGORY_COLORS_LANDING[featured.category] || 'bg-slate-100 text-slate-600'}`}>
+                                {CATEGORY_LABELS_LANDING[featured.category] || featured.category}
+                            </span>
+                            <h3 className="text-white text-xl font-black leading-tight mb-2 group-hover:text-lime-300 transition-colors">{featured.title}</h3>
+                            <div className="flex items-center gap-3 text-slate-400 text-xs">
+                                <span className="flex items-center gap-1"><Clock size={11} /> {new Date(featured.published_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</span>
+                                <span className="flex items-center gap-1"><Eye size={11} /> {featured.views?.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Small cards */}
+                    <div className="flex flex-col gap-4">
+                        {rest.map(article => (
+                            <div
+                                key={article.id}
+                                className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md cursor-pointer group flex gap-4 p-4 transition-all"
+                                onClick={onNavigateToNews}
+                            >
+                                <img src={article.image} alt={article.title} className="w-20 h-16 object-cover rounded-xl flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                    <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mb-1 ${CATEGORY_COLORS_LANDING[article.category] || 'bg-slate-100 text-slate-600'}`}>
+                                        {CATEGORY_LABELS_LANDING[article.category] || article.category}
+                                    </span>
+                                    <h4 className="font-bold text-sm text-slate-900 leading-tight group-hover:text-lime-600 transition-colors line-clamp-2">{article.title}</h4>
+                                    <p className="text-slate-400 text-xs mt-1">{new Date(article.published_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</p>
+                                </div>
+                            </div>
+                        ))}
+                        <button
+                            onClick={onNavigateToNews}
+                            className="mt-auto flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-slate-300 text-slate-500 hover:border-lime-400 hover:text-lime-600 font-bold text-sm transition-all"
+                        >
+                            <Newspaper size={16} /> Все новости
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
+};
+
+// --- Full News Page (public, accessible from landing) ---
+const CATEGORY_COLORS_PAGE: Record<string, string> = {
+    tournament: 'bg-amber-100 text-amber-700 border-amber-200',
+    player: 'bg-blue-100 text-blue-700 border-blue-200',
+    training: 'bg-lime-100 text-lime-700 border-lime-200',
+    equipment: 'bg-purple-100 text-purple-700 border-purple-200',
+    general: 'bg-slate-100 text-slate-600 border-slate-200',
+};
+const CATEGORY_LABELS_PAGE: Record<string, string> = {
+    tournament: 'Турниры', player: 'Игроки', training: 'Тренировки', equipment: 'Инвентарь', general: 'Общее',
+};
+
+const NewsPage = ({ onBack, onLogin, onRegister, onNavigate }: { onBack: () => void, onLogin: () => void, onRegister: () => void, onNavigate: (v: ViewState) => void }) => {
+    const [articles, setArticles] = useState<NewsArticle[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [selected, setSelected] = useState<NewsArticle | null>(null);
+    const [activeCategory, setActiveCategory] = useState<string>('all');
+    const [searchQuery, setSearchQuery] = useState('');
+
+    useEffect(() => {
+        setLoading(true);
+        api.news.getAll().then(data => { setArticles(data); setLoading(false); }).catch(() => setLoading(false));
+    }, []);
+
+    const filtered = articles.filter(a => {
+        const matchCat = activeCategory === 'all' || a.category === activeCategory;
+        const matchSearch = !searchQuery || a.title.toLowerCase().includes(searchQuery.toLowerCase()) || a.summary.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchCat && matchSearch;
+    });
+
+    const featured = filtered[0];
+    const rest = filtered.slice(1);
+
+    const categories = [
+        { key: 'all', label: 'Все' },
+        { key: 'tournament', label: 'Турниры' },
+        { key: 'player', label: 'Игроки' },
+        { key: 'training', label: 'Тренировки' },
+        { key: 'equipment', label: 'Инвентарь' },
+        { key: 'general', label: 'Общее' },
+    ];
+
+    return (
+        <div className="min-h-screen bg-slate-50 font-sans">
+            <PublicHeader onLogin={onLogin} onRegister={onRegister} onNavigate={onNavigate} />
+
+            <div className="pt-28 pb-16 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                {selected ? (
+                    // --- Article Detail ---
+                    <div className="max-w-3xl mx-auto animate-fade-in-up">
+                        <button onClick={() => setSelected(null)} className="flex items-center gap-2 text-slate-500 hover:text-lime-600 transition-colors font-medium mb-6">
+                            <ChevronLeft size={20} /> Назад к новостям
+                        </button>
+                        <div className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
+                            <div className="h-64 lg:h-80 overflow-hidden">
+                                <img src={selected.image} alt={selected.title} className="w-full h-full object-cover" />
+                            </div>
+                            <div className="p-6 lg:p-8">
+                                <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border mb-4 ${CATEGORY_COLORS_PAGE[selected.category] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                                    {CATEGORY_LABELS_PAGE[selected.category] || selected.category}
+                                </span>
+                                <h1 className="text-2xl lg:text-3xl font-black text-slate-900 mb-3 leading-tight">{selected.title}</h1>
+                                <div className="flex flex-wrap items-center gap-4 text-slate-500 text-sm mb-6 pb-6 border-b border-slate-100">
+                                    <span className="flex items-center gap-1.5 font-medium text-slate-700">
+                                        <UserIcon size={14} /> {selected.author}
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                        <Clock size={14} /> {new Date(selected.published_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                        <Eye size={14} /> {(selected.views ?? 0).toLocaleString()} просмотров
+                                    </span>
+                                </div>
+                                <p className="text-slate-700 text-lg font-medium mb-4 leading-relaxed">{selected.summary}</p>
+                                <div>
+                                    {selected.content.split('\n').map((p, i) =>
+                                        p.trim() ? <p key={i} className="text-slate-600 leading-relaxed mb-3">{p}</p> : <br key={i} />
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    // --- News List ---
+                    <>
+                        {/* Page Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+                            <div>
+                                <h1 className="text-3xl font-black text-slate-900 flex items-center gap-2">
+                                    <Newspaper size={28} className="text-lime-500" /> Новости тенниса
+                                </h1>
+                                <p className="text-slate-500 text-sm mt-1">Актуальные события из мира тенниса</p>
+                            </div>
+                            <div className="relative">
+                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Поиск новостей..."
+                                    value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                    className="pl-9 pr-9 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-lime-400 w-52"
+                                />
+                                {searchQuery && (
+                                    <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                        <X size={14} />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Category Filter */}
+                        <div className="flex gap-2 mb-8 overflow-x-auto pb-1">
+                            {categories.map(cat => (
+                                <button
+                                    key={cat.key}
+                                    onClick={() => setActiveCategory(cat.key)}
+                                    className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold border transition-all ${activeCategory === cat.key ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}
+                                >
+                                    {cat.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {loading ? (
+                            <div className="flex items-center justify-center h-64">
+                                <Loader2 className="animate-spin text-lime-500" size={32} />
+                            </div>
+                        ) : filtered.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+                                <Newspaper size={48} className="mb-3 opacity-40" />
+                                <p className="font-medium">Новостей не найдено</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-6">
+                                {/* Featured */}
+                                {featured && (
+                                    <div className="relative rounded-2xl overflow-hidden cursor-pointer group h-80 lg:h-96" onClick={() => setSelected(featured)}>
+                                        <img src={featured.image} alt={featured.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                                        <div className="absolute bottom-0 left-0 right-0 p-6">
+                                            <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border mb-3 ${CATEGORY_COLORS_PAGE[featured.category] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                                                {CATEGORY_LABELS_PAGE[featured.category] || featured.category}
+                                            </span>
+                                            <h2 className="text-white text-xl lg:text-2xl font-black leading-tight mb-2 group-hover:text-lime-300 transition-colors">{featured.title}</h2>
+                                            <p className="text-slate-300 text-sm line-clamp-2 mb-3">{featured.summary}</p>
+                                            <div className="flex items-center gap-4 text-slate-400 text-xs">
+                                                <span className="flex items-center gap-1"><Clock size={12} /> {new Date(featured.published_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                                                <span className="flex items-center gap-1"><Eye size={12} /> {(featured.views ?? 0).toLocaleString()}</span>
+                                                <span className="font-medium text-slate-300">{featured.author}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Grid */}
+                                {rest.length > 0 && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {rest.map(article => (
+                                            <div key={article.id} className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onClick={() => setSelected(article)}>
+                                                <div className="h-44 overflow-hidden">
+                                                    <img src={article.image} alt={article.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                                </div>
+                                                <div className="p-4">
+                                                    <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2 py-0.5 rounded-full border mb-2 ${CATEGORY_COLORS_PAGE[article.category] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                                                        {CATEGORY_LABELS_PAGE[article.category] || article.category}
+                                                    </span>
+                                                    <h3 className="font-bold text-slate-900 leading-tight mb-1.5 group-hover:text-lime-600 transition-colors line-clamp-2">{article.title}</h3>
+                                                    <p className="text-slate-500 text-sm line-clamp-2 mb-3">{article.summary}</p>
+                                                    <div className="flex items-center justify-between text-slate-400 text-xs">
+                                                        <span className="flex items-center gap-1"><Clock size={11} /> {new Date(article.published_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</span>
+                                                        <span className="flex items-center gap-1"><Eye size={11} /> {(article.views ?? 0).toLocaleString()}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+        </div>
+    );
+};
 
 const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginClick: () => void, onRegisterClick: () => void, onNavigate: (v: ViewState) => void }) => {
   return (
@@ -346,6 +641,9 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
           </div>
         </div>
       </section>
+
+      {/* News Section */}
+      <NewsSection onRegisterClick={onRegisterClick} onNavigateToNews={() => onNavigate('news')} />
 
        {/* CTA Section */}
        <section className="py-24 bg-white relative overflow-hidden">
