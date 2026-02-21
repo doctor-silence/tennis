@@ -2840,6 +2840,95 @@ app.get('/api/groups/:groupId/members', async (req, res) => {
     }
 });
 
+// --- NEWS ROUTES ---
+
+// Public: Get all published news
+app.get('/api/news', async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT id, title, summary, content, image, author, category, published_at, is_published, views
+             FROM news WHERE is_published = true ORDER BY published_at DESC`
+        );
+        res.json(result.rows.map(r => ({ ...r, id: r.id.toString() })));
+    } catch (err) {
+        console.error("Get News Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Public: Get one news article
+app.get('/api/news/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await pool.query('SELECT * FROM news WHERE id = $1', [id]);
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+        // Increment views
+        await pool.query('UPDATE news SET views = views + 1 WHERE id = $1', [id]);
+        res.json({ ...result.rows[0], id: result.rows[0].id.toString() });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Public: Create news article
+app.post('/api/news', async (req, res) => {
+    const { title, summary, content, image, author, category, is_published } = req.body;
+    try {
+        const result = await pool.query(
+            `INSERT INTO news (title, summary, content, image, author, category, is_published, published_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+             RETURNING *`,
+            [title, summary, content, image || '', author || 'Редакция', category || 'general', is_published ?? true]
+        );
+        await logSystemEvent('info', `News created: ${title}`, 'News');
+        res.json({ ...result.rows[0], id: result.rows[0].id.toString() });
+    } catch (err) {
+        console.error("Create News Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Public: Update news article
+app.put('/api/news/:id', async (req, res) => {
+    const { id } = req.params;
+    const { title, summary, content, image, author, category, is_published } = req.body;
+    try {
+        const result = await pool.query(
+            `UPDATE news SET title=$1, summary=$2, content=$3, image=$4, author=$5, category=$6, is_published=$7
+             WHERE id=$8 RETURNING *`,
+            [title, summary, content, image, author, category, is_published, id]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+        res.json({ ...result.rows[0], id: result.rows[0].id.toString() });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Public: Delete news article
+app.delete('/api/news/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM news WHERE id = $1', [id]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Admin: Get ALL news (including drafts)
+app.get('/api/admin/news', async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT id, title, summary, content, image, author, category, published_at, is_published, views
+             FROM news ORDER BY published_at DESC`
+        );
+        res.json(result.rows.map(r => ({ ...r, id: r.id.toString() })));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 // Start Server and Init DB
 server.listen(PORT, async () => {
