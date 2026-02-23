@@ -2859,6 +2859,7 @@ const ensureNewsTable = async () => {
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         )
     `);
+    await pool.query(`ALTER TABLE news ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0`);
 };
 ensureNewsTable().catch(err => console.error('Failed to ensure news table:', err));
 
@@ -2892,13 +2893,13 @@ app.get('/api/news/:id', async (req, res) => {
 
 // Public: Create news article
 app.post('/api/news', async (req, res) => {
-    const { title, summary, content, image, author, category, is_published } = req.body;
+    const { title, summary, content, image, author, category, is_published, views } = req.body;
     try {
         const result = await pool.query(
-            `INSERT INTO news (title, summary, content, image, author, category, is_published, published_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+            `INSERT INTO news (title, summary, content, image, author, category, is_published, views, published_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
              RETURNING *`,
-            [title, summary, content, image || '', author || 'Редакция', category || 'general', is_published ?? true]
+            [title, summary, content, image || '', author || 'Редакция', category || 'general', is_published ?? true, views ?? 0]
         );
         await logSystemEvent('info', `News created: ${title}`, 'News');
         res.json({ ...result.rows[0], id: result.rows[0].id.toString() });
@@ -2911,12 +2912,12 @@ app.post('/api/news', async (req, res) => {
 // Public: Update news article
 app.put('/api/news/:id', async (req, res) => {
     const { id } = req.params;
-    const { title, summary, content, image, author, category, is_published } = req.body;
+    const { title, summary, content, image, author, category, is_published, views } = req.body;
     try {
         const result = await pool.query(
-            `UPDATE news SET title=$1, summary=$2, content=$3, image=$4, author=$5, category=$6, is_published=$7
-             WHERE id=$8 RETURNING *`,
-            [title, summary, content, image, author, category, is_published, id]
+            `UPDATE news SET title=$1, summary=$2, content=$3, image=$4, author=$5, category=$6, is_published=$7, views=$8
+             WHERE id=$9 RETURNING *`,
+            [title, summary, content, image, author, category, is_published, views ?? 0, id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
         res.json({ ...result.rows[0], id: result.rows[0].id.toString() });

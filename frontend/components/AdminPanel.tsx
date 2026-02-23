@@ -344,6 +344,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             author: 'Редакция НаКорте',
             category: 'general',
             is_published: true,
+            views: 0,
         });
         setIsNewsModalOpen(true);
     };
@@ -1233,6 +1234,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                     placeholder="Имя автора"
                                 />
                             </div>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Просмотры</label>
+                            <input
+                                type="number"
+                                min="0"
+                                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-lime-400"
+                                value={editingNews.views ?? 0}
+                                onChange={e => setEditingNews({...editingNews, views: parseInt(e.target.value) || 0})}
+                                placeholder="0"
+                            />
                         </div>
                         <div className="flex items-center gap-2">
                             <input
