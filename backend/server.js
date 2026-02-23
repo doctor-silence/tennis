@@ -2843,6 +2843,26 @@ app.get('/api/groups/:groupId/members', async (req, res) => {
 
 // --- NEWS ROUTES ---
 
+// Ensure news table exists (safety net if initDb was skipped or failed)
+const ensureNewsTable = async () => {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS news (
+            id SERIAL PRIMARY KEY,
+            title VARCHAR(500) NOT NULL,
+            summary TEXT NOT NULL DEFAULT '',
+            content TEXT NOT NULL DEFAULT '',
+            image TEXT DEFAULT '',
+            author VARCHAR(200) DEFAULT 'Редакция',
+            category VARCHAR(50) DEFAULT 'general',
+            is_published BOOLEAN DEFAULT TRUE,
+            views INTEGER DEFAULT 0,
+            published_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+};
+ensureNewsTable().catch(err => console.error('Failed to ensure news table:', err));
+
 // Public: Get all published news
 app.get('/api/news', async (req, res) => {
     try {

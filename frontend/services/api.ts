@@ -1346,14 +1346,12 @@ export const api = {
 
     news: {
         getAll: async (): Promise<NewsArticle[]> => {
-            try {
-                const res = await fetch(`${API_URL}/news`);
-                if (!res.ok) throw new Error('Failed to fetch news');
-                return await res.json();
-            } catch (e) {
-                console.warn('Backend offline. Returning mock news.');
-                return MOCK_NEWS.filter(n => n.is_published);
+            const res = await fetch(`${API_URL}/news`);
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: res.statusText }));
+                throw new Error(err.error || 'Failed to fetch news');
             }
+            return await res.json();
         },
         getOne: async (id: string): Promise<NewsArticle | null> => {
             try {
@@ -1365,72 +1363,39 @@ export const api = {
             }
         },
         create: async (article: Partial<NewsArticle>): Promise<NewsArticle> => {
-            try {
-                const res = await fetch(`${API_URL}/news`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(article)
-                });
-                const json = await res.json();
-                if (!res.ok) throw new Error(json.error || 'Failed to create news');
-                return json;
-            } catch (e) {
-                console.warn('Backend offline. Creating mock news.');
-                const newArticle: NewsArticle = {
-                    id: `news-${Date.now()}`,
-                    title: article.title || '',
-                    summary: article.summary || '',
-                    content: article.content || '',
-                    image: article.image || '',
-                    author: article.author || 'Редакция',
-                    category: article.category || 'general',
-                    published_at: new Date().toISOString(),
-                    is_published: article.is_published ?? true,
-                    views: 0,
-                    ...article
-                };
-                MOCK_NEWS.unshift(newArticle);
-                return newArticle;
-            }
+            const res = await fetch(`${API_URL}/news`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(article)
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || 'Failed to create news');
+            return json;
         },
         update: async (id: string, article: Partial<NewsArticle>): Promise<NewsArticle> => {
-            try {
-                const res = await fetch(`${API_URL}/news/${id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(article)
-                });
-                const json = await res.json();
-                if (!res.ok) throw new Error(json.error || 'Failed to update news');
-                return json;
-            } catch (e) {
-                console.warn('Backend offline. Updating mock news.');
-                const idx = MOCK_NEWS.findIndex(n => n.id === id);
-                if (idx !== -1) {
-                    MOCK_NEWS[idx] = { ...MOCK_NEWS[idx], ...article };
-                    return MOCK_NEWS[idx];
-                }
-                throw new Error('News not found');
-            }
+            const res = await fetch(`${API_URL}/news/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(article)
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || 'Failed to update news');
+            return json;
         },
         delete: async (id: string): Promise<void> => {
-            try {
-                const res = await fetch(`${API_URL}/news/${id}`, { method: 'DELETE' });
-                if (!res.ok) throw new Error('Failed to delete news');
-            } catch (e) {
-                console.warn('Backend offline. Deleting mock news.');
-                MOCK_NEWS = MOCK_NEWS.filter(n => n.id !== id);
+            const res = await fetch(`${API_URL}/news/${id}`, { method: 'DELETE' });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: res.statusText }));
+                throw new Error(err.error || 'Failed to delete news');
             }
         },
         adminGetAll: async (): Promise<NewsArticle[]> => {
-            try {
-                const res = await fetch(`${API_URL}/admin/news`);
-                if (!res.ok) throw new Error('Failed to fetch all news');
-                return await res.json();
-            } catch (e) {
-                console.warn('Backend offline. Returning all mock news.');
-                return MOCK_NEWS;
+            const res = await fetch(`${API_URL}/admin/news`);
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: res.statusText }));
+                throw new Error(err.error || 'Failed to fetch all news');
             }
+            return await res.json();
         }
     },
 

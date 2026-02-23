@@ -151,8 +151,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             if(Array.isArray(t)) setTournaments(t);
         }
         if (activeTab === 'news') {
-            const n = await api.news.adminGetAll();
-            if(Array.isArray(n)) setNews(n);
+            try {
+                const n = await api.news.adminGetAll();
+                if(Array.isArray(n)) setNews(n);
+            } catch (e: any) {
+                console.error('Ошибка загрузки новостей:', e);
+                alert('Ошибка загрузки новостей: ' + e.message);
+            }
         }
     };
 
