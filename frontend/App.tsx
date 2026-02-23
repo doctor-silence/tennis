@@ -29,7 +29,9 @@ import {
   Newspaper,
   Clock,
   Eye,
-  ChevronLeft
+  ChevronLeft,
+  MessageSquare,
+  Calendar
 } from 'lucide-react';
 
 const App = () => {
@@ -343,7 +345,16 @@ const NewsPage = ({ onBack, onLogin, onRegister, onNavigate }: { onBack: () => v
         <div className="min-h-screen bg-slate-50 font-sans">
             <PublicHeader onLogin={onLogin} onRegister={onRegister} onNavigate={onNavigate} />
 
-            <div className="pt-28 pb-16 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            {/* News Hero Header */}
+            <div className="bg-slate-900 pt-28 pb-14">
+              <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                <span className="text-lime-400 font-bold tracking-wider uppercase text-xs">Редакция НаКорте</span>
+                <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight mt-2 mb-3">Новости тенниса</h1>
+                <p className="text-slate-400 text-lg max-w-2xl">Турниры, результаты матчей, интервью с игроками и тренировочные советы.</p>
+              </div>
+            </div>
+
+            <div className="pb-16 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
                 {selected ? (
                     // --- Article Detail ---
                     <div className="max-w-3xl mx-auto animate-fade-in-up">
@@ -479,6 +490,25 @@ const NewsPage = ({ onBack, onLogin, onRegister, onNavigate }: { onBack: () => v
                     </>
                 )}
             </div>
+
+            {/* Footer */}
+            <footer className="bg-white border-t border-slate-200 mt-16 py-10">
+              <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
+                <a href="/" className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
+                    <div className="w-3 h-3 rounded-full bg-lime-400"></div>
+                  </div>
+                  <span className="text-xl font-black tracking-wider text-slate-900">НаКорте</span>
+                </a>
+                <div className="text-slate-400 text-sm">
+                  &copy; 2026 НаКорте. Все права защищены.
+                </div>
+                <div className="flex gap-4 text-sm text-slate-400">
+                  <a href="/privacy/" className="hover:text-slate-900 transition-colors">Конфиденциальность</a>
+                  <a href="/terms/" className="hover:text-slate-900 transition-colors">Условия</a>
+                </div>
+              </div>
+            </footer>
         </div>
     );
 };
@@ -596,58 +626,187 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
       </section>
 
       {/* Bento Grid Features */}
-      <section className="py-24 bg-slate-50">
+      <section className="py-32 bg-white overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-slate-900 mb-4">Всё для тенниса в одном месте</h2>
-            <p className="text-slate-500 max-w-2xl mx-auto">Мы убрали лишнее, оставив только то, что нужно для прогресса.</p>
+          <div className="text-center mb-20">
+            <span className="text-lime-600 font-bold tracking-wider uppercase text-xs">Возможности</span>
+            <h2 className="text-5xl font-bold text-slate-900 mt-3 mb-4 tracking-tight">Всё для тенниса<br/>в одном месте</h2>
+            <p className="text-slate-400 max-w-xl mx-auto text-lg font-light">Мы убрали лишнее, оставив только то, что нужно для прогресса.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-auto md:h-[600px]">
+          {/* Row 1 */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
              {/* Feature 1: Large Left */}
-             <div className="md:col-span-2 bg-white rounded-3xl p-8 shadow-sm border border-slate-200 relative overflow-hidden group hover:shadow-xl transition-all duration-500">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-slate-50 rounded-bl-full z-0 transition-transform group-hover:scale-110 duration-700"></div>
+             <div className="md:col-span-2 bg-slate-950 rounded-[2rem] p-10 relative overflow-hidden group cursor-default"
+               style={{minHeight: '320px'}}>
+                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-slate-900 via-slate-950 to-black z-0"></div>
+                <div className="absolute -top-20 -right-20 w-72 h-72 bg-lime-400/10 rounded-full blur-[80px] group-hover:bg-lime-400/20 transition-all duration-700 z-0"></div>
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-500/10 rounded-full blur-[60px] z-0"></div>
                 <div className="relative z-10 h-full flex flex-col justify-between">
                   <div>
-                    <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center text-white mb-6">
-                      <Users size={24} />
+                    <div className="w-12 h-12 bg-white/10 backdrop-blur rounded-2xl flex items-center justify-center text-lime-400 mb-8 group-hover:scale-110 transition-transform duration-500">
+                      <Users size={22} />
                     </div>
-                    <h3 className="text-3xl font-bold mb-4">Умный поиск партнеров</h3>
-                    <p className="text-slate-500 text-lg max-w-md">Алгоритм подбирает соперников не только по уровню NTRP или очкам РТТ, но и по стилю игры, возрасту и локации.</p>
+                    <h3 className="text-3xl font-bold mb-4 text-white tracking-tight">Умный поиск партнеров</h3>
+                    <p className="text-slate-400 text-base max-w-md leading-relaxed">Алгоритм подбирает соперников не только по уровню NTRP или очкам РТТ, но и по стилю игры, возрасту и локации.</p>
                   </div>
-                  <div className="mt-8 flex gap-4">
-                     <div className="bg-slate-50 px-4 py-2 rounded-lg border border-slate-100 font-medium text-sm">Спарринг</div>
-                     <div className="bg-slate-50 px-4 py-2 rounded-lg border border-slate-100 font-medium text-sm">Турнир</div>
-                     <div className="bg-lime-50 px-4 py-2 rounded-lg border border-lime-200 font-medium text-sm text-lime-700">Тренировка</div>
+                  <div className="mt-10 flex gap-3">
+                     <div className="bg-white/5 border border-white/10 backdrop-blur px-4 py-2 rounded-full text-white/60 font-medium text-sm group-hover:border-white/20 transition-colors">Спарринг</div>
+                     <div className="bg-white/5 border border-white/10 backdrop-blur px-4 py-2 rounded-full text-white/60 font-medium text-sm group-hover:border-white/20 transition-colors">Турнир</div>
+                     <div className="bg-lime-400/10 border border-lime-400/30 backdrop-blur px-4 py-2 rounded-full text-lime-400 font-bold text-sm">Тренировка</div>
                   </div>
                 </div>
              </div>
 
-             {/* Feature 2: Top Right */}
-             <div className="bg-slate-900 text-white rounded-3xl p-8 shadow-sm relative overflow-hidden group cursor-pointer hover:shadow-2xl transition-all duration-300" onClick={() => onNavigate('pro')}>
-                <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-slate-800 z-0"></div>
-                <div className="absolute -right-10 -bottom-10 opacity-20 group-hover:opacity-30 transition-opacity">
-                  <Trophy size={200} />
+             {/* Feature 2: PRO */}
+             <div className="rounded-[2rem] p-10 relative overflow-hidden group cursor-pointer bg-gradient-to-br from-lime-400 to-emerald-500 hover:shadow-2xl hover:shadow-lime-400/30 transition-all duration-500 hover:-translate-y-1"
+               style={{minHeight: '320px'}} onClick={() => onNavigate('pro')}>
+                <div className="absolute -right-8 -bottom-8 opacity-20 group-hover:opacity-40 group-hover:scale-110 transition-all duration-700">
+                  <Trophy size={180} />
                 </div>
-                <div className="relative z-10">
-                   <div className="w-12 h-12 bg-lime-400 rounded-xl flex items-center justify-center text-slate-900 mb-6">
-                      <Star size={24} />
+                <div className="relative z-10 h-full flex flex-col justify-between">
+                  <div>
+                    <div className="w-12 h-12 bg-slate-900/20 backdrop-blur rounded-2xl flex items-center justify-center text-slate-900 mb-8 group-hover:scale-110 transition-transform duration-500">
+                      <Star size={22} />
                     </div>
-                    <h3 className="text-2xl font-bold mb-2">Профессионалы РТТ</h3>
-                    <p className="text-slate-400">Верифицированные аккаунты для действующих спортсменов и тренеров категории PRO.</p>
-                    <div className="mt-4 inline-flex items-center text-lime-400 font-bold text-sm">Подробнее <ArrowRight size={14} className="ml-1 group-hover:translate-x-1 transition-transform"/></div>
+                    <h3 className="text-2xl font-bold mb-3 text-slate-900 tracking-tight">Профессионалы РТТ</h3>
+                    <p className="text-slate-800/70 text-sm leading-relaxed">Верифицированные аккаунты для действующих спортсменов и тренеров категории PRO.</p>
+                  </div>
+                  <div className="mt-6 inline-flex items-center text-slate-900 font-bold text-sm gap-1 group-hover:gap-2 transition-all">
+                    Подробнее <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform"/>
+                  </div>
                 </div>
-             </div>
-
-             {/* Feature 3: Bottom Right */}
-             <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200 group hover:shadow-xl transition-all duration-300">
-                <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center mb-6">
-                   <Map size={24} />
-                </div>
-                <h3 className="text-2xl font-bold mb-2">Все корты России</h3>
-                <p className="text-slate-500">Мгновенное бронирование без звонков администраторам. Реальное расписание.</p>
              </div>
           </div>
+
+          {/* Row 2 */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-5">
+
+             {/* Корты */}
+             <div className="bg-slate-50 border border-slate-100 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/60 transition-all duration-500"
+               style={{minHeight: '260px'}}>
+                <div className="absolute -right-6 -bottom-6 text-slate-100 group-hover:text-slate-200 transition-colors duration-500">
+                  <Map size={120} />
+                </div>
+                <div className="relative z-10">
+                  <div className="w-11 h-11 bg-emerald-500 rounded-2xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform duration-500 shadow-lg shadow-emerald-500/30">
+                    <Map size={20} />
+                  </div>
+                  <h3 className="text-xl font-bold mb-2 text-slate-900">Корты рядом с тобой</h3>
+                  <p className="text-slate-500 text-sm leading-relaxed">Находи теннисные корты в своём городе, смотри контакты и удобно договаривайся о времени.</p>
+                </div>
+             </div>
+
+             {/* Статистика */}
+             <div className="bg-slate-950 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/40 transition-all duration-500"
+               style={{minHeight: '260px'}}>
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-transparent z-0"></div>
+                <div className="absolute -right-6 -bottom-6 text-blue-500/10 group-hover:text-blue-500/20 transition-colors duration-500">
+                  <Activity size={120} />
+                </div>
+                <div className="relative z-10">
+                  <div className="w-11 h-11 bg-blue-500 rounded-2xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform duration-500 shadow-lg shadow-blue-500/30">
+                    <Activity size={20} />
+                  </div>
+                  <h3 className="text-xl font-bold mb-2 text-white">Детальная статистика</h3>
+                  <p className="text-slate-400 text-sm leading-relaxed">Анализируй матчи, отслеживай прогресс NTRP и историю личных встреч.</p>
+                </div>
+             </div>
+
+             {/* Комьюнити + Турниры */}
+             <div className="flex flex-col gap-5">
+               <div className="bg-slate-50 border border-slate-100 rounded-[2rem] p-8 relative overflow-hidden group hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/60 transition-all duration-500 flex-1">
+                 <div className="w-11 h-11 bg-purple-500 rounded-2xl flex items-center justify-center text-white mb-4 group-hover:scale-110 transition-transform duration-500 shadow-lg shadow-purple-500/30">
+                   <MessageSquare size={20} />
+                 </div>
+                 <h3 className="text-lg font-bold mb-1 text-slate-900">Комьюнити</h3>
+                 <p className="text-slate-500 text-sm leading-relaxed">Общайся, вступай в группы и находи компанию для игры.</p>
+               </div>
+               <div className="bg-slate-50 border border-slate-100 rounded-[2rem] p-8 relative overflow-hidden group hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/60 transition-all duration-500 flex-1">
+                 <div className="w-11 h-11 bg-orange-500 rounded-2xl flex items-center justify-center text-white mb-4 group-hover:scale-110 transition-transform duration-500 shadow-lg shadow-orange-500/30">
+                   <Calendar size={20} />
+                 </div>
+                 <h3 className="text-lg font-bold mb-1 text-slate-900">Турниры</h3>
+                 <p className="text-slate-500 text-sm leading-relaxed">Участвуй или создавай любительские соревнования в пару кликов.</p>
+               </div>
+             </div>
+
+          </div>
+
+          {/* Row 3 — AI, 3D, CRM */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-5">
+
+            {/* AI Тренер */}
+            <div className="md:col-span-2 bg-slate-950 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/40 transition-all duration-500"
+              style={{minHeight: '260px'}}>
+              <div className="absolute inset-0 bg-gradient-to-br from-violet-900/30 via-slate-950 to-black z-0"></div>
+              <div className="absolute -top-16 -right-16 w-64 h-64 bg-violet-500/10 rounded-full blur-[80px] group-hover:bg-violet-500/20 transition-all duration-700 z-0"></div>
+              <div className="relative z-10 flex flex-col h-full justify-between">
+                <div>
+                  <div className="w-11 h-11 bg-violet-500 rounded-2xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform duration-500 shadow-lg shadow-violet-500/30">
+                    <Zap size={20} />
+                  </div>
+                  <h3 className="text-2xl font-bold mb-3 text-white tracking-tight">AI Тренер</h3>
+                  <p className="text-slate-400 text-sm leading-relaxed max-w-md">Персональный AI-ассистент анализирует твои матчи, подсказывает над чем работать и составляет индивидуальный план тренировок.</p>
+                </div>
+                <div className="mt-8 flex gap-3 flex-wrap">
+                  <div className="bg-violet-500/10 border border-violet-500/20 px-4 py-1.5 rounded-full text-violet-400 font-medium text-xs">Анализ техники</div>
+                  <div className="bg-violet-500/10 border border-violet-500/20 px-4 py-1.5 rounded-full text-violet-400 font-medium text-xs">Plan тренировок</div>
+                  <div className="bg-violet-500/10 border border-violet-500/20 px-4 py-1.5 rounded-full text-violet-400 font-medium text-xs">Разбор ошибок</div>
+                </div>
+              </div>
+            </div>
+
+            {/* 3D Тактический симулятор */}
+            <div className="bg-gradient-to-br from-cyan-500 to-blue-600 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-2xl hover:shadow-cyan-400/30 transition-all duration-500"
+              style={{minHeight: '260px'}}>
+              <div className="absolute -right-8 -bottom-8 opacity-20 group-hover:opacity-40 group-hover:scale-110 transition-all duration-700">
+                <BarChart3 size={160} />
+              </div>
+              <div className="relative z-10 h-full flex flex-col justify-between">
+                <div>
+                  <div className="w-11 h-11 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform duration-500">
+                    <BarChart3 size={20} />
+                  </div>
+                  <h3 className="text-xl font-bold mb-3 text-white tracking-tight">3D Тактический симулятор</h3>
+                  <p className="text-white/70 text-sm leading-relaxed">Разрабатывай игровые схемы и тактики на интерактивном 3D-корте и изучай розыгрыши очков.</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Row 4 — CRM для тренеров */}
+          <div className="mt-5">
+            <div className="bg-slate-50 border border-slate-100 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/60 transition-all duration-500">
+              <div className="absolute -right-10 -bottom-10 text-slate-100 group-hover:text-slate-200 transition-colors duration-500">
+                <Briefcase size={180} />
+              </div>
+              <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+                <div>
+                  <div className="w-11 h-11 bg-amber-500 rounded-2xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform duration-500 shadow-lg shadow-amber-500/30">
+                    <Briefcase size={20} />
+                  </div>
+                  <h3 className="text-2xl font-bold mb-3 text-slate-900 tracking-tight">CRM для тренеров</h3>
+                  <p className="text-slate-500 text-sm leading-relaxed">Полный инструментарий для профессиональных тренеров: управление учениками, расписание тренировок, статистика прогресса каждого игрока и организация собственных турниров.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: 'База учеников', desc: 'Профили, прогресс, история' },
+                    { label: 'Расписание', desc: 'Тренировки и занятия' },
+                    { label: 'Создание турниров', desc: 'Организуй соревнования' },
+                    { label: 'Аналитика', desc: 'Рост каждого игрока' },
+                  ].map((item, i) => (
+                    <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 group-hover:border-amber-200 transition-colors">
+                      <div className="font-bold text-sm text-slate-900 mb-1">{item.label}</div>
+                      <div className="text-xs text-slate-400">{item.desc}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </section>
 
@@ -664,7 +823,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
               Присоединяйся к сообществу, где теннис — это больше, чем просто спорт. Это стиль жизни.
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
-               <Button size="lg" className="shadow-2xl shadow-slate-400/50" onClick={onRegisterClick}>Создать аккаунт бесплатно</Button>
+               <Button size="lg" className="shadow-2xl shadow-slate-400/50" onClick={onRegisterClick}>Создать аккаунт</Button>
                <Button size="lg" variant="outline" onClick={onLoginClick}>Войти</Button>
             </div>
           </div>
@@ -681,17 +840,13 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
               </span>
            </div>
            <div className="text-slate-500 text-sm font-medium">
-             &copy; 2024 НаКорте. Все права защищены.
+             &copy; 2026 НаКорте. Все права защищены.
            </div>
            <div className="flex flex-wrap justify-center gap-4 text-slate-400 text-sm">
              <a href="/privacy/" className="hover:text-slate-900 transition-colors">Политика конфиденциальности</a>
              <a href="/terms/" className="hover:text-slate-900 transition-colors">Условия обслуживания</a>
            </div>
-           <div className="flex gap-6 text-slate-400">
-             <a href="#" className="hover:text-slate-900">Instagram</a>
-             <a href="#" className="hover:text-slate-900">Telegram</a>
-             <a href="#" className="hover:text-slate-900">VK</a>
-           </div>
+
          </div>
        </footer>
     </>

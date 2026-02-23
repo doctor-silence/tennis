@@ -187,9 +187,21 @@
   </main>
 
   <!-- Footer -->
-  <footer class="bg-white border-t border-slate-200 py-8 mt-8">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 text-center text-sm text-slate-400">
-      <span>&copy; 2026 НаКорте. Все права защищены.</span>
+  <footer class="bg-white border-t border-slate-200 py-10 mt-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row justify-between items-center gap-6">
+      <a href="/" class="flex items-center gap-2">
+        <div class="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
+          <div class="w-3 h-3 rounded-full bg-lime-400"></div>
+        </div>
+        <span class="text-xl font-black tracking-wider text-slate-900">НаКорте</span>
+      </a>
+      <div class="text-slate-400 text-sm">
+        &copy; 2026 НаКорте. Все права защищены.
+      </div>
+      <div class="flex gap-4 text-sm text-slate-400">
+        <a href="/privacy/" class="hover:text-slate-900 transition-colors">Конфиденциальность</a>
+        <a href="/terms/" class="hover:text-slate-900 transition-colors">Условия</a>
+      </div>
     </div>
   </footer>
 
