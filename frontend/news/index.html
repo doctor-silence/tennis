@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Новости тенниса — НаКорте</title>
+  <meta name="description" content="Последние новости тенниса в России: турниры, результаты матчей, интервью с игроками, тренировочные советы и обзоры инвентаря." />
+  <meta name="keywords" content="теннис новости, РТТ турниры, теннис Россия, теннисные соревнования, теннисные новости 2026" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://nakорте.ru/news/" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Новости тенниса — НаКорте" />
+  <meta property="og:description" content="Последние новости тенниса в России: турниры, результаты матчей, интервью с игроками и тренировочные советы." />
+  <meta property="og:url" content="https://nakорте.ru/news/" />
+  <meta property="og:locale" content="ru_RU" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    * { box-sizing: border-box; }
+    .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  </style>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": "Новости тенниса",
+    "description": "Последние новости тенниса в России",
+    "url": "https://nakорте.ru/news/",
+    "publisher": {
+      "@type": "Organization",
+      "name": "НаКорте",
+      "url": "https://nakорте.ru"
+    }
+  }
+  </script>
+</head>
+<body class="bg-slate-50 text-slate-900 antialiased">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <a href="/" class="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors font-medium text-sm">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          На главную
+        </a>
+        <div class="w-px h-6 bg-slate-200"></div>
+        <a href="/" class="flex items-center gap-2">
+          <div class="w-6 h-6 bg-slate-900 rounded-md flex items-center justify-center">
+            <div class="w-2 h-2 rounded-full bg-lime-400"></div>
+          </div>
+          <span class="font-black tracking-wider text-slate-900 text-sm">НаКорте</span>
+        </a>
+      </div>
+      <a href="/#register" class="bg-slate-900 text-white text-sm font-bold px-4 py-2 rounded-xl hover:bg-slate-700 transition-colors">
+        Регистрация
+      </a>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="bg-white border-b border-slate-200 py-16">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6">
+      <span class="text-lime-600 font-bold tracking-wider uppercase text-xs">Редакция НаКорте</span>
+      <h1 class="text-4xl md:text-5xl font-bold text-slate-900 tracking-tight mt-2 mb-4">
+        Новости тенниса
+      </h1>
+      <p class="text-slate-500 text-lg max-w-2xl">
+        Турниры, результаты, интервью с игроками и тренировочные советы — всё о теннисе в России и мире.
+      </p>
+    </div>
+  </section>
+
+  <!-- Category Tags -->
+  <section class="bg-white border-b border-slate-100 py-4">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6">
+      <div class="flex gap-2 overflow-x-auto pb-1">
+        <span class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold bg-slate-900 text-white">Все</span>
+        <span class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold bg-white text-slate-600 border border-slate-200">Турниры</span>
+        <span class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold bg-white text-slate-600 border border-slate-200">Игроки</span>
+        <span class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold bg-white text-slate-600 border border-slate-200">Тренировки</span>
+        <span class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold bg-white text-slate-600 border border-slate-200">Инвентарь</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Articles Grid -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-12">
+
+    <!-- Featured -->
+    <div class="relative rounded-3xl overflow-hidden mb-10 h-80 lg:h-[480px] group cursor-pointer" onclick="window.location.href='/'">
+      <img
+        src="https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1600&auto=format&fit=crop"
+        alt="Открытие нового теннисного сезона в России"
+        class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+      />
+      <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent"></div>
+      <div class="absolute bottom-0 left-0 right-0 p-6 lg:p-10">
+        <span class="inline-block bg-amber-400 text-slate-900 text-xs font-bold px-3 py-1 rounded-full mb-3">Турниры</span>
+        <h2 class="text-white text-2xl lg:text-4xl font-black leading-tight mb-3 max-w-3xl">
+          Открытие теннисного сезона 2026: главные турниры и фавориты
+        </h2>
+        <p class="text-slate-300 text-sm lg:text-base mb-4 max-w-2xl line-clamp-2">
+          Новый сезон РТТ стартует с серии региональных турниров. Разбираем расписание и называем главных претендентов на победу.
+        </p>
+        <div class="flex items-center gap-4 text-slate-400 text-xs">
+          <span>Редакция НаКорте</span>
+          <span>·</span>
+          <span>23 февраля 2026</span>
+          <span>·</span>
+          <span>5 мин. чтения</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+
+      <article class="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onclick="window.location.href='/'">
+        <div class="h-44 overflow-hidden">
+          <img src="https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=800&auto=format&fit=crop" alt="AI тренер в теннисе" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        </div>
+        <div class="p-4">
+          <span class="inline-block bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-200 mb-2">Игроки</span>
+          <h3 class="font-bold text-slate-900 leading-tight mb-1.5 group-hover:text-lime-600 transition-colors line-clamp-2">
+            Как AI-тренер помогает любителям прогрессировать быстрее профессионалов
+          </h3>
+          <p class="text-slate-500 text-sm line-clamp-2 mb-3">Технологии машинного обучения добрались до любительского тенниса. Разбираем, как работает персональный AI-коуч.</p>
+          <div class="flex items-center justify-between text-slate-400 text-xs">
+            <span>18 февраля 2026</span>
+            <span>4 780 просмотров</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onclick="window.location.href='/'">
+        <div class="h-44 overflow-hidden">
+          <img src="https://images.unsplash.com/photo-1542144582-1ba00456b5e3?q=80&w=800&auto=format&fit=crop" alt="Бронирование кортов" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        </div>
+        <div class="p-4">
+          <span class="inline-block bg-lime-100 text-lime-700 text-xs font-bold px-2 py-0.5 rounded-full border border-lime-200 mb-2">Тренировки</span>
+          <h3 class="font-bold text-slate-900 leading-tight mb-1.5 group-hover:text-lime-600 transition-colors line-clamp-2">
+            5 упражнений для улучшения первой подачи: советы тренеров РТТ
+          </h3>
+          <p class="text-slate-500 text-sm line-clamp-2 mb-3">Профессиональные тренеры делятся проверенными упражнениями для отработки стабильной подачи.</p>
+          <div class="flex items-center justify-between text-slate-400 text-xs">
+            <span>10 января 2026</span>
+            <span>3 210 просмотров</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onclick="window.location.href='/'">
+        <div class="h-44 overflow-hidden">
+          <img src="https://images.unsplash.com/photo-1617083934555-52951271b273?q=80&w=800&auto=format&fit=crop" alt="Теннисные ракетки 2026" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        </div>
+        <div class="p-4">
+          <span class="inline-block bg-purple-100 text-purple-700 text-xs font-bold px-2 py-0.5 rounded-full border border-purple-200 mb-2">Инвентарь</span>
+          <h3 class="font-bold text-slate-900 leading-tight mb-1.5 group-hover:text-lime-600 transition-colors line-clamp-2">
+            Лучшие ракетки 2026 года: рейтинг по отзывам игроков НаКорте
+          </h3>
+          <p class="text-slate-500 text-sm line-clamp-2 mb-3">Собрали рейтинг ракеток на основе реальных отзывов тысяч игроков нашей платформы.</p>
+          <div class="flex items-center justify-between text-slate-400 text-xs">
+            <span>5 января 2026</span>
+            <span>6 120 просмотров</span>
+          </div>
+        </div>
+      </article>
+
+    </div>
+
+    <!-- CTA -->
+    <div class="mt-16 bg-slate-900 rounded-3xl p-10 text-center text-white">
+      <h2 class="text-2xl font-bold mb-3">Хочешь читать больше и участвовать в дискуссиях?</h2>
+      <p class="text-slate-400 mb-6">Зарегистрируйся на НаКорте — сообщество игроков, корты и турниры в одном приложении.</p>
+      <a href="/" class="inline-block bg-lime-400 text-slate-900 font-bold px-8 py-3 rounded-xl hover:bg-lime-300 transition-colors">
+        Зарегистрироваться бесплатно
+      </a>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 py-8 mt-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 text-center text-sm text-slate-400">
+      <span>&copy; 2026 НаКорте. Все права защищены.</span>
+    </div>
+  </footer>
+
+</body>
+</html>

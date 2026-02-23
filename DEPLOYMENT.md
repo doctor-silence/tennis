@@ -384,7 +384,38 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
 
-    # Frontend
+    # SEO Static Pages (served directly, bypassing React SPA)
+    location ^~ /privacy/ {
+        root /var/www/tennispro/tennis/frontend;
+        try_files $uri $uri/index.html =404;
+        add_header Cache-Control "public, max-age=86400";
+    }
+
+    location ^~ /terms/ {
+        root /var/www/tennispro/tennis/frontend;
+        try_files $uri $uri/index.html =404;
+        add_header Cache-Control "public, max-age=86400";
+    }
+
+    location ^~ /news/ {
+        root /var/www/tennispro/tennis/frontend;
+        try_files $uri $uri/index.html =404;
+        add_header Cache-Control "public, max-age=86400";
+    }
+
+    location ^~ /shop/ {
+        root /var/www/tennispro/tennis/frontend;
+        try_files $uri $uri/index.html =404;
+        add_header Cache-Control "public, max-age=86400";
+    }
+
+    location ^~ /pro/ {
+        root /var/www/tennispro/tennis/frontend;
+        try_files $uri $uri/index.html =404;
+        add_header Cache-Control "public, max-age=86400";
+    }
+
+    # Frontend SPA
     location / {
         root /var/www/tennispro/tennis/frontend/dist;
         try_files $uri $uri/ /index.html;

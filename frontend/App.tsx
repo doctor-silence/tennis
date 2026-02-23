@@ -178,15 +178,15 @@ const PublicHeader = ({ onLogin, onRegister, onNavigate, transparent = false }: 
       </div>
       
       <nav className={`hidden md:flex items-center gap-8 text-sm font-bold uppercase tracking-wider ${transparent ? 'text-slate-300' : 'text-slate-500'}`}>
-        <button onClick={() => onNavigate('news')} className={`hover:text-lime-500 transition-colors flex items-center gap-1 ${transparent ? 'hover:text-white' : ''}`}>
+        <a href="/news/" className={`hover:text-lime-500 transition-colors flex items-center gap-1 ${transparent ? 'hover:text-white' : ''}`}>
            Новости
-        </button>
-        <button onClick={() => onNavigate('shop')} className={`hover:text-lime-500 transition-colors flex items-center gap-1 ${transparent ? 'hover:text-white' : ''}`}>
+        </a>
+        <a href="/shop/" className={`hover:text-lime-500 transition-colors flex items-center gap-1 ${transparent ? 'hover:text-white' : ''}`}>
            Магазин
-        </button>
-        <button onClick={() => onNavigate('pro')} className={`hover:text-lime-500 transition-colors flex items-center gap-1 ${transparent ? 'hover:text-white' : ''}`}>
+        </a>
+        <a href="/pro/" className={`hover:text-lime-500 transition-colors flex items-center gap-1 ${transparent ? 'hover:text-white' : ''}`}>
            PRO <Crown size={14} className="mb-1 text-amber-400"/>
-        </button>
+        </a>
       </nav>
 
       <div className="flex items-center gap-4">
