@@ -127,6 +127,7 @@ const App = () => {
             onBack={() => handleNavigate('landing')}
             onComplete={handleLoginSuccess}
             initialMode={authInitialMode}
+            onNavigate={handleNavigate}
         />
       )}
 
@@ -147,6 +148,14 @@ const App = () => {
 
       {view === 'news' && (
           <NewsPage onBack={() => handleNavigate('landing')} onLogin={() => handleAuthNavigate('login')} onRegister={() => handleAuthNavigate('register')} onNavigate={handleNavigate} />
+      )}
+
+      {view === 'privacy' && (
+          <LegalPage type="privacy" onBack={() => handleNavigate('landing')} />
+      )}
+
+      {view === 'terms' && (
+          <LegalPage type="terms" onBack={() => handleNavigate('landing')} />
       )}
     </div>
   );
@@ -674,6 +683,10 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
            <div className="text-slate-500 text-sm font-medium">
              &copy; 2024 НаКорте. Все права защищены.
            </div>
+           <div className="flex flex-wrap justify-center gap-4 text-slate-400 text-sm">
+             <a href="/privacy/" className="hover:text-slate-900 transition-colors">Политика конфиденциальности</a>
+             <a href="/terms/" className="hover:text-slate-900 transition-colors">Условия обслуживания</a>
+           </div>
            <div className="flex gap-6 text-slate-400">
              <a href="#" className="hover:text-slate-900">Instagram</a>
              <a href="#" className="hover:text-slate-900">Telegram</a>
@@ -835,7 +848,7 @@ const ProPage = ({ onBack, onSubscribe }: { onBack: () => void, onSubscribe: () 
 };
 
 // ... AuthPage (same as before) ...
-const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () => void, onComplete: (user: User) => void, initialMode?: 'login' | 'register' }) => {
+const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { onBack: () => void, onComplete: (user: User) => void, initialMode?: 'login' | 'register', onNavigate: (v: ViewState) => void }) => {
   const [authMode, setAuthMode] = useState<'login' | 'register'>(initialMode);
   const [registerStep, setRegisterStep] = useState<1 | 2>(1);
   
@@ -858,6 +871,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () =>
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [consentGiven, setConsentGiven] = useState(false);
 
   const ntrpLevels = [
       "NTRP 2.0 (Новичок)", 
@@ -1069,7 +1083,23 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () =>
                     required
                     />
                 </div>
-                <Button variant="secondary" className="w-full mt-6 text-base" type="submit">
+                <div className="mt-4 flex items-start gap-3">
+                    <input
+                        type="checkbox"
+                        id="consent"
+                        checked={consentGiven}
+                        onChange={(e) => setConsentGiven(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 accent-lime-400 cursor-pointer flex-shrink-0"
+                        required
+                    />
+                    <label htmlFor="consent" className="text-xs text-slate-400 leading-relaxed cursor-pointer">
+                        Нажимая кнопку, я даю согласие на обработку моих персональных данных в соответствии с{' '}
+                        <a href="/privacy/" target="_blank" rel="noopener noreferrer" className="text-lime-400 hover:text-lime-300 underline transition-colors">
+                            Условиями обработки персональных данных
+                        </a>
+                    </label>
+                </div>
+                <Button variant="secondary" className="w-full mt-6 text-base" type="submit" disabled={!consentGiven}>
                     Продолжить
                 </Button>
 
@@ -1273,6 +1303,181 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login' }: { onBack: () =>
              </form>
          )}
        </div>
+    </div>
+  );
+};
+
+// --- Legal Pages ---
+const LegalPage = ({ type, onBack }: { type: 'privacy' | 'terms', onBack: () => void }) => {
+  const isPrivacy = type === 'privacy';
+
+  const privacyContent = (
+    <>
+      <section>
+        <h2 className="text-xl font-bold text-slate-900 mb-3">1. Общие положения</h2>
+        <p>Настоящая Политика конфиденциальности описывает, как сервис «НаКорте» (далее — «Сервис», «мы») собирает, использует и защищает персональные данные пользователей (далее — «Пользователь», «вы») при использовании платформы.</p>
+      </section>
+      <section>
+        <h2 className="text-xl font-bold text-slate-900 mb-3">2. Какие данные мы собираем</h2>
+        <ul className="list-disc list-inside space-y-1 text-slate-600">
+          <li>Имя и фамилия</li>
+          <li>Адрес электронной почты</li>
+          <li>Город проживания</li>
+          <li>Возраст</li>
+          <li>Уровень игры (NTRP / РТТ)</li>
+          <li>РНИ (для игроков категории РТТ Про)</li>
+          <li>Данные, добровольно указанные в профиле</li>
+        </ul>
+      </section>
+      <section>
+        <h2 className="text-xl font-bold text-slate-900 mb-3">3. Цели обработки данных</h2>
+        <p className="mb-2">Ваши данные используются исключительно для:</p>
+        <ul className="list-disc list-inside space-y-1 text-slate-600">
+          <li>Регистрации и идентификации в Сервисе</li>
+          <li>Подбора партнёров и соперников по уровню игры</li>
+          <li>Отображения профиля в сообществе (только с вашего согласия)</li>
+          <li>Улучшения качества Сервиса</li>
+          <li>Направления уведомлений, связанных с деятельностью Сервиса</li>
+        </ul>
+      </section>
+      <section>
+        <h2 className="text-xl font-bold text-slate-900 mb-3">4. Хранение и защита данных</h2>
+        <p>Мы принимаем все разумные технические и организационные меры для защиты ваших персональных данных от несанкционированного доступа, изменения, раскрытия или уничтожения. Данные хранятся на защищённых серверах и не передаются третьим лицам без вашего явного согласия, за исключением случаев, предусмотренных законодательством Российской Федерации.</p>
+      </section>
+      <section>
+        <h2 className="text-xl font-bold text-slate-900 mb-3">5. Передача данных третьим лицам</h2>
+        <p>Мы не продаём, не обмениваем и не передаём ваши персональные данные третьим лицам в коммерческих целях. Данные могут быть раскрыты только по требованию уполномоченных государственных органов в соответствии с законодательством РФ.</p>
+      </section>
+      <section>
+        <h2 className="text-xl font-bold text-slate-900 mb-3">6. Права пользователя</h2>
+        <p className="mb-2">Вы вправе в любой момент:</p>
+        <ul className="list-disc list-inside space-y-1 text-slate-600">
+          <li>Запросить доступ к своим персональным данным</li>
+          <li>Потребовать исправления или удаления данных</li>
+          <li>Отозвать согласие на обработку персональных данных</li>
+        </ul>
+        <p className="mt-2">Для реализации прав обратитесь к нам через форму обратной связи или по электронной почте.</p>
+      </section>
+      <section>
+        <h2 className="text-xl font-bold text-slate-900 mb-3">7. Cookies</h2>
+        <p>Сервис может использовать файлы cookie для улучшения пользовательского опыта. Вы можете отключить cookies в настройках браузера, однако это может повлиять на функциональность Сервиса.</p>
+      </section>
+      <section>
+        <h2 className="text-xl font-bold text-slate-900 mb-3">8. Изменения политики</h2>
+        <p>Мы оставляем за собой право вносить изменения в настоящую Политику. При существенных изменениях мы уведомим вас через Сервис. Продолжение использования Сервиса после внесения изменений означает ваше согласие с новой редакцией.</p>
+      </section>
+      <section>
+        <h2 className="text-xl font-bold text-slate-900 mb-3">9. Контакты</h2>
+        <p>По всем вопросам, связанным с обработкой персональных данных, обращайтесь через встроенный чат поддержки или по электронной почте, указанной в разделе «О нас».</p>
+      </section>
+    </>
+  );
+
+  const termsContent = (
+    <>
+      <section>
+        <h2 className="text-xl font-bold text-slate-900 mb-3">1. Предмет соглашения</h2>
+        <p>Настоящие Условия обслуживания регулируют использование платформы «НаКорте» (далее — «Сервис»). Регистрируясь в Сервисе, вы соглашаетесь соблюдать данные Условия в полном объёме.</p>
+      </section>
+      <section>
+        <h2 className="text-xl font-bold text-slate-900 mb-3">2. Статус сервиса</h2>
+        <p>На данный момент Сервис находится на стадии бета-тестирования и предоставляется <span className="font-semibold text-lime-600">полностью бесплатно</span>. Мы оставляем за собой право изменить условия доступа к отдельным функциям в будущем, уведомив пользователей заблаговременно.</p>
+      </section>
+      <section>
+        <h2 className="text-xl font-bold text-slate-900 mb-3">3. Регистрация и аккаунт</h2>
+        <ul className="list-disc list-inside space-y-1 text-slate-600">
+          <li>Для использования большинства функций Сервиса необходима регистрация</li>
+          <li>Вы обязуетесь предоставлять достоверные данные при регистрации</li>
+          <li>Вы несёте ответственность за сохранность данных своего аккаунта</li>
+          <li>Один пользователь — один аккаунт</li>
+          <li>Регистрация доступна лицам, достигшим 14 лет</li>
+        </ul>
+      </section>
+      <section>
+        <h2 className="text-xl font-bold text-slate-900 mb-3">4. Правила поведения</h2>
+        <p className="mb-2">Пользователям запрещено:</p>
+        <ul className="list-disc list-inside space-y-1 text-slate-600">
+          <li>Публиковать оскорбительный, дискриминационный или незаконный контент</li>
+          <li>Спамить и рассылать рекламу без согласования с администрацией</li>
+          <li>Использовать Сервис в мошеннических целях</li>
+          <li>Предпринимать попытки взлома или несанкционированного доступа</li>
+          <li>Выдавать себя за другого пользователя или организацию</li>
+        </ul>
+      </section>
+      <section>
+        <h2 className="text-xl font-bold text-slate-900 mb-3">5. Пользовательский контент</h2>
+        <p>Размещая материалы (фотографии, тексты, комментарии), вы подтверждаете, что обладаете необходимыми правами на них, и предоставляете Сервису право отображать их в рамках платформы. Мы не претендуем на право собственности на ваш контент.</p>
+      </section>
+      <section>
+        <h2 className="text-xl font-bold text-slate-900 mb-3">6. Ограничение ответственности</h2>
+        <p>Сервис предоставляется «как есть». В период бета-тестирования возможны сбои и перебои в работе. Мы не несём ответственности за убытки, возникшие в результате использования или невозможности использования Сервиса.</p>
+      </section>
+      <section>
+        <h2 className="text-xl font-bold text-slate-900 mb-3">7. Блокировка аккаунта</h2>
+        <p>Мы оставляем за собой право заблокировать или удалить аккаунт пользователя при нарушении настоящих Условий без предварительного уведомления.</p>
+      </section>
+      <section>
+        <h2 className="text-xl font-bold text-slate-900 mb-3">8. Изменения условий</h2>
+        <p>Мы можем изменять настоящие Условия. Актуальная версия всегда доступна на этой странице. При существенных изменениях мы уведомим вас через Сервис.</p>
+      </section>
+      <section>
+        <h2 className="text-xl font-bold text-slate-900 mb-3">9. Применимое право</h2>
+        <p>Настоящие Условия регулируются законодательством Российской Федерации. Все споры разрешаются в установленном законом порядке.</p>
+      </section>
+    </>
+  );
+
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans">
+      <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-4">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors font-medium text-sm"
+          >
+            <ChevronLeft size={20} /> На главную
+          </button>
+          <div className="w-px h-6 bg-slate-200" />
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-slate-900 rounded-md flex items-center justify-center flex-shrink-0">
+              <div className="w-2 h-2 rounded-full bg-lime-400"></div>
+            </div>
+            <span className="font-black tracking-wider text-slate-900 text-sm">НаКорте</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 md:p-12">
+          <div className="mb-8 pb-8 border-b border-slate-100">
+            <span className="inline-block bg-lime-100 text-lime-700 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full mb-4">
+              {isPrivacy ? 'Правовые документы' : 'Правовые документы'}
+            </span>
+            <h1 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight mb-3">
+              {isPrivacy ? 'Политика конфиденциальности' : 'Условия обслуживания'}
+            </h1>
+            <p className="text-slate-500 text-sm">
+              Последнее обновление: 23 февраля 2026 г. · Сервис «НаКорте»
+            </p>
+          </div>
+
+          <div className="space-y-8 text-slate-700 leading-relaxed">
+            {isPrivacy ? privacyContent : termsContent}
+          </div>
+
+          <div className="mt-12 pt-8 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <p className="text-slate-400 text-sm">
+              Если у вас есть вопросы — напишите нам через чат поддержки.
+            </p>
+            <button
+              onClick={onBack}
+              className="inline-flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-xl font-semibold text-sm hover:bg-slate-700 transition-colors"
+            >
+              <ChevronLeft size={16} /> Вернуться
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
