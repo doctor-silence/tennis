@@ -5,7 +5,7 @@ const http = require('http');
 const OpenAI = require('openai');
 const bcrypt = require('bcryptjs');
 const pool = require('./db');
-const initDb = require('./initDb');
+// const initDb = require('./initDb');
 const rttParser = require('./rttParser');
 
 const app = express();
@@ -2840,7 +2840,6 @@ app.get('/api/groups/:groupId/members', async (req, res) => {
     }
 });
 
-
 // --- NEWS ROUTES ---
 
 // Ensure news table exists (safety net if initDb was skipped or failed)
@@ -2954,13 +2953,6 @@ app.get('/api/admin/news', async (req, res) => {
 // Start Server and Init DB
 server.listen(PORT, async () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`🔌 Attempting to connect to DB at ${process.env.DB_HOST || 'localhost'}...`);
-    try {
-        await initDb();
-    } catch (err) {
-        // initDb failure must never crash the server — tables likely already exist
-        console.error('⚠️  initDb завершился с ошибкой (сервер продолжает работу):', err.message);
-    }
 });
 
 // --- TOURNAMENT AND GROUPS ROUTES ---
