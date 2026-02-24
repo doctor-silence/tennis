@@ -80,12 +80,13 @@
   <!-- Category Tags -->
   <section class="bg-white border-b border-slate-100 py-4">
     <div class="max-w-7xl mx-auto px-4 sm:px-6">
-      <div class="flex gap-2 overflow-x-auto pb-1">
-        <span class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold bg-slate-900 text-white">Все</span>
-        <span class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold bg-white text-slate-600 border border-slate-200">Турниры</span>
-        <span class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold bg-white text-slate-600 border border-slate-200">Игроки</span>
-        <span class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold bg-white text-slate-600 border border-slate-200">Тренировки</span>
-        <span class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold bg-white text-slate-600 border border-slate-200">Инвентарь</span>
+      <div class="flex gap-2 overflow-x-auto pb-1" id="category-tabs">
+        <button onclick="filterBy('all')" data-cat="all" class="cat-btn flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold bg-slate-900 text-white">Все</button>
+        <button onclick="filterBy('tournament')" data-cat="tournament" class="cat-btn flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold bg-white text-slate-600 border border-slate-200">Турниры</button>
+        <button onclick="filterBy('player')" data-cat="player" class="cat-btn flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold bg-white text-slate-600 border border-slate-200">Игроки</button>
+        <button onclick="filterBy('training')" data-cat="training" class="cat-btn flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold bg-white text-slate-600 border border-slate-200">Тренировки</button>
+        <button onclick="filterBy('equipment')" data-cat="equipment" class="cat-btn flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold bg-white text-slate-600 border border-slate-200">Инвентарь</button>
+        <button onclick="filterBy('general')" data-cat="general" class="cat-btn flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold bg-white text-slate-600 border border-slate-200">Общее</button>
       </div>
     </div>
   </section>
@@ -93,86 +94,22 @@
   <!-- Articles Grid -->
   <main class="max-w-7xl mx-auto px-4 sm:px-6 py-12">
 
-    <!-- Featured -->
-    <div class="relative rounded-3xl overflow-hidden mb-10 h-80 lg:h-[480px] group cursor-pointer" onclick="window.location.href='/'">
-      <img
-        src="https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1600&auto=format&fit=crop"
-        alt="Открытие нового теннисного сезона в России"
-        class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-      />
-      <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent"></div>
-      <div class="absolute bottom-0 left-0 right-0 p-6 lg:p-10">
-        <span class="inline-block bg-amber-400 text-slate-900 text-xs font-bold px-3 py-1 rounded-full mb-3">Турниры</span>
-        <h2 class="text-white text-2xl lg:text-4xl font-black leading-tight mb-3 max-w-3xl">
-          Открытие теннисного сезона 2026: главные турниры и фавориты
-        </h2>
-        <p class="text-slate-300 text-sm lg:text-base mb-4 max-w-2xl line-clamp-2">
-          Новый сезон РТТ стартует с серии региональных турниров. Разбираем расписание и называем главных претендентов на победу.
-        </p>
-        <div class="flex items-center gap-4 text-slate-400 text-xs">
-          <span>Редакция НаКорте</span>
-          <span>·</span>
-          <span>23 февраля 2026</span>
-          <span>·</span>
-          <span>5 мин. чтения</span>
-        </div>
-      </div>
+    <!-- Loading state -->
+    <div id="news-loading" class="flex items-center justify-center h-64 text-slate-400">
+      <svg class="animate-spin mr-3" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+      Загружаем новости...
     </div>
 
-    <!-- Grid -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-
-      <article class="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onclick="window.location.href='/'">
-        <div class="h-44 overflow-hidden">
-          <img src="https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=800&auto=format&fit=crop" alt="AI тренер в теннисе" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-        </div>
-        <div class="p-4">
-          <span class="inline-block bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-200 mb-2">Игроки</span>
-          <h3 class="font-bold text-slate-900 leading-tight mb-1.5 group-hover:text-lime-600 transition-colors line-clamp-2">
-            Как AI-тренер помогает любителям прогрессировать быстрее профессионалов
-          </h3>
-          <p class="text-slate-500 text-sm line-clamp-2 mb-3">Технологии машинного обучения добрались до любительского тенниса. Разбираем, как работает персональный AI-коуч.</p>
-          <div class="flex items-center justify-between text-slate-400 text-xs">
-            <span>18 февраля 2026</span>
-            <span>4 780 просмотров</span>
-          </div>
-        </div>
-      </article>
-
-      <article class="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onclick="window.location.href='/'">
-        <div class="h-44 overflow-hidden">
-          <img src="https://images.unsplash.com/photo-1542144582-1ba00456b5e3?q=80&w=800&auto=format&fit=crop" alt="Бронирование кортов" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-        </div>
-        <div class="p-4">
-          <span class="inline-block bg-lime-100 text-lime-700 text-xs font-bold px-2 py-0.5 rounded-full border border-lime-200 mb-2">Тренировки</span>
-          <h3 class="font-bold text-slate-900 leading-tight mb-1.5 group-hover:text-lime-600 transition-colors line-clamp-2">
-            5 упражнений для улучшения первой подачи: советы тренеров РТТ
-          </h3>
-          <p class="text-slate-500 text-sm line-clamp-2 mb-3">Профессиональные тренеры делятся проверенными упражнениями для отработки стабильной подачи.</p>
-          <div class="flex items-center justify-between text-slate-400 text-xs">
-            <span>10 января 2026</span>
-            <span>3 210 просмотров</span>
-          </div>
-        </div>
-      </article>
-
-      <article class="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onclick="window.location.href='/'">
-        <div class="h-44 overflow-hidden">
-          <img src="https://images.unsplash.com/photo-1617083934555-52951271b273?q=80&w=800&auto=format&fit=crop" alt="Теннисные ракетки 2026" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-        </div>
-        <div class="p-4">
-          <span class="inline-block bg-purple-100 text-purple-700 text-xs font-bold px-2 py-0.5 rounded-full border border-purple-200 mb-2">Инвентарь</span>
-          <h3 class="font-bold text-slate-900 leading-tight mb-1.5 group-hover:text-lime-600 transition-colors line-clamp-2">
-            Лучшие ракетки 2026 года: рейтинг по отзывам игроков НаКорте
-          </h3>
-          <p class="text-slate-500 text-sm line-clamp-2 mb-3">Собрали рейтинг ракеток на основе реальных отзывов тысяч игроков нашей платформы.</p>
-          <div class="flex items-center justify-between text-slate-400 text-xs">
-            <span>5 января 2026</span>
-            <span>6 120 просмотров</span>
-          </div>
-        </div>
-      </article>
-
+    <!-- Dynamic content -->
+    <div id="news-content" class="hidden">
+      <!-- Featured -->
+      <div id="news-featured" class="relative rounded-3xl overflow-hidden mb-10 h-80 lg:h-[480px] group cursor-pointer"></div>
+      <!-- Grid -->
+      <div id="news-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+      <!-- Empty state -->
+      <div id="news-empty" class="hidden flex-col items-center justify-center h-48 text-slate-400 text-center">
+        <p class="text-lg font-medium">Новостей не найдено</p>
+      </div>
     </div>
 
     <!-- CTA -->
@@ -185,6 +122,122 @@
     </div>
 
   </main>
+
+  <script>
+    const CATEGORY_LABELS = {
+      tournament: 'Турниры', player: 'Игроки', training: 'Тренировки',
+      equipment: 'Инвентарь', general: 'Общее'
+    };
+    const CATEGORY_COLORS = {
+      tournament: 'bg-amber-100 text-amber-700 border-amber-200',
+      player:     'bg-blue-100 text-blue-700 border-blue-200',
+      training:   'bg-lime-100 text-lime-700 border-lime-200',
+      equipment:  'bg-purple-100 text-purple-700 border-purple-200',
+      general:    'bg-slate-100 text-slate-600 border-slate-200',
+    };
+
+    let allArticles = [];
+    let activeCategory = 'all';
+
+    function formatDate(str) {
+      return new Date(str).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+    }
+
+    function categoryBadge(cat) {
+      const color = CATEGORY_COLORS[cat] || 'bg-slate-100 text-slate-600 border-slate-200';
+      const label = CATEGORY_LABELS[cat] || cat;
+      return `<span class="inline-block text-xs font-bold px-2.5 py-1 rounded-full border ${color}">${label}</span>`;
+    }
+
+    function renderFeatured(article) {
+      const el = document.getElementById('news-featured');
+      el.innerHTML = `
+        <img src="${article.image}" alt="${article.title}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" onerror="this.src='https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=1600&auto=format&fit=crop'"/>
+        <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent"></div>
+        <div class="absolute bottom-0 left-0 right-0 p-6 lg:p-10">
+          ${categoryBadge(article.category)}
+          <h2 class="text-white text-2xl lg:text-4xl font-black leading-tight mt-2 mb-3 max-w-3xl group-hover:text-lime-300 transition-colors">${article.title}</h2>
+          <p class="text-slate-300 text-sm lg:text-base mb-4 max-w-2xl line-clamp-2">${article.summary || ''}</p>
+          <div class="flex items-center gap-4 text-slate-400 text-xs">
+            <span>${article.author || 'Редакция НаКорте'}</span>
+            <span>·</span>
+            <span>${formatDate(article.published_at)}</span>
+            ${article.views ? `<span>·</span><span>${article.views.toLocaleString('ru-RU')} просмотров</span>` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderGrid(articles) {
+      const grid = document.getElementById('news-grid');
+      grid.innerHTML = articles.map(a => `
+        <article class="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group">
+          <div class="h-44 overflow-hidden">
+            <img src="${a.image}" alt="${a.title}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" onerror="this.src='https://images.unsplash.com/photo-1554068865-24cecd4e34b8?q=80&w=800&auto=format&fit=crop'"/>
+          </div>
+          <div class="p-4">
+            ${categoryBadge(a.category)}
+            <h3 class="font-bold text-slate-900 leading-tight mt-1.5 mb-1 group-hover:text-lime-600 transition-colors line-clamp-2">${a.title}</h3>
+            <p class="text-slate-500 text-sm line-clamp-2 mb-3">${a.summary || ''}</p>
+            <div class="flex items-center justify-between text-slate-400 text-xs">
+              <span>${formatDate(a.published_at)}</span>
+              ${a.views ? `<span>${a.views.toLocaleString('ru-RU')} просмотров</span>` : ''}
+            </div>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function render(articles) {
+      const content = document.getElementById('news-content');
+      const empty = document.getElementById('news-empty');
+      const featured = document.getElementById('news-featured');
+      const grid = document.getElementById('news-grid');
+
+      if (!articles.length) {
+        featured.classList.add('hidden');
+        grid.classList.add('hidden');
+        empty.classList.remove('hidden');
+        empty.classList.add('flex');
+      } else {
+        empty.classList.add('hidden');
+        featured.classList.remove('hidden');
+        grid.classList.remove('hidden');
+        renderFeatured(articles[0]);
+        renderGrid(articles.slice(1));
+      }
+      content.classList.remove('hidden');
+    }
+
+    function filterBy(cat) {
+      activeCategory = cat;
+      // Update tab styles
+      document.querySelectorAll('.cat-btn').forEach(btn => {
+        const active = btn.dataset.cat === cat;
+        btn.className = `cat-btn flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold ${
+          active ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border border-slate-200'
+        }`;
+      });
+      const filtered = cat === 'all' ? allArticles : allArticles.filter(a => a.category === cat);
+      render(filtered);
+    }
+
+    // Fetch real news from API
+    // На локальной разработке бэкенд на 3001, на проде — относительный /api
+    const API_BASE = window.location.hostname === 'localhost'
+      ? 'http://localhost:3001/api'
+      : '/api';
+    fetch(`${API_BASE}/news`)
+      .then(r => r.json())
+      .then(data => {
+        allArticles = Array.isArray(data) ? data : (data.articles || []);
+        document.getElementById('news-loading').classList.add('hidden');
+        render(allArticles);
+      })
+      .catch(() => {
+        document.getElementById('news-loading').textContent = 'Не удалось загрузить новости.';
+      });
+  </script>
 
   <!-- Footer -->
   <footer class="bg-white border-t border-slate-200 py-10 mt-8">
