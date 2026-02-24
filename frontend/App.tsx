@@ -664,7 +664,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
 
              {/* Feature 2: PRO */}
              <div className="rounded-[2rem] p-10 relative overflow-hidden group cursor-pointer bg-gradient-to-br from-lime-400 to-emerald-500 hover:shadow-2xl hover:shadow-lime-400/30 transition-all duration-500 hover:-translate-y-1"
-               style={{minHeight: '320px'}} onClick={() => onNavigate('rtt-info')}>
+               style={{minHeight: '320px'}} onClick={() => window.location.href = '/rtt/'}>
                 <div className="absolute -right-8 -bottom-8 opacity-20 group-hover:opacity-40 group-hover:scale-110 transition-all duration-700">
                   <Trophy size={180} />
                 </div>
