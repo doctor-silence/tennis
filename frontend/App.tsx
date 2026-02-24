@@ -52,6 +52,19 @@ const App = () => {
         } else {
           setView('dashboard');
         }
+      } else {
+        // Check URL parameters for auth routing
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('auth') === 'register') {
+          setAuthInitialMode('register');
+          setView('auth');
+          // Clean up URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (params.get('auth') === 'login') {
+          setAuthInitialMode('login');
+          setView('auth');
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
       }
     } catch (error) {
       console.error("Failed to parse user from localStorage", error);
