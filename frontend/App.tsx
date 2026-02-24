@@ -120,6 +120,10 @@ const App = () => {
         <ProPage onBack={() => handleNavigate('landing')} onSubscribe={() => handleAuthNavigate('register')} />
       )}
 
+      {view === 'rtt-info' && (
+        <RttInfoPage onBack={() => handleNavigate('landing')} onRegister={() => handleAuthNavigate('register')} />
+      )}
+
       {view === 'shop' && (
         <Shop onBack={() => handleNavigate('landing')} />
       )}
@@ -660,7 +664,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
 
              {/* Feature 2: PRO */}
              <div className="rounded-[2rem] p-10 relative overflow-hidden group cursor-pointer bg-gradient-to-br from-lime-400 to-emerald-500 hover:shadow-2xl hover:shadow-lime-400/30 transition-all duration-500 hover:-translate-y-1"
-               style={{minHeight: '320px'}} onClick={() => onNavigate('pro')}>
+               style={{minHeight: '320px'}} onClick={() => onNavigate('rtt-info')}>
                 <div className="absolute -right-8 -bottom-8 opacity-20 group-hover:opacity-40 group-hover:scale-110 transition-all duration-700">
                   <Trophy size={180} />
                 </div>
@@ -853,7 +857,205 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
   );
 };
 
-// ... ProPage and AuthPage components (same as before) ...
+const RttInfoPage = ({ onBack, onRegister }: { onBack: () => void, onRegister: () => void }) => {
+  const [scrolled, setScrolled] = React.useState(false);
+  React.useEffect(() => {
+    const el = document.getElementById('rtt-scroll-container');
+    if (!el) return;
+    const onScroll = () => setScrolled(el.scrollTop > 30);
+    el.addEventListener('scroll', onScroll);
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+  return (
+    <div id="rtt-scroll-container" className="bg-slate-900 h-screen text-white relative overflow-y-auto overflow-x-hidden">
+      {/* Sticky Header */}
+      <header className={`sticky top-0 w-full z-50 transition-all duration-300 ${scrolled ? 'bg-slate-900/95 backdrop-blur-md border-b border-white/10 shadow-xl' : 'bg-transparent border-transparent'}`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-2 cursor-pointer group" onClick={onBack}>
+            <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+              <div className="w-4 h-4 rounded-full bg-lime-400"></div>
+            </div>
+            <span className="text-2xl font-black uppercase tracking-wider text-white">
+              НА<span className="text-3xl">К</span>орте
+            </span>
+          </div>
+          <nav className="hidden md:flex items-center gap-8 text-sm font-bold uppercase tracking-wider text-slate-300">
+            <a href="/news/" className="hover:text-white transition-colors">Новости</a>
+            <a href="/shop/" className="hover:text-white transition-colors">Магазин</a>
+            <a href="/pro/" className="hover:text-white transition-colors flex items-center gap-1">PRO <Crown size={14} className="mb-1 text-amber-400"/></a>
+          </nav>
+          <div className="flex items-center gap-4">
+            <button onClick={onRegister} className="font-bold hover:text-lime-400 transition-colors text-sm text-white">Войти</button>
+            <Button onClick={onRegister} size="sm">Регистрация</Button>
+          </div>
+        </div>
+      </header>
+      
+      <div className="pt-20 pb-20 text-center relative overflow-hidden" style={{ perspective: '1000px' }}>
+         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-lime-400/20 rounded-full blur-[120px] pointer-events-none"></div>
+         
+         {/* 3D Floating Elements */}
+         <div className="absolute top-32 left-[10%] animate-[bounce_6s_infinite] opacity-60 hidden md:block" 
+              style={{ transform: 'rotateY(30deg) rotateX(20deg) translateZ(50px)', transformStyle: 'preserve-3d' }}>
+            <div className="w-24 h-24 bg-gradient-to-br from-lime-400 to-emerald-500 rounded-2xl shadow-[0_20px_50px_rgba(163,230,53,0.4)] flex items-center justify-center border border-white/20 backdrop-blur-sm">
+               <ShieldCheck size={48} className="text-slate-900 drop-shadow-md" style={{ transform: 'translateZ(20px)' }} />
+            </div>
+         </div>
+         
+         <div className="absolute bottom-10 right-[10%] animate-[bounce_7s_infinite_1s] opacity-60 hidden md:block" 
+              style={{ transform: 'rotateY(-25deg) rotateX(-15deg) translateZ(80px)', transformStyle: 'preserve-3d' }}>
+            <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full shadow-[0_20px_50px_rgba(59,130,246,0.4)] flex items-center justify-center border border-white/20 backdrop-blur-sm">
+               <Trophy size={60} className="text-white drop-shadow-lg" style={{ transform: 'translateZ(30px)' }} />
+            </div>
+         </div>
+
+         <div className="absolute top-40 right-[20%] animate-[bounce_5s_infinite_0.5s] opacity-40 hidden md:block" 
+              style={{ transform: 'rotateY(-40deg) rotateX(30deg) translateZ(20px)', transformStyle: 'preserve-3d' }}>
+            <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl shadow-[0_15px_30px_rgba(245,158,11,0.3)] flex items-center justify-center border border-white/20">
+               <Star size={32} className="text-white drop-shadow-md" style={{ transform: 'translateZ(15px)' }} />
+            </div>
+         </div>
+
+         <div className="relative z-10 max-w-4xl mx-auto px-4 animate-fade-in-up" style={{ transform: 'translateZ(100px)' }}>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-lime-400/30 bg-lime-400/10 text-lime-400 text-xs font-bold uppercase tracking-wider mb-6 shadow-[0_0_20px_rgba(163,230,53,0.2)]">
+               <ShieldCheck size={14} /> Верификация профиля
+            </div>
+            <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6 drop-shadow-2xl">
+               СТАТУС <span className="text-lime-400 inline-block hover:scale-105 transition-transform cursor-default" style={{ textShadow: '0 0 30px rgba(163,230,53,0.5)' }}>ПРОФЕССИОНАЛА РТТ</span>
+            </h1>
+            <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-10 drop-shadow-md">
+               Привяжите свой номер РТТ, чтобы получить официальную галочку верификации, загрузить свою статистику и открыть новые возможности.
+            </p>
+         </div>
+      </div>
+
+      <div className="max-w-5xl mx-auto px-4 pb-24 relative z-20">
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
+            
+            {/* Steps */}
+            <div className="space-y-8 perspective-1000">
+               <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
+                  <span className="bg-slate-800 p-2 rounded-lg shadow-inner"><ListOrdered size={28} className="text-lime-400" /></span>
+                  Как подключить?
+               </h2>
+               
+               <div className="flex gap-4 group hover:-translate-y-1 transition-transform duration-300 bg-white/5 p-4 rounded-2xl border border-white/5 hover:border-lime-400/30 hover:shadow-[0_10px_30px_rgba(163,230,53,0.1)]">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-lime-400 to-emerald-500 text-slate-900 flex items-center justify-center font-bold text-xl shrink-0 shadow-lg group-hover:scale-110 transition-transform">1</div>
+                  <div>
+                     <h3 className="text-xl font-bold mb-2 text-white group-hover:text-lime-400 transition-colors">Зарегистрируйтесь</h3>
+                     <p className="text-slate-400">При создании аккаунта в приложении НаКОрте укажите ваш действующий регистрационный номер игрока (РНИ) в системе Российского Теннисного Тура.</p>
+                  </div>
+               </div>
+               
+               <div className="flex gap-4 group hover:-translate-y-1 transition-transform duration-300 bg-white/5 p-4 rounded-2xl border border-white/5 hover:border-lime-400/30 hover:shadow-[0_10px_30px_rgba(163,230,53,0.1)]">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-lime-400 to-emerald-500 text-slate-900 flex items-center justify-center font-bold text-xl shrink-0 shadow-lg group-hover:scale-110 transition-transform">2</div>
+                  <div>
+                     <h3 className="text-xl font-bold mb-2 text-white group-hover:text-lime-400 transition-colors">Автоматическая проверка</h3>
+                     <p className="text-slate-400">Наша система свяжется с базой данных ФТР и автоматически подтянет вашу статистику, рейтинг и историю матчей.</p>
+                  </div>
+               </div>
+            </div>
+
+            {/* Benefits - 3D Card */}
+            <div className="relative group" style={{ perspective: '1000px' }}>
+               <div className="bg-slate-800/80 border border-white/10 rounded-3xl p-8 backdrop-blur-xl transition-all duration-500 group-hover:shadow-[0_30px_60px_rgba(163,230,53,0.15)] group-hover:-translate-y-2" 
+                    style={{ 
+                       transformStyle: 'preserve-3d',
+                       boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.1), 0 20px 40px rgba(0,0,0,0.5)'
+                    }}
+                    onMouseMove={(e) => {
+                       const rect = e.currentTarget.getBoundingClientRect();
+                       const x = e.clientX - rect.left;
+                       const y = e.clientY - rect.top;
+                       const centerX = rect.width / 2;
+                       const centerY = rect.height / 2;
+                       const rotateX = ((y - centerY) / centerY) * -10;
+                       const rotateY = ((x - centerX) / centerX) * 10;
+                       e.currentTarget.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-10px)`;
+                    }}
+                    onMouseLeave={(e) => {
+                       e.currentTarget.style.transform = 'rotateX(0deg) rotateY(0deg) translateY(0px)';
+                    }}
+               >
+                  <div style={{ transform: 'translateZ(40px)' }}>
+                     <h2 className="text-2xl font-bold mb-8 flex items-center gap-3">
+                        <Crown size={28} className="text-amber-400" />
+                        Преимущества статуса
+                     </h2>
+                     <ul className="space-y-6">
+                        <li className="flex items-start gap-4 group/item">
+                           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-white flex items-center justify-center shrink-0 mt-1 shadow-lg group-hover/item:scale-110 transition-transform">
+                              <ShieldCheck size={24} />
+                           </div>
+                           <div>
+                              <h4 className="font-bold text-lg text-white">Галочка верификации</h4>
+                              <p className="text-slate-400 text-sm mt-1">Официальное подтверждение вашей личности и статуса действующего спортсмена.</p>
+                           </div>
+                        </li>
+                        <li className="flex items-start gap-4 group/item">
+                           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 text-white flex items-center justify-center shrink-0 mt-1 shadow-lg group-hover/item:scale-110 transition-transform">
+                              <BarChart3 size={24} />
+                           </div>
+                           <div>
+                              <h4 className="font-bold text-lg text-white">Официальная статистика</h4>
+                              <p className="text-slate-400 text-sm mt-1">Ваш рейтинг, очки и история матчей РТТ автоматически отображаются в профиле.</p>
+                           </div>
+                        </li>
+                        <li className="flex items-start gap-4 group/item">
+                           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-400 to-purple-600 text-white flex items-center justify-center shrink-0 mt-1 shadow-lg group-hover/item:scale-110 transition-transform">
+                              <Users size={24} />
+                           </div>
+                           <div>
+                              <h4 className="font-bold text-lg text-white">Доверие партнеров</h4>
+                              <p className="text-slate-400 text-sm mt-1">Легче находить сильных спарринг-партнеров, которые видят ваш реальный уровень игры.</p>
+                           </div>
+                        </li>
+                     </ul>
+                     
+                     <div className="mt-10" style={{ transform: 'translateZ(20px)' }}>
+                        <Button onClick={onRegister} className="w-full bg-gradient-to-r from-lime-400 to-emerald-500 text-slate-900 hover:from-lime-300 hover:to-emerald-400 py-4 text-lg font-bold shadow-[0_10px_20px_rgba(163,230,53,0.3)] hover:shadow-[0_15px_30px_rgba(163,230,53,0.4)] transition-all hover:-translate-y-1 border-none">
+                           Зарегистрироваться и подключить
+                        </Button>
+                     </div>
+                  </div>
+               </div>
+            </div>
+         </div>
+      </div>
+
+      {/* SEO Block */}
+      <div className="border-t border-white/10 bg-slate-950/60 backdrop-blur-sm">
+        <div className="max-w-5xl mx-auto px-4 py-16">
+          <h2 className="text-2xl font-bold mb-4 text-white">Верификация по номеру РТТ — как это работает</h2>
+          <p className="text-slate-400 mb-6 leading-relaxed">
+            РТТ (Российский Теннисный Тур) — официальная система рейтингования любительских и профессиональных теннисистов в России, управляемая Федерацией Тенниса России (ФТР). Каждый игрок, участвующий в турнирах РТТ, получает уникальный регистрационный номер игрока (РНИ), а также рейтинг по очкам классификации.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
+              <h3 className="font-bold text-lg mb-2 text-lime-400">Что такое РНИ?</h3>
+              <p className="text-slate-400 text-sm leading-relaxed">Регистрационный номер игрока (РНИ) — уникальный идентификатор в базе данных ФТР. Он присваивается при первой официальной регистрации на турнир РТТ.</p>
+            </div>
+            <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
+              <h3 className="font-bold text-lg mb-2 text-lime-400">Где найти свой номер?</h3>
+              <p className="text-slate-400 text-sm leading-relaxed">Ваш РНИ указан в личном кабинете на сайте tennisrating.ru, в карточке участника, а также в протоколах прошедших турниров.</p>
+            </div>
+            <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
+              <h3 className="font-bold text-lg mb-2 text-lime-400">Категории РТТ</h3>
+              <p className="text-slate-400 text-sm leading-relaxed">Игроки разделяются по возрастным и рейтинговым категориям: мужчины, женщины, юниоры. Рейтинг обновляется после каждого официального турнира.</p>
+            </div>
+          </div>
+          <div className="bg-lime-400/5 border border-lime-400/20 rounded-2xl p-6">
+            <h3 className="font-bold text-lg mb-2 text-white">Почему это важно для НаКОрте?</h3>
+            <p className="text-slate-400 text-sm leading-relaxed">
+              Верификация через номер РТТ позволяет нам гарантировать достоверность данных игрока: его реальный уровень, количество сыгранных матчей и положение в рейтинге. Это делает сообщество НаКОрте честным и прозрачным — вы всегда знаете, с кем выходите на корт.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ProPage = ({ onBack, onSubscribe }: { onBack: () => void, onSubscribe: () => void }) => {
   return (
     <div className="bg-slate-900 min-h-screen text-white relative" style={{overflow: 'hidden', maxHeight: '100vh'}}>
