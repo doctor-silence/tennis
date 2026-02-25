@@ -895,8 +895,19 @@ app.delete('/api/products/:id', async (req, res) => {
 // New route to get unique cities
 app.get('/api/cities', async (req, res) => {
     try {
+        const defaultCities = [
+            'Москва', 'Санкт-Петербург', 'Новосибирск', 'Екатеринбург', 'Казань',
+            'Нижний Новгород', 'Челябинск', 'Самара', 'Уфа', 'Ростов-на-Дону',
+            'Краснодар', 'Пермь', 'Воронеж', 'Волгоград', 'Красноярск',
+            'Саратов', 'Тюмень', 'Тольятти', 'Ижевск', 'Барнаул',
+            'Иркутск', 'Ульяновск', 'Хабаровск', 'Ярославль', 'Владивосток',
+            'Махачкала', 'Томск', 'Оренбург', 'Кемерово', 'Рязань',
+            'Подольск', 'Балашиха', 'Химки', 'Мытищи', 'Люберцы', 'Сочи'
+        ];
         const result = await pool.query('SELECT DISTINCT city FROM users WHERE city IS NOT NULL AND city != \'\' ORDER BY city');
-        res.json(result.rows.map(row => row.city));
+        const dbCities = result.rows.map(row => row.city);
+        const merged = [...new Set([...dbCities, ...defaultCities])].sort((a, b) => a.localeCompare(b, 'ru'));
+        res.json(merged);
     } catch (err) {
         console.error("Fetch Cities Error:", err);
         res.status(500).json({ error: 'Failed to fetch cities' });
