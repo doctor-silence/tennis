@@ -5,6 +5,7 @@ import Button from './components/Button';
 import Shop from './components/Shop';
 import AdminPanel from './components/AdminPanel';
 import SupportChatWidget from './components/SupportChatWidget'; // Import the new component
+import TrainerCRMPage from './components/TrainerCRMPage';
 import { api } from './services/api';
 import { 
   ArrowRight, 
@@ -135,6 +136,10 @@ const App = () => {
 
       {view === 'rtt-info' && (
         <RttInfoPage onBack={() => handleNavigate('landing')} onRegister={() => handleAuthNavigate('register')} />
+      )}
+
+      {view === 'crm-info' && (
+        <TrainerCRMPage onBack={() => handleNavigate('landing')} onRegister={() => handleAuthNavigate('register')} />
       )}
 
       {view === 'shop' && (
@@ -372,6 +377,7 @@ const NewsPage = ({ onBack, onLogin, onRegister, onNavigate }: { onBack: () => v
             </div>
 
             <div className="pb-16 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
+                {console.log('NewsPage render - selected:', selected)}
                 {selected ? (
                     // --- Article Detail ---
                     <div className="max-w-3xl mx-auto animate-fade-in-up">
@@ -461,10 +467,10 @@ const NewsPage = ({ onBack, onLogin, onRegister, onNavigate }: { onBack: () => v
                             <div className="space-y-6">
                                 {/* Featured */}
                                 {featured && (
-                                    <div className="relative rounded-2xl overflow-hidden cursor-pointer group h-80 lg:h-96" onClick={() => setSelected(featured)}>
-                                        <img src={featured.image} alt={featured.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-                                        <div className="absolute bottom-0 left-0 right-0 p-6">
+                                    <div className="relative rounded-2xl overflow-hidden cursor-pointer group h-80 lg:h-96" onClick={() => { console.log('Featured clicked:', featured); setSelected(featured); }}>
+                                        <img src={featured.image} alt={featured.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 pointer-events-none" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
+                                        <div className="absolute bottom-0 left-0 right-0 p-6 pointer-events-none">
                                             <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border mb-3 ${CATEGORY_COLORS_PAGE[featured.category] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                                                 {CATEGORY_LABELS_PAGE[featured.category] || featured.category}
                                             </span>
@@ -483,11 +489,11 @@ const NewsPage = ({ onBack, onLogin, onRegister, onNavigate }: { onBack: () => v
                                 {rest.length > 0 && (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                         {rest.map(article => (
-                                            <div key={article.id} className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onClick={() => setSelected(article)}>
-                                                <div className="h-44 overflow-hidden">
+                                            <div key={article.id} className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onClick={() => { console.log('Article clicked:', article); setSelected(article); }}>
+                                                <div className="h-44 overflow-hidden pointer-events-none">
                                                     <img src={article.image} alt={article.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                                                 </div>
-                                                <div className="p-4">
+                                                <div className="p-4 pointer-events-none">
                                                     <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2 py-0.5 rounded-full border mb-2 ${CATEGORY_COLORS_PAGE[article.category] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                                                         {CATEGORY_LABELS_PAGE[article.category] || article.category}
                                                     </span>
@@ -544,7 +550,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
         
         {/* Background Texture */}
         <div className="absolute inset-0 z-0 opacity-20" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM36 0V4h-2V0h-4v2h4v4h2V2h4V0h-4zM0 34v-4h4v4h2v-2H4v-4H2v4H0zM0 0h4v4H2v2H0V2H4V0H0z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
         }}></div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-2 gap-12 items-center">
@@ -806,6 +812,12 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                   </div>
                   <h3 className="text-2xl font-bold mb-3 text-slate-900 tracking-tight">CRM для тренеров</h3>
                   <p className="text-slate-500 text-sm leading-relaxed">Полный инструментарий для профессиональных тренеров: управление учениками, расписание тренировок, статистика прогресса каждого игрока и организация собственных турниров.</p>
+                  <div
+                    className="mt-6 inline-flex items-center text-amber-600 font-bold text-sm gap-1 cursor-pointer hover:gap-2 transition-all"
+                    onClick={() => onNavigate('crm-info')}
+                  >
+                    Подробнее <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform"/>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {[
@@ -943,7 +955,7 @@ const RttInfoPage = ({ onBack, onRegister }: { onBack: () => void, onRegister: (
       </div>
 
       <div className="max-w-5xl mx-auto px-4 pb-24 relative z-20">
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
             
             {/* Steps */}
             <div className="space-y-8 perspective-1000">
@@ -1217,7 +1229,7 @@ const ProPage = ({ onBack, onSubscribe }: { onBack: () => void, onSubscribe: () 
   );
 };
 
-// ... AuthPage (same as before) ...
+// --- AuthPage (same as before) ...
 const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { onBack: () => void, onComplete: (user: User) => void, initialMode?: 'login' | 'register', onNavigate: (v: ViewState) => void }) => {
   const [authMode, setAuthMode] = useState<'login' | 'register'>(initialMode);
   const [registerStep, setRegisterStep] = useState<1 | 2>(1);
