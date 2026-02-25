@@ -27,7 +27,9 @@ import {
     ExternalLink,
     Newspaper,
     Eye,
-    EyeOff
+    EyeOff,
+    Loader2,
+    RefreshCw
 } from 'lucide-react';
 import AdminTournamentsView from './dashboard/AdminTournamentsView';
 import AdminSupportChat from './dashboard/AdminSupportChat';
@@ -105,7 +107,42 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [editingNews, setEditingNews] = useState<Partial<NewsArticle> | null>(null);
     
     // User Edit State
-    const [editingUser, setEditingUser] = useState<(Partial<User> & { password?: string }) | null>(null);
+    const [editingUser, setEditingUser] = useState<(Partial<User> & { password?: string, rni?: string }) | null>(null);
+    const [rttFetching, setRttFetching] = useState(false);
+    const [rttFetchResult, setRttFetchResult] = useState<{ok: boolean; msg: string} | null>(null);
+
+    const handleFetchRtt = async () => {
+        if (!editingUser?.rni) return;
+        setRttFetching(true);
+        setRttFetchResult(null);
+        try {
+            const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001/api' : '/api';
+            const res = await fetch(`${API_URL}/rtt/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rni: editingUser.rni })
+            });
+            const data = await res.json();
+            if (data.success && data.data) {
+                const d = data.data;
+                setEditingUser(prev => ({
+                    ...prev!,
+                    role: 'rtt_pro',
+                    rating: d.points ?? prev!.rating,
+                    rttRank: d.rank ?? prev!.rttRank,
+                    rttCategory: d.category ?? prev!.rttCategory,
+                    level: d.points ? `РТТ ${d.points} очков` : prev!.level,
+                }));
+                setRttFetchResult({ ok: true, msg: `✓ ${d.name} — ${d.points ?? '?'} очков, позиция ${d.rank ?? '?'}` });
+            } else {
+                setRttFetchResult({ ok: false, msg: data.error || 'Игрок не найден' });
+            }
+        } catch {
+            setRttFetchResult({ ok: false, msg: 'Ошибка соединения с сервером' });
+        } finally {
+            setRttFetching(false);
+        }
+    };
 
     // Search Filters
     const [courtSearchName, setCourtSearchName] = useState<string>('');
@@ -642,7 +679,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
                                                     <div className="flex justify-end gap-2">
-                                                        <button onClick={() => { setEditingUser(u); setIsUserModalOpen(true); }} className="p-2 hover:bg-slate-200 rounded-lg text-slate-600"><Edit size={16}/></button>
+                                                        <button onClick={() => { setEditingUser(u); setIsUserModalOpen(true); setRttFetchResult(null); }} className="p-2 hover:bg-slate-200 rounded-lg text-slate-600"><Edit size={16}/></button>
                                                         <button onClick={() => handleDeleteUser(u.id)} className="p-2 hover:bg-red-50 rounded-lg text-red-500"><Trash2 size={16}/></button>
                                                     </div>
                                                 </td>
@@ -1133,6 +1170,35 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         {editingUser.role === 'rtt_pro' && (
                             <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 space-y-3">
                                 <div className="text-xs font-bold text-amber-700 uppercase mb-2">Настройки РТТ</div>
+
+                                {/* РНИ + кнопка */}
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Номер РНИ (РТТ)</label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            placeholder="Например: 12345"
+                                            className="flex-1 bg-white border border-amber-200 rounded-lg px-3 py-2 outline-none focus:border-amber-400 font-mono"
+                                            value={editingUser.rni || ''}
+                                            onChange={e => { setEditingUser({...editingUser, rni: e.target.value}); setRttFetchResult(null); }}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleFetchRtt}
+                                            disabled={rttFetching || !editingUser.rni}
+                                            className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors whitespace-nowrap"
+                                        >
+                                            {rttFetching ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                                            Подтянуть
+                                        </button>
+                                    </div>
+                                    {rttFetchResult && (
+                                        <p className={`text-xs font-medium mt-1 ${rttFetchResult.ok ? 'text-emerald-600' : 'text-red-500'}`}>
+                                            {rttFetchResult.msg}
+                                        </p>
+                                    )}
+                                </div>
+
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-bold text-slate-500 uppercase">Возрастная категория</label>
                                     <select className="w-full bg-white border border-amber-200 rounded-lg px-3 py-2 outline-none" value={editingUser.rttCategory || 'Взрослые'} onChange={e => setEditingUser({...editingUser, rttCategory: e.target.value})}>

@@ -59,12 +59,12 @@ class RTTParser {
       const rniMatch = pageText.match(/РНИ:\s*(\d+)/);
       const playerRNI = rniMatch ? rniMatch[1] : rni;
 
-      // Очки РТТ
-      const pointsMatch = pageText.match(/Очки РТТ:\s*(\d+)/);
+      // Очки РТТ (одиночный разряд)
+      const pointsMatch = pageText.match(/Одиночный\s+Очки:\s*([\d]+)/);
       const points = pointsMatch ? parseInt(pointsMatch[1]) : 0;
 
-      // Позиция в возрастной группе
-      const rankMatch = pageText.match(/Позиция в своей возрастной группе:\s*(\d+)/);
+      // Позиция (рейтинг) в возрастной группе
+      const rankMatch = pageText.match(/Одиночный[\s\S]*?Рейтинг:\s*([\d]+)/);
       const rank = rankMatch ? parseInt(rankMatch[1]) : 0;
 
       // Возраст

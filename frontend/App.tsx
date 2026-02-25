@@ -814,7 +814,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                   <p className="text-slate-500 text-sm leading-relaxed">Полный инструментарий для профессиональных тренеров: управление учениками, расписание тренировок, статистика прогресса каждого игрока и организация собственных турниров.</p>
                   <div
                     className="mt-6 inline-flex items-center text-amber-600 font-bold text-sm gap-1 cursor-pointer hover:gap-2 transition-all"
-                    onClick={() => onNavigate('crm-info')}
+                    onClick={() => window.location.href = '/crm/'}
                   >
                     Подробнее <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform"/>
                   </div>
