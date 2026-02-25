@@ -16,25 +16,26 @@ const SupportChatWidget: React.FC<SupportChatWidgetProps> = ({ user }) => {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  // Track how many admin messages were seen when chat was last closed/opened
-  const seenAdminCountRef = useRef<number>(-1);
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
 
-  // Background polling — fetch history without opening chat, compare admin message count
+  const storageKey = `support_seen_${user.id}`;
+
+  // Background polling — check for new admin messages
   useEffect(() => {
     if (isOpen) return;
 
     let isActive = true;
     const checkUnread = async () => {
       try {
-        const history = await api.support.getHistory(user.id, SUPPORT_ADMIN_ID);
+        const history = await api.support.getHistory(user.id, SUPPORT_ADMIN_ID, false);
         if (!isActive) return;
         const adminCount = history.filter((m: any) => m.role !== 'user').length;
-        if (seenAdminCountRef.current === -1) {
-          // First check — initialize baseline, no badge
-          seenAdminCountRef.current = adminCount;
-        } else if (adminCount > seenAdminCountRef.current) {
-          setUnreadCount(adminCount - seenAdminCountRef.current);
+        const seen = parseInt(localStorage.getItem(storageKey) || '-1', 10);
+        if (seen === -1) {
+          // First ever visit — save current count as baseline, no badge
+          localStorage.setItem(storageKey, String(adminCount));
+        } else if (adminCount > seen) {
+          setUnreadCount(adminCount - seen);
         }
       } catch {
         // silent
@@ -46,11 +47,10 @@ const SupportChatWidget: React.FC<SupportChatWidgetProps> = ({ user }) => {
     return () => { isActive = false; clearInterval(interval); };
   }, [isOpen, user.id]);
 
-  // Fetch messages periodically when the widget is open
+  // Fetch messages when open, mark as seen
   useEffect(() => {
     if (!isOpen) return;
 
-    // Clear unread when opened
     setUnreadCount(0);
 
     let isActive = true;
@@ -60,9 +60,9 @@ const SupportChatWidget: React.FC<SupportChatWidgetProps> = ({ user }) => {
         const history = await api.support.getHistory(user.id, SUPPORT_ADMIN_ID);
         if (isActive) {
           setMessages(history);
-          // Update baseline so background poller knows current count
+          // Save how many admin messages user has now seen
           const adminCount = history.filter((m: any) => m.role !== 'user').length;
-          seenAdminCountRef.current = adminCount;
+          localStorage.setItem(storageKey, String(adminCount));
         }
       } catch (error) {
         console.error("Failed to fetch support history", error);

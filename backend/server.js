@@ -336,6 +336,7 @@ app.get('/api/support/unread/:userId', async (req, res) => {
 // User or Admin: Get message history for a support conversation
 app.get('/api/support/history/:userId/:partnerId', async (req, res) => {
     const { userId, partnerId } = req.params;
+    const markRead = req.query.markRead !== 'false';
     try {
         const parsedUserId = parseInt(userId, 10);
         const parsedPartnerId = parseInt(partnerId, 10);
@@ -354,11 +355,13 @@ app.get('/api/support/history/:userId/:partnerId', async (req, res) => {
         }
         const conversationId = conversation.rows[0].id;
 
-        // Mark messages as read now that the conversation is being viewed
-        await pool.query(
-            `UPDATE messages SET is_read = TRUE WHERE conversation_id = $1 AND sender_id != $2`,
-            [conversationId, parsedUserId]
-        );
+        // Mark messages as read only when actually viewing the chat
+        if (markRead) {
+            await pool.query(
+                `UPDATE messages SET is_read = TRUE WHERE conversation_id = $1 AND sender_id != $2`,
+                [conversationId, parsedUserId]
+            );
+        }
 
         const messagesResult = await pool.query(
             `SELECT * FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC`,

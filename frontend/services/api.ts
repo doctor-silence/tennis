@@ -577,8 +577,9 @@ export const api = {
             if (!res.ok) throw new Error('Failed to fetch support conversations');
             return await res.json();
         },
-        getHistory: async (userId: string, partnerId: number): Promise<ChatMessage[]> => {
-            const res = await fetch(`${API_URL}/support/history/${userId}/${partnerId}`);
+        getHistory: async (userId: string, partnerId: number, markRead = true): Promise<ChatMessage[]> => {
+            const url = `${API_URL}/support/history/${userId}/${partnerId}${markRead ? '' : '?markRead=false'}`;
+            const res = await fetch(url);
             if (!res.ok) throw new Error('Failed to fetch support history');
             return await res.json();
         },
