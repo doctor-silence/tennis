@@ -16,23 +16,26 @@ const SupportChatWidget: React.FC<SupportChatWidgetProps> = ({ user }) => {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const initializedRef = useRef(false);
+  // Track how many admin messages were seen when chat was last closed/opened
+  const seenAdminCountRef = useRef<number>(-1);
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
 
-  // Background polling for unread messages (even when chat is closed)
+  // Background polling — fetch history without opening chat, compare admin message count
   useEffect(() => {
     if (isOpen) return;
 
     let isActive = true;
     const checkUnread = async () => {
       try {
-        const count = await api.support.getUnreadCount(user.id);
+        const history = await api.support.getHistory(user.id, SUPPORT_ADMIN_ID);
         if (!isActive) return;
-        if (!initializedRef.current) {
-          // First load — just display the real unread count from DB
-          initializedRef.current = true;
+        const adminCount = history.filter((m: any) => m.role !== 'user').length;
+        if (seenAdminCountRef.current === -1) {
+          // First check — initialize baseline, no badge
+          seenAdminCountRef.current = adminCount;
+        } else if (adminCount > seenAdminCountRef.current) {
+          setUnreadCount(adminCount - seenAdminCountRef.current);
         }
-        setUnreadCount(count);
       } catch {
         // silent
       }
@@ -57,13 +60,14 @@ const SupportChatWidget: React.FC<SupportChatWidgetProps> = ({ user }) => {
         const history = await api.support.getHistory(user.id, SUPPORT_ADMIN_ID);
         if (isActive) {
           setMessages(history);
+          // Update baseline so background poller knows current count
+          const adminCount = history.filter((m: any) => m.role !== 'user').length;
+          seenAdminCountRef.current = adminCount;
         }
       } catch (error) {
         console.error("Failed to fetch support history", error);
       } finally {
-        if (isActive) {
-          setLoading(false);
-        }
+        if (isActive) setLoading(false);
       }
     };
 
