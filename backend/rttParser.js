@@ -197,31 +197,33 @@ class RTTParser {
               
               console.log(`  Строка ${i}: ${cells.length} ячеек`);
               
-              if (cells.length >= 5) {
-                // Структура: [Город, Возрастная группа, Дата, Заявок, Средний рейтинг, Название]
+              if (cells.length >= 6) {
+                // Структура: [Город, Возрастная группа, Категория, Дата, Заявок, Средний рейтинг, Название]
                 const city = cells.eq(0).text().trim();
                 const ageGroup = cells.eq(1).text().trim();
-                const date = cells.eq(2).text().trim();
-                const applicationsCount = cells.eq(3).text().trim();
-                const avgRating = cells.eq(4).text().trim();
-                const tournamentName = cells.eq(5).text().trim();
-                const tournamentLink = cells.eq(5).find('a').attr('href');
+                const category = cells.eq(2).text().trim();
+                const date = cells.eq(3).text().trim();
+                const applicationsCount = cells.eq(4).text().trim();
+                const avgRating = cells.eq(5).text().trim();
+                const tournamentName = cells.eq(6).text().trim();
+                const tournamentLink = cells.eq(6).find('a').attr('href');
                 
                 console.log(`    ${city} | ${ageGroup} | ${date} | ${applicationsCount} | ${avgRating} | ${tournamentName}`);
                 
                 // Проверяем, что это не заголовок и есть название турнира
-                if (tournamentName && tournamentName !== 'Название' && tournamentName !== 'НАЗВАНИЕ' && tournamentName.length > 3) {
+                if (tournamentName && tournamentName !== 'Название' && tournamentName !== 'НАЗВАНИЕ' && tournamentName !== 'Средний рейтинг' && tournamentName.length > 3) {
                   tournaments.push({
                     id: tournaments.length,
                     city: city,
                     category: ageGroup,
                     ageGroup: ageGroup,
+                    tournamentCategory: category,
                     date: date,
                     applicationsCount: applicationsCount,
                     avgRating: avgRating,
                     tournament: tournamentName,
                     link: tournamentLink ? `https://rttstat.ru${tournamentLink}` : null,
-                    status: 'accepted' // По умолчанию считаем принятой
+                    status: 'accepted'
                   });
                   console.log(`    ✅ Добавлен турнир: ${tournamentName}`);
                 }

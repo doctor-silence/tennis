@@ -49,7 +49,7 @@ export const RttStatsView = ({ user }: { user: User }) => {
 
     return (
         <>
-            <div className="max-w-6xl mx-auto space-y-6">
+            <div className="space-y-6">
             {/* Header */}
             <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-3xl p-8 text-white">
                 <h1 className="text-3xl font-black mb-2">Статистика РТТ</h1>
