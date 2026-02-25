@@ -383,7 +383,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
                         <div className="text-xs font-bold text-slate-400 uppercase mb-1">{formatDate(nearestTournament.start_date).day} {formatDate(nearestTournament.start_date).month}, {formatDate(nearestTournament.start_date).dayOfWeek}</div>
                         <div className="font-bold text-slate-900">{nearestTournament.name}</div>
-                        <div className="text-sm text-slate-500 mt-1">{nearestTournament.groupName || 'Частный'} • {nearestTournament.category}</div>
+                        <div className="text-sm text-slate-500 mt-1">{nearestTournament.groupName || 'Открытый'} • {nearestTournament.category}</div>
                     </div>
                 ) : (
                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-center text-sm text-slate-500">
@@ -572,7 +572,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
                         </div>
                         <div>
                             <div className="font-bold text-slate-900">{t.name}</div>
-                            <div className="text-xs text-slate-500">{t.groupName || 'Частный'} • {t.category}</div>
+                            <div className="text-xs text-slate-500">{t.groupName || 'Открытый'} • {t.category}</div>
                         </div>
                     </div>
                 </div>

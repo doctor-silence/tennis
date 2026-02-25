@@ -406,7 +406,7 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
                             <button onClick={() => setSelectedTournament(null)} className="p-2 hover:bg-white/10 rounded-xl text-white/50 hover:text-white transition-all shrink-0"><ChevronLeft size={22}/></button>
                             <div className="min-w-0">
                                 <h2 className="text-lg md:text-2xl font-black uppercase italic tracking-tighter truncate">{selectedTournament.name}</h2>
-                                <p className="text-lime-400 text-[10px] font-black uppercase tracking-widest truncate">{selectedTournament.groupName || 'Частный кубок'} • {formatDate(selectedTournament.start_date)} • {selectedTournament.prize_pool}</p>
+                                <p className="text-lime-400 text-[10px] font-black uppercase tracking-widest truncate">{selectedTournament.groupName || 'Открытый'} • {formatDate(selectedTournament.start_date)} • {selectedTournament.prize_pool}</p>
                             </div>
                         </div>
                         <div className="flex gap-2 relative z-10 flex-wrap">

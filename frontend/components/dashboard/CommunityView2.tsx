@@ -878,7 +878,7 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
                                 </div>
                                 <div>
                                     <p className="font-bold text-sm group-hover:text-lime-600 transition-colors">{t.name}</p>
-                                    <p className="text-xs text-slate-500">{t.groupName || 'Частный турнир'}</p>
+                                    <p className="text-xs text-slate-500">{t.groupName || 'Открытый'}</p>
                                 </div>
                             </div>
                         );
@@ -959,7 +959,7 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
                                 </div>
                                 <div>
                                     <p className="font-bold text-sm group-hover:text-lime-600 transition-colors">{t.name}</p>
-                                    <p className="text-xs text-slate-500">{t.groupName || 'Частный турнир'}</p>
+                                    <p className="text-xs text-slate-500">{t.groupName || 'Открытый'}</p>
                                 </div>
                             </div>
                         );
