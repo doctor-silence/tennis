@@ -582,6 +582,12 @@ export const api = {
             if (!res.ok) throw new Error('Failed to fetch support history');
             return await res.json();
         },
+        getUnreadCount: async (userId: string): Promise<number> => {
+            const res = await fetch(`${API_URL}/support/unread/${userId}`);
+            if (!res.ok) return 0;
+            const data = await res.json();
+            return data.unread ?? 0;
+        },
         sendMessage: async (data: { senderId: string, recipientId: number, text: string }): Promise<ChatMessage> => {
             const res = await fetch(`${API_URL}/support/messages`, {
                 method: 'POST',

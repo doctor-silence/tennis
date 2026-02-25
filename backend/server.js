@@ -311,6 +311,28 @@ app.get('/api/support/conversations', async (req, res) => {
     }
 });
 
+// Get unread support message count for a user (without marking as read)
+app.get('/api/support/unread/:userId', async (req, res) => {
+    const { userId } = req.params;
+    try {
+        const parsedUserId = parseInt(userId, 10);
+        if (isNaN(parsedUserId)) return res.status(400).json({ error: 'Invalid user ID' });
+
+        const result = await pool.query(
+            `SELECT COUNT(*) as count FROM messages m
+             JOIN conversations c ON m.conversation_id = c.id
+             WHERE (c.user1_id = $1 OR c.user2_id = $1)
+               AND m.sender_id != $1
+               AND m.is_read = FALSE`,
+            [parsedUserId]
+        );
+        res.json({ unread: parseInt(result.rows[0].count) });
+    } catch (err) {
+        console.error('Error fetching unread support count:', err);
+        res.status(500).json({ error: 'Failed to fetch unread count' });
+    }
+});
+
 // User or Admin: Get message history for a support conversation
 app.get('/api/support/history/:userId/:partnerId', async (req, res) => {
     const { userId, partnerId } = req.params;

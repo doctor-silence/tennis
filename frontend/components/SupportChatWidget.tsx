@@ -15,11 +15,40 @@ const SupportChatWidget: React.FC<SupportChatWidgetProps> = ({ user }) => {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const initializedRef = useRef(false);
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
+
+  // Background polling for unread messages (even when chat is closed)
+  useEffect(() => {
+    if (isOpen) return;
+
+    let isActive = true;
+    const checkUnread = async () => {
+      try {
+        const count = await api.support.getUnreadCount(user.id);
+        if (!isActive) return;
+        if (!initializedRef.current) {
+          // First load — just display the real unread count from DB
+          initializedRef.current = true;
+        }
+        setUnreadCount(count);
+      } catch {
+        // silent
+      }
+    };
+
+    checkUnread();
+    const interval = setInterval(checkUnread, 5000);
+    return () => { isActive = false; clearInterval(interval); };
+  }, [isOpen, user.id]);
 
   // Fetch messages periodically when the widget is open
   useEffect(() => {
     if (!isOpen) return;
+
+    // Clear unread when opened
+    setUnreadCount(0);
 
     let isActive = true;
     const fetchMessages = async () => {
@@ -79,9 +108,14 @@ const SupportChatWidget: React.FC<SupportChatWidgetProps> = ({ user }) => {
       <div className="fixed bottom-8 right-8 z-50">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="bg-slate-900 text-white w-16 h-16 rounded-full flex items-center justify-center shadow-lg hover:bg-slate-700 transition-colors"
+          className="bg-slate-900 text-white w-16 h-16 rounded-full flex items-center justify-center shadow-lg hover:bg-slate-700 transition-colors relative"
         >
           {isOpen ? <X size={24} /> : <MessageSquare size={24} />}
+          {!isOpen && unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 text-white text-[11px] font-bold rounded-full flex items-center justify-center px-1 shadow-md animate-bounce">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
         </button>
       </div>
 
