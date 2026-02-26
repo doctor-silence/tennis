@@ -7,6 +7,8 @@ import { api } from '../../services/api';
 
 export const RttStatsView = ({ user }: { user: User }) => {
     const [activeTab, setActiveTab] = useState<'rni' | 'tournaments'>('rni');
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const abortRef = useRef<AbortController | null>(null);
     const [rni, setRni] = useState('');
     const [loading, setLoading] = useState(false);
     const [playerData, setPlayerData] = useState<any>(null);
@@ -25,6 +27,10 @@ export const RttStatsView = ({ user }: { user: User }) => {
     const [tourHasSearched, setTourHasSearched] = useState(false);
 
     const loadTournaments = async (filters = tourFilters) => {
+        // Отменяем предыдущий запрос если он ещё идёт
+        if (abortRef.current) abortRef.current.abort();
+        abortRef.current = new AbortController();
+
         setTourLoading(true);
         setTourError('');
         setTourHasSearched(true);
@@ -38,8 +44,8 @@ export const RttStatsView = ({ user }: { user: User }) => {
             } else {
                 setTourError(res.error || 'Не удалось загрузить турниры');
             }
-        } catch {
-            setTourError('Ошибка загрузки турниров');
+        } catch (e: any) {
+            if (e?.name !== 'AbortError') setTourError('Ошибка загрузки турниров');
         } finally {
             setTourLoading(false);
         }
@@ -48,7 +54,9 @@ export const RttStatsView = ({ user }: { user: User }) => {
     const handleTourFilterChange = (key: string, value: string) => {
         const newFilters = { ...tourFilters, [key]: value };
         setTourFilters(newFilters);
-        loadTournaments(newFilters);
+        // Дебаунс: ждём 300мс после последнего изменения фильтра
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => loadTournaments(newFilters), 300);
     };
 
     const resetTourFilters = () => {

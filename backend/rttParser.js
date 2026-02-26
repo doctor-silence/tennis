@@ -18,6 +18,9 @@ class RTTParser {
         'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7'
       }
     });
+    // Кэш для списка турниров: key → { data, expireAt }
+    this._tourCache = new Map();
+    this._tourCacheTTL = 5 * 60 * 1000; // 5 минут
   }
 
   /**
@@ -617,7 +620,16 @@ class RTTParser {
       if (filters.subject)  params.set('l2', filters.subject);
       if (filters.city)     params.set('l3', filters.city);
 
-      const url = `/tours/${params.toString() ? '?' + params.toString() : ''}`;
+      const cacheKey = params.toString();
+
+      // Проверяем кэш
+      const cached = this._tourCache.get(cacheKey);
+      if (cached && Date.now() < cached.expireAt) {
+        console.log('✅ Турниры из кэша:', cached.data.tournaments.length);
+        return { success: true, data: cached.data };
+      }
+
+      const url = `/tours/${cacheKey ? '?' + cacheKey : ''}`;
       console.log('📡 URL запроса:', url);
 
       const response = await this.axios.get(url);
@@ -683,12 +695,14 @@ class RTTParser {
 
       console.log(`✅ Найдено турниров: ${tournaments.length}`);
 
+      const resultData = { tournaments, filters: { districts, subjects, cities } };
+
+      // Сохраняем в кэш
+      this._tourCache.set(cacheKey, { data: resultData, expireAt: Date.now() + this._tourCacheTTL });
+
       return {
         success: true,
-        data: {
-          tournaments,
-          filters: { districts, subjects, cities }
-        }
+        data: resultData
       };
 
     } catch (error) {
