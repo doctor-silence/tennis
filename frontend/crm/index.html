@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>CRM для тренеров — НаКорте</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="apple-touch-icon" href="/favicon.svg" />
+  <meta name="description" content="CRM для теннисных тренеров: управление учениками, расписанием, абонементами и прогрессом в одном месте." />
+  <meta name="keywords" content="теннис, тренер, CRM, ученики, расписание, абонементы, НаКорте" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://onthecourt.ru/crm/" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="CRM для тренеров — НаКорте" />
+  <meta property="og:description" content="Управляйте тренировками, учениками и финансами в единой CRM-системе для теннисных тренеров." />
+  <meta property="og:url" content="https://onthecourt.ru/crm/" />
+  <meta property="og:locale" content="ru_RU" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; overflow-x: hidden; background-color: #020617; }
+    * { box-sizing: border-box; }
+  </style>
+</head>
+<body class="text-white bg-slate-900">
+  <div id="crm-scroll-container" class="min-h-screen flex flex-col bg-slate-900">
+    <!-- Sticky header -->
+    <header class="sticky top-0 z-50 bg-slate-900/95 backdrop-blur-md border-b border-white/10">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-3">
+        <a href="/" class="flex items-center gap-2 group">
+          <div class="w-8 h-8 sm:w-10 sm:h-10 bg-slate-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+            <div class="w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-lime-400"></div>
+          </div>
+          <span class="text-xl sm:text-2xl font-black uppercase tracking-wider text-white">
+            НА<span class="text-2xl sm:text-3xl">К</span>орте
+          </span>
+        </a>
+        <nav class="hidden md:flex items-center gap-8 text-sm font-bold uppercase tracking-wider text-slate-300">
+          <a href="/news/" class="hover:text-white transition-colors">Новости</a>
+          <a href="/shop/" class="hover:text-white transition-colors">Магазин</a>
+          <a href="/pro/" class="hover:text-white transition-colors">PRO</a>
+        </nav>
+        <div class="flex items-center gap-2 sm:gap-4">
+          <a href="/?auth=login" class="font-bold hover:text-lime-400 transition-colors text-xs sm:text-sm text-white whitespace-nowrap">Войти</a>
+          <a href="/?auth=register" class="inline-flex items-center justify-center h-9 px-3 sm:px-4 rounded-xl bg-amber-400 text-slate-900 text-xs sm:text-sm font-bold shadow-lg shadow-amber-400/20 hover:bg-amber-300 transition-colors whitespace-nowrap">
+            Тренер — старт
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="pt-10 sm:pt-16 pb-14 sm:pb-20 text-center relative overflow-hidden">
+      <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[520px] h-[520px] bg-amber-500/20 rounded-full blur-[110px] pointer-events-none"></div>
+      <div class="absolute top-24 left-[5%] hidden md:block opacity-60">
+        <div class="w-20 h-20 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl shadow-[0_20px_50px_rgba(251,191,36,0.4)] flex items-center justify-center border border-white/20 text-3xl">
+            📊
+        </div>
+      </div>
+      <div class="absolute bottom-8 right-[8%] hidden md:block opacity-60">
+        <div class="w-24 h-24 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full shadow-[0_20px_50px_rgba(59,130,246,0.4)] flex items-center justify-center border border-white/20 text-3xl">
+            📅
+        </div>
+      </div>
+
+      <div class="relative z-10 max-w-4xl mx-auto px-4">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-amber-400/30 bg-amber-400/10 text-amber-400 text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-5 sm:mb-6 shadow-[0_0_20px_rgba(251,191,36,0.2)]">
+          <span class="text-xs">⚡</span>
+          <span>CRM для профессиональных тренеров</span>
+        </div>
+        <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-5 sm:mb-6 leading-tight">
+          CRM <span class="text-amber-400" style="text-shadow:0 0 30px rgba(251,191,36,0.5)">ДЛЯ ТРЕНЕРОВ</span>
+        </h1>
+        <p class="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed">
+          Управляйте учениками, расписанием, абонементами и прогрессом в одном месте. Меньше рутины — больше времени на настоящие тренировки.
+        </p>
+        <a href="/?auth=register" class="inline-flex items-center justify-center h-12 px-8 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold text-sm sm:text-base shadow-lg shadow-amber-400/30 transition-colors">
+          Начать бесплатно
+        </a>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="max-w-6xl mx-auto px-4 pb-16 sm:pb-24 relative z-10">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-14">
+        <!-- Card 1 -->
+        <article class="bg-slate-800/60 border border-white/10 rounded-3xl p-7 sm:p-8 hover:bg-slate-800/90 hover:-translate-y-1 transition-all duration-300">
+          <div class="w-12 h-12 rounded-2xl bg-amber-500 flex items-center justify-center mb-5 shadow-lg shadow-amber-500/20 text-xl">👥</div>
+          <h3 class="text-lg sm:text-xl font-bold mb-2">Управление учениками</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-4">
+            Профили учеников, история тренировок, заметки и уровни подготовки — вся информация в одном месте.
+          </p>
+          <ul class="space-y-1.5 text-sm text-slate-300">
+            <li class="flex gap-2"><span class="text-amber-300 mt-0.5">✓</span> Карточка спортсмена с историей</li>
+            <li class="flex gap-2"><span class="text-amber-300 mt-0.5">✓</span> Группы по уровню и возрасту</li>
+            <li class="flex gap-2"><span class="text-amber-300 mt-0.5">✓</span> Учёт посещаемости</li>
+          </ul>
+        </article>
+
+        <!-- Card 2 -->
+        <article class="bg-slate-800/60 border border-white/10 rounded-3xl p-7 sm:p-8 hover:bg-slate-800/90 hover:-translate-y-1 transition-all duration-300">
+          <div class="w-12 h-12 rounded-2xl bg-blue-500 flex items-center justify-center mb-5 shadow-lg shadow-blue-500/20 text-xl">📅</div>
+          <h3 class="text-lg sm:text-xl font-bold mb-2">Умный календарь</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-4">
+            Планируйте индивидуальные и групповые занятия, контролируйте загрузку кортов и напоминайте ученикам о тренировках.
+          </p>
+          <ul class="space-y-1.5 text-sm text-slate-300">
+            <li class="flex gap-2"><span class="text-blue-300 mt-0.5">✓</span> Синхронизация с календарём</li>
+            <li class="flex gap-2"><span class="text-blue-300 mt-0.5">✓</span> Онлайн-запись на занятия</li>
+            <li class="flex gap-2"><span class="text-blue-300 mt-0.5">✓</span> Учёт аренды кортов</li>
+          </ul>
+        </article>
+
+        <!-- Card 3 -->
+        <article class="bg-slate-800/60 border border-white/10 rounded-3xl p-7 sm:p-8 hover:bg-slate-800/90 hover:-translate-y-1 transition-all duration-300">
+          <div class="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center mb-5 shadow-lg shadow-emerald-500/20 text-xl">📈</div>
+          <h3 class="text-lg sm:text-xl font-bold mb-2">Аналитика и прогресс</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-4">
+            Видьте рост своих учеников: уровень NTRP/РТТ, результаты тестов, статистику матчей и тренировок.
+          </p>
+          <ul class="space-y-1.5 text-sm text-slate-300">
+            <li class="flex gap-2"><span class="text-emerald-300 mt-0.5">✓</span> Динамика рейтинга и формы</li>
+            <li class="flex gap-2"><span class="text-emerald-300 mt-0.5">✓</span> Видео-разборы техники</li>
+            <li class="flex gap-2"><span class="text-emerald-300 mt-0.5">✓</span> Статистика матчей и турниров</li>
+          </ul>
+        </article>
+
+        <!-- Card 4 -->
+        <article class="bg-slate-800/60 border border-white/10 rounded-3xl p-7 sm:p-8 hover:bg-slate-800/90 hover:-translate-y-1 transition-all duration-300">
+          <div class="w-12 h-12 rounded-2xl bg-purple-500 flex items-center justify-center mb-5 shadow-lg shadow-purple-500/20 text-xl">🏆</div>
+          <h3 class="text-lg sm:text-xl font-bold mb-2">Организация турниров</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-4">
+            Проводите внутренние и клубные турниры: сетки, расписание матчей и результаты в одном интерфейсе.
+          </p>
+          <ul class="space-y-1.5 text-sm text-slate-300">
+            <li class="flex gap-2"><span class="text-purple-300 mt-0.5">✓</span> Форматы: олимпийка, круговая</li>
+            <li class="flex gap-2"><span class="text-purple-300 mt-0.5">✓</span> Онлайн-табло результатов</li>
+            <li class="flex gap-2"><span class="text-purple-300 mt-0.5">✓</span> Клубный рейтинг</li>
+          </ul>
+        </article>
+
+        <!-- Card 5 -->
+        <article class="bg-slate-800/60 border border-white/10 rounded-3xl p-7 sm:p-8 hover:bg-slate-800/90 hover:-translate-y-1 transition-all duration-300">
+          <div class="w-12 h-12 rounded-2xl bg-cyan-500 flex items-center justify-center mb-5 shadow-lg shadow-cyan-500/20 text-xl">🎥</div>
+          <h3 class="text-lg sm:text-xl font-bold mb-2">Видео-разборы</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-4">
+            Загружайте видео тренировок, ставьте метки по ударам и делитесь разбором с игроком.</p>
+          <ul class="space-y-1.5 text-sm text-slate-300">
+            <li class="flex gap-2"><span class="text-cyan-300 mt-0.5">✓</span> Пометки прямо на видео</li>
+            <li class="flex gap-2"><span class="text-cyan-300 mt-0.5">✓</span> Сравнение «до» и «после»</li>
+            <li class="flex gap-2"><span class="text-cyan-300 mt-0.5">✓</span> Личная библиотека упражнений</li>
+          </ul>
+        </article>
+
+        <!-- Card 6 -->
+        <article class="bg-slate-800/60 border border-white/10 rounded-3xl p-7 sm:p-8 hover:bg-slate-800/90 hover:-translate-y-1 transition-all duration-300">
+          <div class="w-12 h-12 rounded-2xl bg-rose-500 flex items-center justify-center mb-5 shadow-lg shadow-rose-500/20 text-xl">💳</div>
+          <h3 class="text-lg sm:text-xl font-bold mb-2">Финансы и абонементы</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-4">
+            Ведите абонементы и оплаты без таблиц: пакеты занятий, остаток уроков и история платежей.</p>
+          <ul class="space-y-1.5 text-sm text-slate-300">
+            <li class="flex gap-2"><span class="text-rose-300 mt-0.5">✓</span> Гибкие пакеты тренировок</li>
+            <li class="flex gap-2"><span class="text-rose-300 mt-0.5">✓</span> Напоминания об окончании абонемента</li>
+            <li class="flex gap-2"><span class="text-rose-300 mt-0.5">✓</span> История оплат</li>
+          </ul>
+        </article>
+      </div>
+
+      <!-- Steps -->
+      <section class="mb-14">
+        <h2 class="text-2xl sm:text-3xl font-bold text-white text-center mb-8 sm:mb-10">Как начать работу</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <article class="flex gap-4 bg-slate-800/50 border border-white/10 rounded-2xl p-5 sm:p-6">
+            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-slate-900 flex items-center justify-center font-bold text-lg sm:text-xl shrink-0">
+              1
+            </div>
+            <div>
+              <h3 class="font-bold text-white mb-1.5 sm:mb-2">Зарегистрируйтесь</h3>
+              <p class="text-slate-400 text-sm leading-relaxed">Создайте аккаунт тренера, укажите специализацию, клуб и город. Это займёт пару минут.</p>
+            </div>
+          </article>
+          <article class="flex gap-4 bg-slate-800/50 border border-white/10 rounded-2xl p-5 sm:p-6">
+            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-slate-900 flex items-center justify-center font-bold text-lg sm:text-xl shrink-0">
+              2
+            </div>
+            <div>
+              <h3 class="font-bold text-white mb-1.5 sm:mb-2">Добавьте учеников</h3>
+              <p class="text-slate-400 text-sm leading-relaxed">Пригласите учеников по ссылке или добавьте вручную, чтобы они получили доступ к личному кабинету.</p>
+            </div>
+          </article>
+          <article class="flex gap-4 bg-slate-800/50 border border-white/10 rounded-2xl p-5 sm:p-6">
+            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-slate-900 flex items-center justify-center font-bold text-lg sm:text-xl shrink-0">
+              3
+            </div>
+            <div>
+              <h3 class="font-bold text-white mb-1.5 sm:mb-2">Управляйте процессом</h3>
+              <p class="text-slate-400 text-sm leading-relaxed">Планируйте тренировки, следите за прогрессом и анализируйте результаты прямо в CRM НаКОрте.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- CTA -->
+      <section class="bg-gradient-to-r from-amber-500/20 to-orange-500/10 border border-amber-500/20 rounded-3xl p-8 sm:p-10 md:p-14 text-center relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-48 sm:w-64 h-48 sm:h-64 bg-amber-500/10 rounded-full blur-[70px] pointer-events-none"></div>
+        <div class="absolute bottom-0 left-0 w-40 sm:w-52 h-40 sm:h-52 bg-orange-500/10 rounded-full blur-[60px] pointer-events-none"></div>
+        <div class="relative z-10">
+          <div class="mx-auto mb-4 text-2xl">⚡</div>
+          <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-3 sm:mb-4">Начните уже сегодня — бесплатно</h2>
+          <p class="text-slate-300 max-w-xl mx-auto mb-8 text-sm sm:text-base leading-relaxed">
+            На этапе бета-тестирования весь функционал CRM для тренеров доступен без ограничений и без оплаты.
+          </p>
+          <a href="/?auth=register" class="inline-flex items-center justify-center h-12 px-10 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold text-sm sm:text-base shadow-lg shadow-amber-400/30 transition-colors">
+            Создать аккаунт тренера
+          </a>
+        </div>
+      </section>
+    </section>
+  </div>
+</body>
+</html>

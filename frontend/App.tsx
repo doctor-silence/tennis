@@ -45,6 +45,8 @@ const App = () => {
   useEffect(() => {
     try {
       const storedUser = localStorage.getItem('currentUser');
+      const pathname = window.location.pathname;
+
       if (storedUser) {
         const user: User = JSON.parse(storedUser);
         setCurrentUser(user);
@@ -54,17 +56,23 @@ const App = () => {
           setView('dashboard');
         }
       } else {
-        // Check URL parameters for auth routing
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('auth') === 'register') {
-          setAuthInitialMode('register');
-          setView('auth');
-          // Clean up URL
-          window.history.replaceState({}, document.title, window.location.pathname);
-        } else if (params.get('auth') === 'login') {
+        // Если открыт /crm/ — показываем форму входа
+        if (pathname.startsWith('/crm')) {
           setAuthInitialMode('login');
           setView('auth');
-          window.history.replaceState({}, document.title, window.location.pathname);
+        } else {
+          // Check URL parameters for auth routing
+          const params = new URLSearchParams(window.location.search);
+          if (params.get('auth') === 'register') {
+            setAuthInitialMode('register');
+            setView('auth');
+            // Clean up URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+          } else if (params.get('auth') === 'login') {
+            setAuthInitialMode('login');
+            setView('auth');
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
         }
       }
     } catch (error) {
@@ -187,7 +195,7 @@ const App = () => {
 
 // --- Shared Header Component ---
 const PublicHeader = ({ onLogin, onRegister, onNavigate, transparent = false }: any) => (
-  <header className={`fixed top-0 w-full z-50 transition-all duration-300 ${transparent ? 'bg-transparent border-transparent' : 'glass-panel border-b-0 bg-white/80 backdrop-blur-md'}`}>
+  <header className={`fixed top-0 w-full z-50 transition-all duration-300 ${transparent ? 'bg-transparent border-transparent' : 'glass-panel border-b-0 bg-white/80 backdrop-blur-md'}`} style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
       <div 
         className="flex items-center gap-2 cursor-pointer group" 
@@ -541,7 +549,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
       <PublicHeader onLogin={onLoginClick} onRegister={onRegisterClick} onNavigate={onNavigate} />
 
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center pt-20 bg-slate-900 overflow-hidden">
+      <section className="relative min-h-screen flex items-center bg-slate-900 overflow-hidden" style={{ paddingTop: 'calc(5rem + env(safe-area-inset-top, 0px))' }}>
         {/* Animated Abstract Background */}
         <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-lime-400/20 rounded-full blur-[120px] animate-pulse"></div>
         <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-emerald-600/20 rounded-full blur-[100px]"></div>
@@ -893,14 +901,19 @@ const RttInfoPage = ({ onBack, onRegister }: { onBack: () => void, onRegister: (
   return (
     <div id="rtt-scroll-container" className="bg-slate-900 h-screen text-white relative overflow-y-auto overflow-x-hidden">
       {/* Sticky Header */}
-      <header className={`sticky top-0 w-full z-50 transition-all duration-300 ${scrolled ? 'bg-slate-900/95 backdrop-blur-md border-b border-white/10 shadow-xl' : 'bg-transparent border-transparent'}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      <header className={`sticky top-0 w-full z-50 transition-all duration-300 ${scrolled ? 'bg-slate-900/95 backdrop-blur-md border-b border-white/10 shadow-xl' : 'bg-transparent border-transparent'}`} style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 md:h-20 flex items-center justify-between gap-2">
+          {/* Back button — мобильный */}
+          <button onClick={onBack} className="flex items-center gap-1 text-slate-300 hover:text-white transition-colors text-sm font-semibold shrink-0">
+            <ChevronLeft size={18} />
+            <span className="hidden xs:inline">На главную</span>
+          </button>
           <div className="flex items-center gap-2 cursor-pointer group" onClick={onBack}>
-            <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-              <div className="w-4 h-4 rounded-full bg-lime-400"></div>
+            <div className="w-8 h-8 md:w-10 md:h-10 bg-slate-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+              <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-lime-400"></div>
             </div>
-            <span className="text-2xl font-black uppercase tracking-wider text-white">
-              НА<span className="text-3xl">К</span>орте
+            <span className="text-xl md:text-2xl font-black uppercase tracking-wider text-white">
+              НА<span className="text-2xl md:text-3xl">К</span>орте
             </span>
           </div>
           <nav className="hidden md:flex items-center gap-8 text-sm font-bold uppercase tracking-wider text-slate-300">
@@ -908,14 +921,14 @@ const RttInfoPage = ({ onBack, onRegister }: { onBack: () => void, onRegister: (
             <a href="/shop/" className="hover:text-white transition-colors">Магазин</a>
             <a href="/pro/" className="hover:text-white transition-colors flex items-center gap-1">PRO <Crown size={14} className="mb-1 text-amber-400"/></a>
           </nav>
-          <div className="flex items-center gap-4">
-            <button onClick={onRegister} className="font-bold hover:text-lime-400 transition-colors text-sm text-white">Войти</button>
-            <Button onClick={onRegister} size="sm">Регистрация</Button>
+          <div className="flex items-center gap-2 md:gap-4">
+            <button onClick={onRegister} className="font-bold hover:text-lime-400 transition-colors text-xs md:text-sm text-white whitespace-nowrap">Войти</button>
+            <Button onClick={onRegister} size="sm" className="text-xs md:text-sm px-3 md:px-4">Регистрация</Button>
           </div>
         </div>
       </header>
       
-      <div className="pt-20 pb-20 text-center relative overflow-hidden" style={{ perspective: '1000px' }}>
+      <div className="pt-8 md:pt-20 pb-16 text-center relative overflow-hidden" style={{ perspective: '1000px' }}>
          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-lime-400/20 rounded-full blur-[120px] pointer-events-none"></div>
          
          {/* 3D Floating Elements */}
@@ -944,22 +957,22 @@ const RttInfoPage = ({ onBack, onRegister }: { onBack: () => void, onRegister: (
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-lime-400/30 bg-lime-400/10 text-lime-400 text-xs font-bold uppercase tracking-wider mb-6 shadow-[0_0_20px_rgba(163,230,53,0.2)]">
                <ShieldCheck size={14} /> Верификация профиля
             </div>
-            <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6 drop-shadow-2xl">
-               СТАТУС <span className="text-lime-400 inline-block hover:scale-105 transition-transform cursor-default" style={{ textShadow: '0 0 30px rgba(163,230,53,0.5)' }}>ПРОФЕССИОНАЛА РТТ</span>
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-6 drop-shadow-2xl leading-tight">
+               СТАТУС<br className="sm:hidden" /> <span className="text-lime-400 inline-block hover:scale-105 transition-transform cursor-default" style={{ textShadow: '0 0 30px rgba(163,230,53,0.5)' }}>ПРОФЕССИОНАЛА<br className="sm:hidden" /> РТТ</span>
             </h1>
-            <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-10 drop-shadow-md">
+            <p className="text-base md:text-xl text-slate-300 max-w-2xl mx-auto mb-10 drop-shadow-md px-2 leading-relaxed">
                Привяжите свой номер РТТ, чтобы получить официальную галочку верификации, загрузить свою статистику и открыть новые возможности.
             </p>
          </div>
       </div>
 
       <div className="max-w-5xl mx-auto px-4 pb-24 relative z-20">
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
             
             {/* Steps */}
-            <div className="space-y-8 perspective-1000">
-               <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
-                  <span className="bg-slate-800 p-2 rounded-lg shadow-inner"><ListOrdered size={28} className="text-lime-400" /></span>
+            <div className="space-y-6 md:space-y-8">
+               <h2 className="text-2xl md:text-3xl font-bold mb-4 md:mb-6 flex items-center gap-3">
+                  <span className="bg-slate-800 p-2 rounded-lg shadow-inner"><ListOrdered size={24} className="text-lime-400" /></span>
                   Как подключить?
                </h2>
                
