@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Filter, ExternalLink, RefreshCw } from 'lucide-react';
 import { User } from '../../types';
 import Button from '../Button';
 import { api } from '../../services/api';
 
 export const RttStatsView = ({ user }: { user: User }) => {
+    const [activeTab, setActiveTab] = useState<'rni' | 'tournaments'>('rni');
     const [rni, setRni] = useState('');
     const [loading, setLoading] = useState(false);
     const [playerData, setPlayerData] = useState<any>(null);
@@ -14,6 +15,49 @@ export const RttStatsView = ({ user }: { user: User }) => {
     const [showAllTournaments, setShowAllTournaments] = useState(false);
     const [selectedTournament, setSelectedTournament] = useState<any>(null);
     const [tournamentModalOpen, setTournamentModalOpen] = useState(false);
+
+    // Турниры РТТ
+    const [tourList, setTourList] = useState<any[]>([]);
+    const [tourLoading, setTourLoading] = useState(false);
+    const [tourError, setTourError] = useState('');
+    const [tourFilters, setTourFilters] = useState({ age: '', gender: '', district: '', subject: '', city: '' });
+    const [tourFilterOptions, setTourFilterOptions] = useState<{districts: any[], subjects: any[], cities: any[]}>({ districts: [], subjects: [], cities: [] });
+    const [tourHasSearched, setTourHasSearched] = useState(false);
+
+    const loadTournaments = async (filters = tourFilters) => {
+        setTourLoading(true);
+        setTourError('');
+        setTourHasSearched(true);
+        try {
+            const res = await api.rtt.getTournamentsList(filters);
+            if (res.success) {
+                setTourList(res.data.tournaments || []);
+                if (res.data.filters && tourFilterOptions.districts.length === 0) {
+                    setTourFilterOptions(res.data.filters);
+                }
+            } else {
+                setTourError(res.error || 'Не удалось загрузить турниры');
+            }
+        } catch {
+            setTourError('Ошибка загрузки турниров');
+        } finally {
+            setTourLoading(false);
+        }
+    };
+
+    const handleTourFilterChange = (key: string, value: string) => {
+        const newFilters = { ...tourFilters, [key]: value };
+        setTourFilters(newFilters);
+        loadTournaments(newFilters);
+    };
+
+    const resetTourFilters = () => {
+        const empty = { age: '', gender: '', district: '', subject: '', city: '' };
+        setTourFilters(empty);
+        setTourList([]);
+        setTourError('');
+        setTourHasSearched(false);
+    };
 
     const handleSearch = async () => {
         if (!rni || rni.length < 4) {
@@ -50,43 +94,228 @@ export const RttStatsView = ({ user }: { user: User }) => {
     return (
         <>
             <div className="space-y-6">
-            {/* Header */}
+            {/* Header с вкладками */}
             <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-3xl p-8 text-white">
                 <h1 className="text-3xl font-black mb-2">Статистика РТТ</h1>
-                <p className="text-orange-100">Поиск статистики любого игрока по номеру РНИ</p>
+                <p className="text-orange-100">Поиск игроков и турниров</p>
             </div>
 
-            {/* Search Box */}
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6">
-                <div className="flex gap-4">
-                    <div className="flex-1">
-                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">
-                            Номер РНИ
-                        </label>
-                        <input
-                            type="text"
-                            value={rni}
-                            onChange={(e) => setRni(e.target.value.replace(/\D/g, ''))}
-                            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                            placeholder="Введите РНИ (например, 53699)"
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-400 outline-none text-lg"
-                        />
-                        {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+            {/* Единый контейнер с вкладками */}
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                {/* Таб-панель */}
+                <div className="flex border-b border-slate-200">
+                    <button
+                        onClick={() => setActiveTab('rni')}
+                        className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-colors ${
+                            activeTab === 'rni'
+                                ? 'bg-white text-orange-600 border-b-2 border-orange-500'
+                                : 'bg-slate-50 text-slate-400 hover:text-slate-600'
+                        }`}
+                    >
+                        🔍 Поиск по РНИ
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('tournaments')}
+                        className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-colors ${
+                            activeTab === 'tournaments'
+                                ? 'bg-white text-orange-600 border-b-2 border-orange-500'
+                                : 'bg-slate-50 text-slate-400 hover:text-slate-600'
+                        }`}
+                    >
+                        🏆 Турниры РТТ
+                    </button>
+                </div>
+
+                {/* Вкладка: Поиск по РНИ */}
+                {activeTab === 'rni' && (
+                    <div className="p-6">
+                        <div className="flex gap-4">
+                            <div className="flex-1">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">
+                                    Номер РНИ
+                                </label>
+                                <input
+                                    type="text"
+                                    value={rni}
+                                    onChange={(e) => setRni(e.target.value.replace(/\D/g, ''))}
+                                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                                    placeholder="Введите РНИ (например, 53699)"
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-400 outline-none text-lg"
+                                />
+                                {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+                            </div>
+                            <div className="flex items-end">
+                                <Button
+                                    onClick={handleSearch}
+                                    disabled={loading || !rni}
+                                    className="px-8 py-3 bg-orange-600 hover:bg-orange-700"
+                                >
+                                    {loading ? <Loader2 className="animate-spin" size={20} /> : 'Найти'}
+                                </Button>
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex items-end">
-                        <Button 
-                            onClick={handleSearch}
-                            disabled={loading || !rni}
-                            className="px-8 py-3 bg-orange-600 hover:bg-orange-700"
+                )}
+
+                {/* Вкладка: Турниры */}
+                {activeTab === 'tournaments' && <>
+            <div className="overflow-hidden">
+                {/* Toolbar */}
+                <div className="px-6 py-3 border-b border-slate-100 flex items-center justify-end gap-3">
+                    {tourHasSearched && (
+                        <button
+                            onClick={resetTourFilters}
+                            className="flex items-center gap-1 text-xs text-slate-400 hover:text-red-500 transition-colors border border-slate-200 hover:border-red-300 px-3 py-1.5 rounded-lg"
+                            title="Сбросить фильтры"
                         >
-                            {loading ? <Loader2 className="animate-spin" size={20} /> : 'Найти'}
-                        </Button>
+                            <span>✕</span>
+                            <span>Сбросить фильтры</span>
+                        </button>
+                    )}
+                    {tourHasSearched && (
+                        <button
+                            onClick={() => loadTournaments()}
+                            className="text-slate-400 hover:text-slate-700 transition-colors"
+                            title="Обновить"
+                        >
+                            <RefreshCw size={16} className={tourLoading ? 'animate-spin' : ''} />
+                        </button>
+                    )}
+                </div>
+
+                {/* Фильтры */}
+                <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 grid grid-cols-2 md:grid-cols-5 gap-3">
+                    {/* Возраст */}
+                    <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Возраст</label>
+                        <select value={tourFilters.age} onChange={(e) => handleTourFilterChange('age', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-orange-400 outline-none">
+                            <option value="">Все возраста</option>
+                            <option value="131">9-10 лет</option>
+                            <option value="132">до 13 лет</option>
+                            <option value="133">до 15 лет</option>
+                            <option value="134">до 17 лет</option>
+                            <option value="135">до 19 лет</option>
+                            <option value="136">19+ лет</option>
+                        </select>
+                    </div>
+                    {/* Пол */}
+                    <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Пол</label>
+                        <select value={tourFilters.gender} onChange={(e) => handleTourFilterChange('gender', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-orange-400 outline-none">
+                            <option value="">Все</option>
+                            <option value="1">М</option>
+                            <option value="2">Ж</option>
+                            <option value="3">Микст</option>
+                        </select>
+                    </div>
+                    {/* Округ */}
+                    <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Округ</label>
+                        <select value={tourFilters.district} onChange={(e) => handleTourFilterChange('district', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-orange-400 outline-none">
+                            <option value="">Не выбрано</option>
+                            {tourFilterOptions.districts.map((d: any) => (
+                                <option key={d.value} value={d.value}>{d.label}</option>
+                            ))}
+                        </select>
+                    </div>
+                    {/* Субъект */}
+                    <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Субъект</label>
+                        <select value={tourFilters.subject} onChange={(e) => handleTourFilterChange('subject', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-orange-400 outline-none">
+                            <option value="">Не выбрано</option>
+                            {tourFilterOptions.subjects
+                                .filter((s: any) => !tourFilters.district || s.parent === tourFilters.district)
+                                .map((s: any) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                        </select>
+                    </div>
+                    {/* Город */}
+                    <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Город</label>
+                        <select value={tourFilters.city} onChange={(e) => handleTourFilterChange('city', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-orange-400 outline-none">
+                            <option value="">Не выбрано</option>
+                            {tourFilterOptions.cities
+                                .filter((c: any) => !tourFilters.subject || c.parent === tourFilters.subject)
+                                .map((c: any) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                        </select>
                     </div>
                 </div>
-            </div>
 
-            {/* Player Data */}
-            {playerData && (
+                {/* Таблица */}
+                {tourLoading ? (
+                    <div className="flex items-center justify-center py-16">
+                        <Loader2 className="animate-spin text-orange-500" size={32} />
+                        <span className="ml-3 text-slate-500 font-medium">Загружаем турниры...</span>
+                    </div>
+                ) : !tourHasSearched ? (
+                    <div className="py-16 text-center text-slate-400">
+                        <Filter size={32} className="mx-auto mb-3 text-slate-300" />
+                        <p className="font-medium">Выберите фильтр для поиска турниров</p>
+                        <p className="text-sm mt-1 text-slate-300">Выберите возраст, пол или регион</p>
+                    </div>
+                ) : tourError ? (
+                    <div className="py-12 text-center text-red-500 font-medium">{tourError}</div>
+                ) : tourList.length === 0 ? (
+                    <div className="py-12 text-center text-slate-400 font-medium">Турниры не найдены</div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="bg-slate-50 border-b-2 border-slate-200">
+                                <tr>
+                                    {['Город','Тип','Возраст','Категория','Начало','Корты','Заявок','Ср. рейтинг','Статус','Название'].map(h => (
+                                        <th key={h} className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase whitespace-nowrap">{h}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {tourList.map((t: any, i: number) => (
+                                    <tr key={i} className={`border-b border-slate-100 hover:bg-orange-50 transition-colors ${i % 2 === 0 ? '' : 'bg-slate-25'}`}>
+                                        <td className="px-3 py-2 font-medium text-slate-800 whitespace-nowrap">{t.city || '—'}</td>
+                                        <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{t.type || '—'}</td>
+                                        <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{t.ageGroup || '—'}</td>
+                                        <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{t.category || '—'}</td>
+                                        <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{t.startDate || '—'}</td>
+                                        <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{t.surface || '—'}</td>
+                                        <td className="px-3 py-2 text-center font-bold text-slate-700">{t.applications || '—'}</td>
+                                        <td className="px-3 py-2 text-center text-slate-600">{t.avgRating || '—'}</td>
+                                        <td className="px-3 py-2 whitespace-nowrap">
+                                            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                                                t.status?.toLowerCase().includes('подача') ? 'bg-green-100 text-green-700' :
+                                                t.status?.toLowerCase().includes('идут') ? 'bg-blue-100 text-blue-700' :
+                                                t.status?.toLowerCase().includes('завер') ? 'bg-slate-100 text-slate-500' :
+                                                'bg-orange-100 text-orange-700'
+                                            }`}>
+                                                {t.status || '—'}
+                                            </span>
+                                        </td>
+                                        <td className="px-3 py-2 font-medium text-slate-800">
+                                            {t.link ? (
+                                                <a href={t.link} target="_blank" rel="noopener noreferrer"
+                                                    className="text-orange-600 hover:text-orange-800 hover:underline flex items-center gap-1">
+                                                    {t.name}
+                                                    <ExternalLink size={12} />
+                                                </a>
+                                            ) : t.name || '—'}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        <div className="px-6 py-3 text-xs text-slate-400 text-right">
+                            Источник: rttstat.ru · Найдено: {tourList.length} турниров
+                        </div>
+                    </div>
+                )}
+            </div>
+            </> }
+            </div>{/* конец единого контейнера с вкладками */}
+
+            {/* Player Data — вне вкладок, всегда видно на вкладке РНИ */}
+            {activeTab === 'rni' && playerData && (
                 <div className="space-y-4 animate-fade-in-up">
                     {/* Player Card */}
                     <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl shadow-sm border border-orange-200 p-5">

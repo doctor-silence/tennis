@@ -568,6 +568,30 @@ export const api = {
                     error: 'Ошибка получения информации о турнире'
                 };
             }
+        },
+
+        // Получить список турниров РТТ с фильтрами
+        getTournamentsList: async (filters: {
+            age?: string;
+            gender?: string;
+            district?: string;
+            subject?: string;
+            city?: string;
+        } = {}): Promise<any> => {
+            try {
+                const params = new URLSearchParams();
+                if (filters.age)      params.set('age', filters.age);
+                if (filters.gender)   params.set('g', filters.gender);
+                if (filters.district) params.set('l1', filters.district);
+                if (filters.subject)  params.set('l2', filters.subject);
+                if (filters.city)     params.set('l3', filters.city);
+                const res = await fetch(`${API_URL}/rtt/tournaments?${params.toString()}`);
+                const data = await res.json();
+                return data;
+            } catch (error) {
+                console.error('RTT tournaments list error:', error);
+                return { success: false, error: 'Ошибка получения списка турниров' };
+            }
         }
     },
 

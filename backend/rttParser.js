@@ -601,6 +601,107 @@ class RTTParser {
   }
 
   /**
+   * Получить список турниров с фильтрами
+   * @param {Object} filters - Фильтры (age, gender, district, subject, city)
+   * @returns {Promise<Object>} Список турниров
+   */
+  async getTournamentsList(filters = {}) {
+    try {
+      console.log('🎾 Запрос списка турниров с фильтрами:', filters);
+
+      // Строим параметры запроса к rttstat.ru/tours/
+      const params = new URLSearchParams();
+      if (filters.age)      params.set('age', filters.age);
+      if (filters.gender)   params.set('g', filters.gender);
+      if (filters.district) params.set('l1', filters.district);
+      if (filters.subject)  params.set('l2', filters.subject);
+      if (filters.city)     params.set('l3', filters.city);
+
+      const url = `/tours/${params.toString() ? '?' + params.toString() : ''}`;
+      console.log('📡 URL запроса:', url);
+
+      const response = await this.axios.get(url);
+      const html = response.data;
+      const $ = cheerio.load(html);
+
+      const tournaments = [];
+
+      // Парсим опции фильтров из формы
+      const districts = [];
+      const subjects = [];
+      const cities = [];
+      $('select[name="l1"] option').each((i, el) => {
+        const val = $(el).attr('value');
+        const text = $(el).text().trim();
+        if (val) districts.push({ value: val, label: text });
+      });
+      $('select[name="l2"] option').each((i, el) => {
+        const val = $(el).attr('value');
+        const text = $(el).text().trim();
+        const parent = $(el).attr('data-parent');
+        if (val) subjects.push({ value: val, label: text, parent });
+      });
+      $('select[name="l3"] option').each((i, el) => {
+        const val = $(el).attr('value');
+        const text = $(el).text().trim();
+        const parent = $(el).attr('data-parent');
+        if (val) cities.push({ value: val, label: text, parent });
+      });
+
+      // Парсим строки таблицы .tours-table
+      $('table.tours-table tr').each((i, row) => {
+        if (i === 0) return; // пропускаем заголовок
+
+        const cells = $(row).find('td');
+        if (cells.length < 10) return;
+
+        // td[0] = звёздочка, td[1] = город, td[2] = тип, td[3] = возраст,
+        // td[4] = категория, td[5] = начало, td[6] = корты, td[7] = заявок,
+        // td[8] = средний рейтинг, td[9] = статус, td[10] = название
+        const city        = cells.eq(1).text().trim();
+        const type        = cells.eq(2).text().trim();
+        const ageGroup    = cells.eq(3).text().trim();
+        const category    = cells.eq(4).text().trim();
+        const startDate   = cells.eq(5).text().trim();
+        const surface     = cells.eq(6).text().trim();
+        const applications= cells.eq(7).text().trim();
+        const avgRating   = cells.eq(8).text().trim();
+        const status      = cells.eq(9).text().trim();
+        const nameCell    = cells.eq(10);
+        const name        = nameCell.text().trim();
+        const link        = nameCell.find('a').attr('href');
+
+        if (city && name && name.length > 2) {
+          tournaments.push({
+            id: tournaments.length,
+            city, type, ageGroup, category, startDate,
+            surface, applications, avgRating, status, name,
+            link: link ? (link.startsWith('http') ? link : `https://rttstat.ru${link}`) : null
+          });
+        }
+      });
+
+      console.log(`✅ Найдено турниров: ${tournaments.length}`);
+
+      return {
+        success: true,
+        data: {
+          tournaments,
+          filters: { districts, subjects, cities }
+        }
+      };
+
+    } catch (error) {
+      console.error('❌ Ошибка при получении списка турниров:', error.message);
+      return {
+        success: false,
+        error: 'Ошибка при получении списка турниров: ' + error.message,
+        data: { tournaments: [], filters: {} }
+      };
+    }
+  }
+
+  /**
    * Проверка доступности сервиса РТТ
    * @returns {Promise<boolean>}
    */

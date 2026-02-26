@@ -269,6 +269,21 @@ app.get('/api/rtt/tournament', async (req, res) => {
     }
 });
 
+// Get tournaments list with filters
+app.get('/api/rtt/tournaments', async (req, res) => {
+    try {
+        const { age, g, l1, l2, l3 } = req.query;
+        const result = await rttParser.getTournamentsList({ age, gender: g, district: l1, subject: l2, city: l3 });
+        res.json(result);
+    } catch (err) {
+        console.error("❌ RTT Tournaments List Error:", err);
+        res.status(500).json({
+            success: false,
+            error: 'Ошибка при получении списка турниров: ' + err.message
+        });
+    }
+});
+
 // Check RTT service availability
 app.get('/api/rtt/status', async (req, res) => {
     try {
