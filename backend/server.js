@@ -943,29 +943,50 @@ app.get('/api/partners', async (req, res) => {
     const { city, level, search } = req.query;
 
     try {
-        let query = "SELECT id, name, age, level, city, avatar as image, (role = 'rtt_pro' or role = 'coach') as isPro, rtt_rank, rating, role FROM users WHERE role != 'admin' AND (is_private IS NULL OR is_private = FALSE)";
+        // --- Реальные пользователи ---
+        let query = "SELECT id, name, age, level, city, avatar as image, (role = 'rtt_pro' or role = 'coach') as isPro, rtt_rank, rating, role, xp FROM users WHERE role != 'admin' AND (is_private IS NULL OR is_private = FALSE)";
         const queryParams = [];
 
         if (city) {
             queryParams.push(city);
             query += ` AND city = $${queryParams.length}`;
         }
-
         if (level && level !== 'all') {
             queryParams.push(level);
             query += ` AND level = $${queryParams.length}`;
         }
-
         if (search) {
             queryParams.push(`%${search}%`);
             query += ` AND name ILIKE $${queryParams.length}`;
         }
-        
         query += ' ORDER BY xp DESC, name ASC';
+        const realResult = await pool.query(query, queryParams);
 
-        const result = await pool.query(query, queryParams);
-        
-        res.json(result.rows.map(r => ({ ...r, id: r.id.toString() })));
+        // --- Призраки из ghost_users (не в реальной таблице users) ---
+        let ghostQuery = "SELECT id, name, age, level, city, avatar as image, (role = 'rtt_pro' or role = 'coach') as isPro, rtt_rank, rating, role, xp FROM ghost_users WHERE TRUE";
+        const ghostParams = [];
+        if (city) {
+            ghostParams.push(city);
+            ghostQuery += ` AND city = $${ghostParams.length}`;
+        }
+        if (level && level !== 'all') {
+            ghostParams.push(level);
+            ghostQuery += ` AND level = $${ghostParams.length}`;
+        }
+        if (search) {
+            ghostParams.push(`%${search}%`);
+            ghostQuery += ` AND name ILIKE $${ghostParams.length}`;
+        }
+        ghostQuery += ' ORDER BY xp DESC, name ASC';
+        const ghostResult = await pool.query(ghostQuery, ghostParams);
+
+        // Объединяем: реальные + призраки, сортируем по xp
+        const all = [
+            ...realResult.rows.map(r => ({ ...r, id: r.id.toString(), isGhost: false })),
+            ...ghostResult.rows.map(r => ({ ...r, id: `ghost_${r.id}`, isGhost: true })),
+        ].sort((a, b) => (b.xp || 0) - (a.xp || 0) || a.name.localeCompare(b.name));
+
+        res.json(all);
 
     } catch (err) {
         console.error("Fetch Partners Error:", err);
@@ -1054,8 +1075,38 @@ app.get('/api/ladder/rankings', async (req, res) => {
                 status: defendingPlayerIds.has(row.id) ? 'defending' : 'idle'
             };
         }));
-        
-        res.json(ladderPlayers);
+
+        // --- Добавляем призраков из ghost_users ---
+        // Для рейтинга 'club_elo' — все призраки, для 'rtt_rating' — только rtt_pro с rtt_rank
+        let ghostWhereClause = type === 'rtt_rating'
+            ? "WHERE role = 'rtt_pro' AND rtt_rank IS NOT NULL"
+            : "WHERE TRUE";
+        if (type === 'rtt_rating' && category && category !== 'Взрослые') {
+            ghostWhereClause += ` AND rtt_category = '${category.replace(/'/g, "''")}'`;
+        } else if (type === 'rtt_rating' && category === 'Взрослые') {
+            ghostWhereClause += ` AND (rtt_category IS NULL OR rtt_category = 'Взрослые' OR rtt_category = '')`;
+        }
+        const ghostLadderResult = await pool.query(
+            `SELECT id, name, avatar, xp, rating, rtt_rank, rtt_category, role FROM ghost_users ${ghostWhereClause}`
+        );
+        const ghostLadderPlayers = ghostLadderResult.rows.map(row => ({
+            id: `ghost_${row.id}`,
+            userId: `ghost_${row.id}`,
+            name: row.name,
+            avatar: row.avatar,
+            points: type === 'rtt_rating' ? row.rating : row.xp,
+            matches: Math.floor(Math.random() * 30) + 5,  // случайное число матчей для вида
+            winRate: Math.floor(Math.random() * 40) + 40, // случайный win rate 40-80%
+            status: 'idle',
+            rank: 0 // будет пересчитан ниже
+        }));
+
+        // Объединяем реальных + призраков и пересчитываем rank по points
+        const combined = [...ladderPlayers, ...ghostLadderPlayers]
+            .sort((a, b) => (b.points || 0) - (a.points || 0))
+            .map((p, i) => ({ ...p, rank: i + 1 }));
+
+        res.json(combined);
     } catch (err) {
         console.error("Fetch Ladder Rankings Error:", err);
         res.status(500).json({ error: 'Failed to fetch ladder rankings' });
