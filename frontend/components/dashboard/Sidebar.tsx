@@ -57,13 +57,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogo
   return (
     <aside className="fixed left-0 top-0 h-screen w-72 bg-slate-900 text-white hidden md:flex flex-col z-20 shadow-2xl">
       <div className="p-8">
-        <div className="flex items-center gap-3 mb-10">
-           <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center shadow-lg border border-slate-700">
-             <div className="w-4 h-4 rounded-full bg-lime-400 shadow-[0_0_10px_rgba(163,230,53,0.5)]"></div>
-           </div>
-          <span className="text-2xl font-black tracking-wider text-white">
-            НаКорте
-          </span>
+        <div className="flex items-center mb-10">
+          <img src="/assets/logo.svg" alt="НаКорте" className="h-14 w-auto" />
         </div>
         
         <nav className="space-y-2 overflow-y-auto max-h-[calc(100vh-200px)] hide-scrollbar pb-4">

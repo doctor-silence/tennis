@@ -130,12 +130,7 @@ const TrainerCRMPage = ({
             className="flex items-center gap-2 cursor-pointer group"
             onClick={onBack}
           >
-            <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-              <div className="w-4 h-4 rounded-full bg-lime-400"></div>
-            </div>
-            <span className="text-2xl font-black uppercase tracking-wider text-white">
-              НА<span className="text-3xl">К</span>орте
-            </span>
+            <img src="/assets/logo.svg" alt="НаКорте" className="h-14 w-auto group-hover:opacity-90 transition-opacity" />
           </div>
           <nav className="hidden md:flex items-center gap-8 text-sm font-bold uppercase tracking-wider text-slate-300">
             <a href="/news/" className="hover:text-white transition-colors">

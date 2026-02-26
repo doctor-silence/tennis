@@ -196,11 +196,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
       <div className={`md:hidden fixed top-0 left-0 h-full w-72 bg-slate-900 z-50 flex flex-col transform transition-transform duration-300 ease-in-out shadow-2xl ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         {/* Drawer Header */}
         <div className="flex items-center justify-between px-5 py-5 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-slate-800 rounded-xl flex items-center justify-center border border-slate-700">
-              <div className="w-3 h-3 rounded-full bg-lime-400 shadow-[0_0_8px_rgba(163,230,53,0.6)]"></div>
-            </div>
-            <span className="text-xl font-black tracking-wider text-white">НаКорте</span>
+          <div className="flex items-center">
+            <img src="/assets/logo.svg" alt="НаКорте" className="h-12 w-auto" />
           </div>
           <button onClick={() => setMobileMenuOpen(false)} className="text-slate-400 hover:text-white p-1">
             <X size={22} />
@@ -269,11 +266,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
           >
             <Menu size={20}/>
           </button>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700">
-              <div className="w-2.5 h-2.5 rounded-full bg-lime-400"></div>
-            </div>
-            <span className="font-black tracking-wider text-white text-sm">НаКорте</span>
+          <div className="flex items-center">
+            <img src="/assets/logo.svg" alt="НаКорте" className="h-10 w-auto" />
           </div>
         </div>
         <div className="flex items-center gap-2">

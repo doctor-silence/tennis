@@ -198,15 +198,15 @@ const PublicHeader = ({ onLogin, onRegister, onNavigate, transparent = false }: 
   <header className={`fixed top-0 w-full z-50 transition-all duration-300 ${transparent ? 'bg-transparent border-transparent' : 'glass-panel border-b-0 bg-white/80 backdrop-blur-md'}`} style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
       <div 
-        className="flex items-center gap-2 cursor-pointer group" 
+        className="flex items-center cursor-pointer group" 
         onClick={() => onNavigate('landing')}
       >
-        <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-          <div className="w-4 h-4 rounded-full bg-lime-400"></div>
-        </div>
-        <span className={`text-2xl font-black uppercase tracking-wider ${transparent ? 'text-white' : 'text-slate-900'}`}>
-          НА<span className="text-3xl">К</span>орте
-        </span>
+        <img
+          src="/assets/logo.svg"
+          alt="НаКорте"
+          className="h-14 sm:h-16 w-auto group-hover:opacity-90 transition-opacity"
+          style={transparent ? {} : { filter: 'invert(1)' }}
+        />
       </div>
       
       <nav className={`hidden md:flex items-center gap-8 text-sm font-bold uppercase tracking-wider ${transparent ? 'text-slate-300' : 'text-slate-500'}`}>
@@ -524,11 +524,8 @@ const NewsPage = ({ onBack, onLogin, onRegister, onNavigate }: { onBack: () => v
             {/* Footer */}
             <footer className="bg-white border-t border-slate-200 mt-16 py-10">
               <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
-                <a href="/" className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
-                    <div className="w-3 h-3 rounded-full bg-lime-400"></div>
-                  </div>
-                  <span className="text-xl font-black tracking-wider text-slate-900">НаКорте</span>
+                <a href="/" className="flex items-center">
+                  <img src="/assets/logo.svg" alt="НаКорте" className="h-16 w-auto" style={{ filter: 'invert(1)' }} />
                 </a>
                 <div className="text-slate-400 text-sm">
                   &copy; 2026 НаКорте. Все права защищены.
@@ -867,13 +864,8 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
        
        <footer className="bg-slate-50 py-12 border-t border-slate-200">
          <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-6">
-           <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
-                <div className="w-3 h-3 rounded-full bg-lime-400"></div>
-              </div>
-              <span className="text-xl font-black tracking-wider text-slate-900">
-                На<span className="text-2xl">К</span>орте
-              </span>
+           <div className="flex items-center">
+              <img src="/assets/logo.svg" alt="НаКорте" className="h-20 w-auto" style={{ filter: 'invert(1)' }} />
            </div>
            <div className="text-slate-500 text-sm font-medium">
              &copy; 2026 НаКорте. Все права защищены.
@@ -908,13 +900,8 @@ const RttInfoPage = ({ onBack, onRegister }: { onBack: () => void, onRegister: (
             <ChevronLeft size={18} />
             <span className="hidden xs:inline">На главную</span>
           </button>
-          <div className="flex items-center gap-2 cursor-pointer group" onClick={onBack}>
-            <div className="w-8 h-8 md:w-10 md:h-10 bg-slate-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-              <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-lime-400"></div>
-            </div>
-            <span className="text-xl md:text-2xl font-black uppercase tracking-wider text-white">
-              НА<span className="text-2xl md:text-3xl">К</span>орте
-            </span>
+          <div className="flex items-center cursor-pointer group" onClick={onBack}>
+            <img src="/assets/logo.svg" alt="НаКорте" className="h-12 md:h-14 w-auto group-hover:opacity-90 transition-opacity" />
           </div>
           <nav className="hidden md:flex items-center gap-8 text-sm font-bold uppercase tracking-wider text-slate-300">
             <a href="/news/" className="hover:text-white transition-colors">Новости</a>
@@ -1832,11 +1819,8 @@ const LegalPage = ({ type, onBack }: { type: 'privacy' | 'terms', onBack: () => 
             <ChevronLeft size={20} /> На главную
           </button>
           <div className="w-px h-6 bg-slate-200" />
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-slate-900 rounded-md flex items-center justify-center flex-shrink-0">
-              <div className="w-2 h-2 rounded-full bg-lime-400"></div>
-            </div>
-            <span className="font-black tracking-wider text-slate-900 text-sm">НаКорте</span>
+          <div className="flex items-center">
+            <img src="/assets/logo.svg" alt="НаКорте" className="h-11 w-auto" style={{ filter: 'invert(1)' }} />
           </div>
         </div>
       </div>
