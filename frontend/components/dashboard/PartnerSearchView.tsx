@@ -114,7 +114,7 @@ const PartnerSearchView = ({ onNavigate, onStartConversation, onCreateChallenge 
                          <option value="4.5">NTRP 4.5 (Полупрофи)</option>
                          <option value="5.0">NTRP 5.0+ (Профи)</option>
                      </select>
-                     <Button variant="secondary" className="w-12 px-0"><Filter size={20}/></Button>
+                     <button className="w-12 h-12 flex items-center justify-center bg-lime-400 hover:bg-lime-500 text-slate-900 rounded-xl shadow-lg shadow-lime-400/30 transition-all active:scale-95 flex-shrink-0"><Filter size={20}/></button>
                  </div>
             </div>
 
