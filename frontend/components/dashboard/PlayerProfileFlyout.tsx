@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { X, TrendingUp, TrendingDown, Award, Calendar, Swords, Shield } from 'lucide-react';
+import { X, TrendingUp, TrendingDown, Award, Calendar, Swords, Shield, CheckCircle2 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { PlayerProfile } from '../../types';
 
@@ -39,7 +39,14 @@ const PlayerProfileFlyout = ({ profile, onClose }: { profile: PlayerProfile, onC
                 <div className="flex-1 overflow-y-auto p-6">
                     {/* Header */}
                     <div className="flex items-center gap-4 mb-6">
-                        <img src={profile.avatar} className="w-20 h-20 rounded-full border-4 border-white shadow-lg" alt={profile.name} />
+                        <div className="relative shrink-0">
+                            <img src={profile.avatar} className="w-20 h-20 rounded-full border-4 border-white shadow-lg" alt={profile.name} />
+                            {profile.role === 'rtt_pro' && (
+                                <div className="absolute bottom-0 right-0">
+                                    <CheckCircle2 className="text-blue-500 fill-blue-100" size={26} strokeWidth={2} />
+                                </div>
+                            )}
+                        </div>
                         <div>
                             <h3 className="text-2xl font-bold">{profile.name}</h3>
                             <p className="text-slate-500">В рейтинге с {new Date(profile.joinDate).toLocaleDateString('ru-RU', { year: 'numeric', month: 'long' })}</p>

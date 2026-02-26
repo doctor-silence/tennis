@@ -1554,6 +1554,7 @@ app.get('/api/ladder/player/:userId', async (req, res) => {
             matches: wins + losses,
             winRate: (wins + losses) > 0 ? Math.round((wins / (wins + losses)) * 100) : 0,
             status: 'idle', // This will be dynamically set by the frontend
+            role: userRow.role,
             joinDate: userRow.join_date,
             bio: 'Нет дополнительной информации об этом игроке.', // Placeholder
             stats: { wins, losses, bestRank: userRow.rtt_rank || 0, currentStreak: currentStreak },

@@ -204,6 +204,7 @@ export interface LadderPlayer {
     matches: number;
     winRate: number;
     status: 'idle' | 'defending' | 'challenging';
+    role?: string;
 }
 
 export interface RankHistoryItem {
