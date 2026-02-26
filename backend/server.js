@@ -456,6 +456,46 @@ app.post('/api/support/messages', async (req, res) => {
 });
 
 
+// --- ONLINE PRESENCE ---
+
+// Добавляем колонку last_seen если её ещё нет
+pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP`).catch(() => {});
+
+// Пинг: обновляет last_seen текущего пользователя (вызывается с фронта каждые 30 сек)
+app.post('/api/users/ping', async (req, res) => {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId required' });
+    try {
+        await pool.query('UPDATE users SET last_seen = NOW() WHERE id = $1', [userId]);
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Статистика онлайна: реальные (last_seen < 2 мин) и всего зарегистрированных
+app.get('/api/users/online-stats', async (req, res) => {
+    try {
+        const online = await pool.query(
+            `SELECT COUNT(*) FROM users WHERE last_seen > NOW() - INTERVAL '2 minutes'`
+        );
+        const realUsers = await pool.query(`SELECT COUNT(*) FROM users`);
+        // Ghost users считаем отдельно (могут отсутствовать таблица)
+        let ghostCount = 0;
+        try {
+            const ghosts = await pool.query(`SELECT COUNT(*) FROM ghost_users`);
+            ghostCount = parseInt(ghosts.rows[0].count);
+        } catch {}
+
+        res.json({
+            online: parseInt(online.rows[0].count),
+            total: parseInt(realUsers.rows[0].count) + ghostCount
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- ADMIN ROUTES ---
 
 app.get('/api/admin/stats', async (req, res) => {
@@ -1887,7 +1927,7 @@ app.get('/api/tournaments', async (req, res) => {
                 (SELECT COUNT(*) FROM tournament_applications ta WHERE ta.tournament_id = t.id AND ta.status = 'pending') as pending_applications_count
             FROM tournaments t
             JOIN users u ON t.user_id = u.id
-            LEFT JOIN groups g ON t.target_group_id IS NOT NULL AND t.target_group_id != '' AND CAST(t.target_group_id AS INTEGER) = g.id
+            LEFT JOIN groups g ON t.target_group_id IS NOT NULL AND t.target_group_id != '' AND t.target_group_id ~ '^\d+$' AND CAST(t.target_group_id AS INTEGER) = g.id
             LEFT JOIN group_members gm ON g.id = gm.group_id AND gm.user_id = $1
             WHERE
                 t.user_id = $1 -- It's a tournament created by the current user

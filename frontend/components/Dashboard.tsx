@@ -117,7 +117,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
   const renderContent = () => {
     const views: { [key in DashboardTab]?: React.ReactNode } = {
         profile: <ProfileView user={user} onUserUpdate={onUserUpdate} />,
-        search: <PartnerSearchView onNavigate={handleNavigate} onStartConversation={handleStartConversation} onCreateChallenge={handleCreateChallenge} />,
+        search: <PartnerSearchView user={user} onNavigate={handleNavigate} onStartConversation={handleStartConversation} onCreateChallenge={handleCreateChallenge} />,
         courts: <CourtBookingView />,
         ai_coach: <AiCoachView user={user} />,
         messages: <MessagesView 

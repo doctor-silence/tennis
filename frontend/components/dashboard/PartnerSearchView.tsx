@@ -1,20 +1,47 @@
 
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, MapPin, Radar, CheckCircle2 } from 'lucide-react';
-import { Partner, DashboardTab } from '../../types';
+import { Partner, DashboardTab, User } from '../../types';
 import Button from '../Button';
 import { api } from '../../services/api';
 
 interface PartnerSearchViewProps {
+    user: User;
     onNavigate: (tab: DashboardTab) => void;
     onStartConversation: (partnerId: string) => void;
     onCreateChallenge: (opponentId: string) => void;
 }
 
-const PartnerSearchView = ({ onNavigate, onStartConversation, onCreateChallenge }: PartnerSearchViewProps) => {
+const PartnerSearchView = ({ user, onNavigate, onStartConversation, onCreateChallenge }: PartnerSearchViewProps) => {
     const [partners, setPartners] = useState<Partner[]>([]);
     const [filter, setFilter] = useState({ city: '', level: 'all', search: '' });
-    const [cities, setCities] = useState<string[]>([]); // New state for cities
+    const [cities, setCities] = useState<string[]>([]);
+    const [onlineStats, setOnlineStats] = useState<{ online: number; total: number } | null>(null);
+    const [fakeOnline, setFakeOnline] = useState(Math.floor(Math.random() * 11) + 20);
+
+    // Анимированный счётчик онлайна: меняется каждые 4-7 секунд
+    useEffect(() => {
+        const tick = () => {
+            setFakeOnline(prev => {
+                const delta = Math.random() < 0.5 ? 1 : -1;
+                const next = prev + delta;
+                return Math.min(30, Math.max(20, next));
+            });
+        };
+        const id = setInterval(tick, Math.random() * 10000 + 15000);
+        return () => clearInterval(id);
+    }, []);
+
+    // Пинг сервера каждые 30 секунд + загрузка статистики
+    useEffect(() => {
+        const ping = () => {
+            if (user?.id) api.pingOnline(user.id);
+            api.getOnlineStats().then(setOnlineStats);
+        };
+        ping();
+        const interval = setInterval(ping, 30000);
+        return () => clearInterval(interval);
+    }, [user?.id]);
 
     // Fetch partners when filter changes
     useEffect(() => {
@@ -67,9 +94,17 @@ const PartnerSearchView = ({ onNavigate, onStartConversation, onCreateChallenge 
                     {/* Статистика */}
                     <div class="hidden md:flex gap-8 items-center bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-[24px]">
                         <div class="text-center">
-                            <div class="text-[10px] font-black text-slate-500 uppercase mb-1">Онлайн</div>
+                            <div class="text-[10px] font-black text-slate-500 uppercase mb-1">Онлайн сейчас</div>
                             <div class="text-2xl font-black text-white flex items-center gap-2">
-                                <div class="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></div> 248
+                                <div class="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></div>
+                                {fakeOnline}
+                            </div>
+                        </div>
+                        <div class="w-px h-8 bg-white/10"></div>
+                        <div class="text-center">
+                            <div class="text-[10px] font-black text-slate-500 uppercase mb-1">Всего игроков</div>
+                            <div class="text-2xl font-black text-slate-400">
+                                {onlineStats ? onlineStats.total : '—'}
                             </div>
                         </div>
                     </div>

@@ -994,6 +994,23 @@ export const api = {
         },
     },
 
+    pingOnline: async (userId: string | number) => {
+        try {
+            await fetch(`${API_URL}/users/ping`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId }),
+            });
+        } catch {}
+    },
+
+    getOnlineStats: async (): Promise<{ online: number; total: number }> => {
+        try {
+            const res = await fetch(`${API_URL}/users/online-stats`);
+            return await res.json();
+        } catch { return { online: 0, total: 0 }; }
+    },
+
     getPartners: async (params?: { city?: string; level?: string; search?: string }) => {
         try {
             const searchParams = new URLSearchParams();
