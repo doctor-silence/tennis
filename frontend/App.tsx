@@ -204,7 +204,7 @@ const PublicHeader = ({ onLogin, onRegister, onNavigate, transparent = false }: 
         <img
           src="/assets/logo.svg"
           alt="НаКорте"
-          className="h-14 sm:h-16 w-auto group-hover:opacity-90 transition-opacity"
+          className="h-20 w-auto group-hover:opacity-90 transition-opacity"
           style={transparent ? {} : { filter: 'invert(1)' }}
         />
       </div>
@@ -894,14 +894,14 @@ const RttInfoPage = ({ onBack, onRegister }: { onBack: () => void, onRegister: (
     <div id="rtt-scroll-container" className="bg-slate-900 h-screen text-white relative overflow-y-auto overflow-x-hidden">
       {/* Sticky Header */}
       <header className={`sticky top-0 w-full z-50 transition-all duration-300 ${scrolled ? 'bg-slate-900/95 backdrop-blur-md border-b border-white/10 shadow-xl' : 'bg-transparent border-transparent'}`} style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 md:h-20 flex items-center justify-between gap-2">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-24 md:h-28 flex items-center justify-between gap-2">
           {/* Back button — мобильный */}
           <button onClick={onBack} className="flex items-center gap-1 text-slate-300 hover:text-white transition-colors text-sm font-semibold shrink-0">
             <ChevronLeft size={18} />
             <span className="hidden xs:inline">На главную</span>
           </button>
           <div className="flex items-center cursor-pointer group" onClick={onBack}>
-            <img src="/assets/logo.svg" alt="НаКорте" className="h-12 md:h-14 w-auto group-hover:opacity-90 transition-opacity" />
+            <img src="/assets/logo.svg" alt="НаКорте" className="h-20 w-auto group-hover:opacity-90 transition-opacity" />
           </div>
           <nav className="hidden md:flex items-center gap-8 text-sm font-bold uppercase tracking-wider text-slate-300">
             <a href="/news/" className="hover:text-white transition-colors">Новости</a>
