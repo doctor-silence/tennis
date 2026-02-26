@@ -344,7 +344,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     };
 
     const handleEditTournament = (tournament: Tournament) => {
-        setEditingTournament(tournament);
+        setEditingTournament({
+            ...tournament,
+            // Map snake_case DB fields → camelCase form fields
+            startDate: (tournament.startDate || (tournament as any).start_date || ''),
+            endDate: (tournament.endDate || (tournament as any).end_date || ''),
+            prizePool: (tournament.prizePool || (tournament as any).prize_pool || ''),
+            tournamentType: (tournament.tournamentType || (tournament as any).tournament_type || 'Одиночный'),
+            ageGroup: (tournament.ageGroup || (tournament as any).age_group || ''),
+            matchFormat: (tournament.matchFormat || (tournament as any).match_format || ''),
+            groupName: (tournament.groupName || (tournament as any).group_name || ''),
+            participantsCount: (tournament.participantsCount || (tournament as any).participants_count || 16),
+            target_group_id: (tournament.target_group_id || (tournament as any).target_group_id || ''),
+        });
         setIsTournamentModalOpen(true);
     };
 
