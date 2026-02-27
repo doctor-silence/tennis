@@ -468,6 +468,9 @@ app.post('/api/support/messages', async (req, res) => {
 // Добавляем колонку last_seen если её ещё нет
 pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP`).catch(() => {});
 
+// Добавляем колонку avatar в groups если её ещё нет
+pool.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS avatar TEXT`).catch(() => {});
+
 // Создаём таблицу ghost_users если не существует
 pool.query(`
     CREATE TABLE IF NOT EXISTS ghost_users (
@@ -728,11 +731,11 @@ app.post('/api/admin/groups', async (req, res) => {
 
 app.put('/api/admin/groups/:id', async (req, res) => {
     const { id } = req.params;
-    const { name, description, location, contact } = req.body;
+    const { name, description, location, contact, avatar } = req.body;
     try {
         const result = await pool.query(
-            'UPDATE groups SET name = $1, description = $2, location = $3, contact = $4 WHERE id = $5 RETURNING *',
-            [name, description, location, contact, id]
+            'UPDATE groups SET name = $1, description = $2, location = $3, contact = $4, avatar = $5 WHERE id = $6 RETURNING *',
+            [name, description, location, contact, avatar || null, id]
         );
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Group not found' });

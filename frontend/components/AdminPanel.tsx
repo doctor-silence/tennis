@@ -954,6 +954,39 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             <Modal isOpen={isGroupModalOpen} onClose={() => setIsGroupModalOpen(false)} title={editingGroup?.id ? 'Редактировать группу' : 'Новая группа'}>
                 {editingGroup && (
                     <form onSubmit={handleSaveGroup} className="space-y-4">
+                        {/* Avatar upload */}
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Аватар группы</label>
+                            <div className="flex items-center gap-4">
+                                <div className="w-16 h-16 rounded-2xl bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden shrink-0">
+                                    {editingGroup.avatar
+                                        ? <img src={editingGroup.avatar} className="w-full h-full object-cover" alt="avatar" />
+                                        : <span className="text-2xl">🎾</span>
+                                    }
+                                </div>
+                                <div className="flex-1 space-y-2">
+                                    <label className="flex items-center gap-2 cursor-pointer bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors">
+                                        <span>📁 Выбрать фото</span>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={e => {
+                                                const file = e.target.files?.[0];
+                                                if (!file) return;
+                                                if (file.size > 500 * 1024) { alert('Файл слишком большой. Максимум 500 КБ'); return; }
+                                                const reader = new FileReader();
+                                                reader.onload = () => setEditingGroup({...editingGroup, avatar: reader.result as string});
+                                                reader.readAsDataURL(file);
+                                            }}
+                                        />
+                                    </label>
+                                    {editingGroup.avatar && (
+                                        <button type="button" onClick={() => setEditingGroup({...editingGroup, avatar: ''})} className="text-xs text-red-400 hover:text-red-600 font-bold">✕ Удалить фото</button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Название</label>
                             <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingGroup.name || ''} onChange={e => setEditingGroup({...editingGroup, name: e.target.value})} />
