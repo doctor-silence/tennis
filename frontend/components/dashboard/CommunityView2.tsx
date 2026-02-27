@@ -537,6 +537,93 @@ const TournamentAnnouncementPost = ({ post }: { post: any }) => (
     </div>
 );
 
+// Результат матча в рамках турнира (публикует админ)
+const TournamentMatchResultPost = ({ post }: { post: any }) => {
+    const c = post.content || {};
+    const isFullResult = !c.player1Name;
+    if (isFullResult) return <TournamentResultPost post={post} />;
+
+    const isFinal = c.round === 'Финал';
+    const isSemi = c.round === 'Полуфинал';
+    const roundLabel = c.round
+        ? isFinal ? '🏆 Финал' : isSemi ? '⚡ Полуфинал' : `Раунд ${c.round}`
+        : 'Матч';
+
+    return (
+        <div className={`p-4 rounded-2xl shadow-lg border relative overflow-hidden ${isFinal ? 'bg-gradient-to-br from-amber-900 to-slate-900 border-amber-500/40' : 'bg-gradient-to-br from-slate-900 to-slate-800 border-slate-700'}`}>
+            <div className="absolute -top-4 -right-4 opacity-10">
+                <Trophy size={80} strokeWidth={1} className="text-white"/>
+            </div>
+            <div className="relative z-10">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center ${isFinal ? 'bg-amber-400' : 'bg-slate-600'}`}>
+                            <Trophy size={14} className="text-white" fill="white"/>
+                        </div>
+                        <div>
+                            <p className={`text-[10px] font-black uppercase tracking-widest ${isFinal ? 'text-amber-400' : 'text-slate-400'}`}>
+                                {c.tournamentName}
+                            </p>
+                            <p className="text-[10px] text-slate-500">{post.author?.role === 'admin' ? 'Администрация' : post.author?.name} · {new Date(post.created_at).toLocaleDateString('ru-RU')}</p>
+                        </div>
+                    </div>
+                    {/* Round badge */}
+                    {c.round && (
+                        <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wide ${
+                            isFinal ? 'bg-amber-400 text-amber-900' :
+                            isSemi ? 'bg-purple-500/30 text-purple-300 border border-purple-500/40' :
+                            'bg-white/10 text-slate-300 border border-white/10'
+                        }`}>{roundLabel}</span>
+                    )}
+                </div>
+
+                {/* Score board */}
+                <div className="flex items-stretch gap-2">
+                    {/* Player 1 */}
+                    <div className={`flex-1 flex flex-col items-center justify-center p-3 rounded-xl gap-1 ${c.winnerName === c.player1Name ? 'bg-lime-400/20 border border-lime-400/40' : 'bg-white/5'}`}>
+                        {c.winnerName === c.player1Name && (
+                            <div className="flex items-center gap-1 mb-0.5">
+                                <span className="w-4 h-4 rounded-full bg-lime-400 flex items-center justify-center">
+                                    <svg width="8" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                </span>
+                                <span className="text-[9px] font-black text-lime-400 uppercase">Победа</span>
+                            </div>
+                        )}
+                        <p className="font-black text-white text-sm text-center leading-tight">{c.player1Name}</p>
+                        {c.winnerName !== c.player1Name && c.winnerName && (
+                            <p className="text-[9px] text-slate-500 font-bold uppercase">Проигрыш</p>
+                        )}
+                    </div>
+
+                    {/* Score */}
+                    <div className="flex flex-col items-center justify-center shrink-0 px-1">
+                        <p className="font-black text-xl text-white tracking-tight leading-none">{c.score}</p>
+                        <p className="text-[9px] text-slate-500 font-bold uppercase mt-0.5">счёт</p>
+                    </div>
+
+                    {/* Player 2 */}
+                    <div className={`flex-1 flex flex-col items-center justify-center p-3 rounded-xl gap-1 ${c.winnerName === c.player2Name ? 'bg-lime-400/20 border border-lime-400/40' : 'bg-white/5'}`}>
+                        {c.winnerName === c.player2Name && (
+                            <div className="flex items-center gap-1 mb-0.5">
+                                <span className="w-4 h-4 rounded-full bg-lime-400 flex items-center justify-center">
+                                    <svg width="8" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                </span>
+                                <span className="text-[9px] font-black text-lime-400 uppercase">Победа</span>
+                            </div>
+                        )}
+                        <p className="font-black text-white text-sm text-center leading-tight">{c.player2Name}</p>
+                        {c.winnerName !== c.player2Name && c.winnerName && (
+                            <p className="text-[9px] text-slate-500 font-bold uppercase">Проигрыш</p>
+                        )}
+                    </div>
+                </div>
+
+                {c.note && <p className="text-xs text-slate-400 mt-3 text-center italic">"{c.note}"</p>}
+            </div>
+        </div>
+    );
+};
 
 const TournamentResultPost = ({ post }: { post: any }) => (
     <div className="bg-gradient-to-br from-amber-50 to-white p-4 rounded-2xl shadow-lg border-2 border-amber-200/80 relative overflow-hidden">
@@ -551,7 +638,7 @@ const TournamentResultPost = ({ post }: { post: any }) => (
                     </div>
                     <div>
                         <p className="font-bold text-amber-900 text-sm">ТУРНИР ЗАВЕРШЕН</p>
-                        <p className="text-xs text-amber-700/80">Опубликовал: {post.author.name}</p>
+                        <p className="text-xs text-amber-700/80">Опубликовал: {post.author?.role === 'admin' ? 'Администрация' : post.author?.name}</p>
                     </div>
                 </div>
             </div>
@@ -591,7 +678,10 @@ const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate, onSta
                     case 'partner_search':
                         return <PartnerSearchPost key={item.id} post={item} />;
                     case 'match_result':
-                        return <MatchResultPost key={item.id} post={item} user={user} onUpdate={onUpdate} />;
+                        // Если есть tournamentName в content — это результат от турнира (публикует админ)
+                        return item.content?.tournamentName
+                            ? <TournamentMatchResultPost key={item.id} post={item} />
+                            : <MatchResultPost key={item.id} post={item} user={user} onUpdate={onUpdate} />;
                     case 'marketplace':
                         return <MarketplacePost key={item.id} post={item} user={user} onStartConversation={onStartConversation} onUpdate={onUpdate} />;
                     case 'tournament_announcement':

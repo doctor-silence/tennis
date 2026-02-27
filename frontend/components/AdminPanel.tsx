@@ -29,7 +29,9 @@ import {
     Eye,
     EyeOff,
     Loader2,
-    RefreshCw
+    RefreshCw,
+    Send,
+    Megaphone
 } from 'lucide-react';
 import AdminTournamentsView from './dashboard/AdminTournamentsView';
 import AdminSupportChat from './dashboard/AdminSupportChat';
@@ -82,6 +84,14 @@ type AdminGroup = Group & { creator_name: string; members_count: number };
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups' | 'tournaments' | 'support' | 'news'>('support');
+
+    // Toast notifications
+    const [toasts, setToasts] = useState<{ id: number; message: string; type: 'success' | 'error' }[]>([]);
+    const toast = (message: string, type: 'success' | 'error' = 'success') => {
+        const id = Date.now();
+        setToasts(prev => [...prev, { id, message, type }]);
+        setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
+    };
     
     // Data State
     const [stats, setStats] = useState({ revenue: 0, activeUsers: 0, newSignups: 0, serverLoad: 0 });
@@ -103,6 +113,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [editingGroup, setEditingGroup] = useState<Partial<Group> | null>(null);
     const [isTournamentModalOpen, setIsTournamentModalOpen] = useState(false);
     const [editingTournament, setEditingTournament] = useState<Partial<Tournament> | null>(null);
+    const [isPublishResultModalOpen, setIsPublishResultModalOpen] = useState(false);
+    const [publishResultTournament, setPublishResultTournament] = useState<Tournament | null>(null);
+    const [publishResultForm, setPublishResultForm] = useState({
+        type: 'tournament_result' as 'tournament_result' | 'match_result_update',
+        round: '' as '' | '1/16' | '1/8' | '1/4' | 'Полуфинал' | 'Финал',
+        player1: '',
+        player2: '',
+        score: '',
+        winnerName: '',
+        note: '',
+    });
+    const [isPublishing, setIsPublishing] = useState(false);
     const [isNewsModalOpen, setIsNewsModalOpen] = useState(false);
     const [editingNews, setEditingNews] = useState<Partial<NewsArticle> | null>(null);
     
@@ -193,7 +215,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                 if(Array.isArray(n)) setNews(n);
             } catch (e: any) {
                 console.error('Ошибка загрузки новостей:', e);
-                alert('Ошибка загрузки новостей: ' + e.message);
+                toast('Ошибка загрузки новостей: ' + e.message, 'error');
             }
         }
     };
@@ -213,7 +235,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             
             await loadData(); // Reload data after deletion
         } catch (e: any) {
-            alert('Ошибка удаления: ' + e.message);
+            toast('Ошибка удаления: ' + e.message, 'error');
             console.error("Deletion failed", e);
         } finally {
             setShowConfirmDeleteModal(false);
@@ -226,11 +248,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const handleSaveProduct = async (e: React.FormEvent) => {
         e.preventDefault();
         if (editingProduct) {
-            await api.admin.saveProduct(editingProduct);
-            await loadData(); // Reload to get IDs
+            try {
+                await api.admin.saveProduct(editingProduct);
+                await loadData();
+                setIsProductModalOpen(false);
+                setEditingProduct(null);
+            } catch (e: any) {
+                toast('Ошибка сохранения: ' + e.message, 'error');
+            }
         }
-        setIsProductModalOpen(false);
-        setEditingProduct(null);
     };
 
     const handleDeleteProduct = (id: string) => {
@@ -254,7 +280,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                 setIsCourtModalOpen(false);
                 setEditingCourt(null);
             } catch (e: any) {
-                alert('Ошибка сохранения: ' + e.message);
+                toast('Ошибка сохранения: ' + e.message, 'error');
                 console.error("Save failed", e);
             }
         }
@@ -287,12 +313,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const handleSaveUser = async (e: React.FormEvent) => {
         e.preventDefault();
         if (editingUser) {
-             if (editingUser.id) await api.admin.updateUser(editingUser.id, editingUser);
-             else await api.admin.createUser(editingUser);
-             await loadData();
+            try {
+                if (editingUser.id) await api.admin.updateUser(editingUser.id, editingUser);
+                else await api.admin.createUser(editingUser);
+                await loadData();
+                setIsUserModalOpen(false);
+                setEditingUser(null);
+            } catch (e: any) {
+                toast('Ошибка сохранения: ' + e.message, 'error');
+            }
         }
-        setIsUserModalOpen(false);
-        setEditingUser(null);
     };
 
     const handleDeleteUser = (id: string) => {
@@ -320,7 +350,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             setIsGroupModalOpen(false);
             setEditingGroup(null);
         } catch (e: any) {
-            alert('Ошибка сохранения: ' + e.message);
+            toast('Ошибка сохранения: ' + e.message, 'error');
         }
     };
 
@@ -331,6 +361,51 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     };
 
     // Tournament Handlers
+    const handlePublishResult = (tournament: Tournament) => {
+        setPublishResultTournament(tournament);
+        setPublishResultForm({ type: 'tournament_result', round: '', player1: '', player2: '', score: '', winnerName: '', note: '' });
+        setIsPublishResultModalOpen(true);
+    };
+
+    const handleSubmitPublishResult = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!publishResultTournament) return;
+        setIsPublishing(true);
+        try {
+            const groupId = publishResultTournament.target_group_id || (publishResultTournament as any).target_group_id || null;
+            const isFullResult = publishResultForm.type === 'tournament_result';
+            const content = isFullResult
+                ? {
+                    tournamentName: publishResultTournament.name,
+                    winnerName: publishResultForm.winnerName,
+                    winnerAvatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(publishResultForm.winnerName)}&background=f59e0b&color=fff`,
+                    note: publishResultForm.note,
+                }
+                : {
+                    tournamentName: publishResultTournament.name,
+                    round: publishResultForm.round,
+                    player1Name: publishResultForm.player1,
+                    player2Name: publishResultForm.player2,
+                    score: publishResultForm.score,
+                    winnerName: publishResultForm.winnerName,
+                    note: publishResultForm.note,
+                };
+            await api.posts.create({
+                userId: user.id,
+                type: isFullResult ? 'tournament_result' : 'match_result',
+                groupId: groupId || undefined,
+                content,
+            });
+            setIsPublishResultModalOpen(false);
+            setPublishResultTournament(null);
+            toast('Результат опубликован в сообществе!');
+        } catch (e: any) {
+            toast('Ошибка: ' + e.message, 'error');
+        } finally {
+            setIsPublishing(false);
+        }
+    };
+
     const handleAddTournament = () => {
         setEditingTournament({
             name: 'Новый турнир',
@@ -373,7 +448,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             setIsTournamentModalOpen(false);
             setEditingTournament(null);
         } catch (e: any) {
-            alert('Ошибка сохранения: ' + e.message);
+            toast('Ошибка сохранения: ' + e.message, 'error');
         }
     };
 
@@ -416,7 +491,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             setIsNewsModalOpen(false);
             setEditingNews(null);
         } catch (e: any) {
-            alert('Ошибка сохранения: ' + e.message);
+            toast('Ошибка сохранения: ' + e.message, 'error');
         }
     };
 
@@ -469,7 +544,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                          <img src={user.avatar} className="w-8 h-8 rounded-full bg-slate-700" alt=""/>
                          <div className="text-sm">
                              <div className="font-bold">{user.name}</div>
-                             <div className="text-xs text-lime-400">Super Admin</div>
+                             <div className="text-xs text-lime-400">Администрация</div>
                          </div>
                     </div>
                     <button onClick={onLogout} className="flex items-center gap-3 text-slate-400 hover:text-white w-full px-2 py-2 rounded-lg hover:bg-slate-800 transition-colors">
@@ -527,6 +602,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                             onDelete={handleDeleteTournament} 
                             onEdit={handleEditTournament} 
                             onAdd={handleAddTournament}
+                            onPublishResult={handlePublishResult}
                         />
                     )}
 
@@ -974,7 +1050,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                             onChange={e => {
                                                 const file = e.target.files?.[0];
                                                 if (!file) return;
-                                                if (file.size > 500 * 1024) { alert('Файл слишком большой. Максимум 500 КБ'); return; }
+                                                if (file.size > 500 * 1024) { toast('Файл слишком большой. Максимум 500 КБ', 'error'); return; }
                                                 const reader = new FileReader();
                                                 reader.onload = () => setEditingGroup({...editingGroup, avatar: reader.result as string});
                                                 reader.readAsDataURL(file);
@@ -1395,11 +1471,160 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                     </div>
                 </div>
             </Modal>
+
+            {/* Publish Tournament Result Modal */}
+            <Modal isOpen={isPublishResultModalOpen} onClose={() => setIsPublishResultModalOpen(false)} title="📢 Опубликовать результат">
+                {publishResultTournament && (
+                    <form onSubmit={handleSubmitPublishResult} className="space-y-4">
+                        {/* Tournament badge */}
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3">
+                            <Trophy size={18} className="text-amber-500 shrink-0"/>
+                            <div>
+                                <p className="text-xs text-amber-700 font-bold uppercase">Турнир</p>
+                                <p className="font-black text-slate-900 text-sm">{publishResultTournament.name}</p>
+                                {!(publishResultTournament.target_group_id || (publishResultTournament as any).target_group_id) && (
+                                    <p className="text-xs text-red-500 mt-0.5">⚠️ Турнир без группы — пост увидят все</p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Post type */}
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Тип публикации</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button type="button"
+                                    onClick={() => setPublishResultForm(f => ({...f, type: 'match_result_update'}))}
+                                    className={`p-3 rounded-xl border-2 text-left transition-all ${publishResultForm.type === 'match_result_update' ? 'border-lime-400 bg-lime-50' : 'border-slate-200 hover:border-slate-300'}`}
+                                >
+                                    <p className="font-bold text-sm">⚡ Результат матча</p>
+                                    <p className="text-xs text-slate-400 mt-0.5">Счёт между двумя игроками</p>
+                                </button>
+                                <button type="button"
+                                    onClick={() => setPublishResultForm(f => ({...f, type: 'tournament_result'}))}
+                                    className={`p-3 rounded-xl border-2 text-left transition-all ${publishResultForm.type === 'tournament_result' ? 'border-amber-400 bg-amber-50' : 'border-slate-200 hover:border-slate-300'}`}
+                                >
+                                    <p className="font-bold text-sm">🏆 Турнир завершён</p>
+                                    <p className="text-xs text-slate-400 mt-0.5">Финальный победитель</p>
+                                </button>
+                            </div>
+                        </div>
+
+                        {publishResultForm.type === 'match_result_update' && (
+                            <>
+                                {/* Раунд */}
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Раунд</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {(['1/16', '1/8', '1/4', 'Полуфинал', 'Финал'] as const).map(r => (
+                                            <button
+                                                key={r}
+                                                type="button"
+                                                onClick={() => setPublishResultForm(f => ({...f, round: f.round === r ? '' : r}))}
+                                                className={`px-3 py-1.5 rounded-xl text-xs font-black border-2 transition-all ${
+                                                    publishResultForm.round === r
+                                                        ? r === 'Финал'
+                                                            ? 'border-amber-400 bg-amber-50 text-amber-700'
+                                                            : 'border-lime-400 bg-lime-50 text-lime-700'
+                                                        : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                                                }`}
+                                            >
+                                                {r === 'Финал' ? '🏆 ' : r === 'Полуфинал' ? '⚡ ' : ''}{r}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Игроки */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Игрок 1</label>
+                                        <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none text-sm" placeholder="Имя игрока" value={publishResultForm.player1} onChange={e => setPublishResultForm(f => ({...f, player1: e.target.value}))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Игрок 2</label>
+                                        <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none text-sm" placeholder="Имя игрока" value={publishResultForm.player2} onChange={e => setPublishResultForm(f => ({...f, player2: e.target.value}))} />
+                                    </div>
+                                </div>
+
+                                {/* Счёт */}
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Счёт</label>
+                                    <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none text-sm" placeholder="6:3 6:4" value={publishResultForm.score} onChange={e => setPublishResultForm(f => ({...f, score: e.target.value}))} />
+                                </div>
+
+                                {/* Победитель — кликабельный выбор */}
+                                {publishResultForm.player1 && publishResultForm.player2 && (
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Победитель</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {[publishResultForm.player1, publishResultForm.player2].map(name => (
+                                                <button
+                                                    key={name}
+                                                    type="button"
+                                                    onClick={() => setPublishResultForm(f => ({...f, winnerName: name}))}
+                                                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${
+                                                        publishResultForm.winnerName === name
+                                                            ? 'border-lime-400 bg-lime-50 text-lime-800'
+                                                            : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                                                    }`}
+                                                >
+                                                    <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                                        publishResultForm.winnerName === name ? 'border-lime-500 bg-lime-400' : 'border-slate-300'
+                                                    }`}>
+                                                        {publishResultForm.winnerName === name && (
+                                                            <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                                                                <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                            </svg>
+                                                        )}
+                                                    </span>
+                                                    <span className="truncate">{name}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {publishResultForm.type === 'tournament_result' && (
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Победитель турнира</label>
+                                <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none text-sm" placeholder="Имя победителя" value={publishResultForm.winnerName} onChange={e => setPublishResultForm(f => ({...f, winnerName: e.target.value}))} />
+                            </div>
+                        )}
+
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Комментарий (необязательно)</label>
+                            <textarea rows={2} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none text-sm resize-none" placeholder="Отличный матч! Борьба до последнего..." value={publishResultForm.note} onChange={e => setPublishResultForm(f => ({...f, note: e.target.value}))} />
+                        </div>
+
+                        <div className="flex gap-2 pt-1">
+                            <Button variant="outline" type="button" className="flex-1" onClick={() => setIsPublishResultModalOpen(false)}>Отмена</Button>
+                            <Button type="submit" className="flex-1 gap-2" disabled={isPublishing}>
+                                {isPublishing ? <Loader2 size={16} className="animate-spin"/> : <Megaphone size={16}/>}
+                                {isPublishing ? 'Публикую...' : 'Опубликовать'}
+                            </Button>
+                        </div>
+                    </form>
+                )}
+            </Modal>
+            {/* Toast Notifications */}
+            <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2 pointer-events-none">
+                {toasts.map(t => (
+                    <div key={t.id} className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl text-sm font-bold animate-fade-in-up pointer-events-auto transition-all ${
+                        t.type === 'success'
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-red-500 text-white'
+                    }`}>
+                        <span className="text-base">{t.type === 'success' ? '✅' : '❌'}</span>
+                        <span>{t.message}</span>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 };
 
-// Internal Components
 const SidebarLink = ({ icon, label, active, onClick }: any) => (
     <button 
         onClick={onClick}

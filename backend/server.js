@@ -1684,7 +1684,7 @@ app.get('/api/posts', async (req, res) => {
                 p.type,
                 p.content,
                 p.created_at,
-                json_build_object('id', u.id, 'name', u.name, 'avatar', u.avatar) as author,
+                json_build_object('id', u.id, 'name', u.name, 'avatar', u.avatar, 'role', u.role) as author,
                 (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes_count,
                 EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $1) as liked_by_user,
                 (SELECT json_agg(json_build_object(

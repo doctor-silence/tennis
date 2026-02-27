@@ -1598,7 +1598,7 @@ export const api = {
                 return [];
             }
         },
-        create: async (postData: { userId: string, type: string, content: any }): Promise<{ success: boolean, postId: number }> => {
+        create: async (postData: { userId: string, type: string, content: any, groupId?: string }): Promise<{ success: boolean, postId: number }> => {
             const res = await fetch(`${API_URL}/posts`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

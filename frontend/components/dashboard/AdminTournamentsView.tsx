@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Tournament } from '../../types';
-import { Trash2, Edit, Plus } from 'lucide-react';
+import { Trash2, Edit, Plus, Megaphone } from 'lucide-react';
 import Button from '../Button';
 
 interface AdminTournamentsViewProps {
@@ -9,9 +9,10 @@ interface AdminTournamentsViewProps {
   onDelete: (id: string) => void;
   onEdit: (tournament: Tournament) => void;
   onAdd: () => void;
+  onPublishResult: (tournament: Tournament) => void;
 }
 
-const AdminTournamentsView: React.FC<AdminTournamentsViewProps> = ({ tournaments, onDelete, onEdit, onAdd }) => {
+const AdminTournamentsView: React.FC<AdminTournamentsViewProps> = ({ tournaments, onDelete, onEdit, onAdd, onPublishResult }) => {
   return (
     <div className="animate-fade-in-up">
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -35,19 +36,27 @@ const AdminTournamentsView: React.FC<AdminTournamentsViewProps> = ({ tournaments
             {(tournaments || []).map(t => (
               <tr key={t.id} className="hover:bg-slate-50 transition-colors">
                 <td className="px-6 py-4 font-bold">{t.name}</td>
-                <td className="px-6 py-4 text-slate-600">{t.groupName || 'N/A'}</td>
+                <td className="px-6 py-4 text-slate-600">{t.groupName || 'Без группы'}</td>
                 <td className="px-6 py-4">
                   <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase ${
                     t.status === 'live' ? 'bg-green-100 text-green-700' :
-                    t.status === 'finished' ? 'bg-blue-100 text-blue-700' :
-                    'bg-slate-100 text-slate-600'
+                    t.status === 'open' ? 'bg-blue-100 text-blue-700' :
+                    t.status === 'finished' ? 'bg-slate-100 text-slate-500' :
+                    'bg-yellow-50 text-yellow-600'
                   }`}>
-                    {t.status}
+                    {t.status === 'live' ? 'В игре' : t.status === 'open' ? 'Регистрация' : t.status === 'finished' ? 'Завершён' : 'Черновик'}
                   </span>
                 </td>
-                <td className="px-6 py-4 font-bold text-slate-700">{t.prizePool}</td>
+                <td className="px-6 py-4 font-bold text-slate-700">{(t as any).prize_pool || t.prizePool || '—'}</td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => onPublishResult(t)}
+                      title="Опубликовать результат матча в сообщество"
+                      className="p-2 hover:bg-amber-50 rounded-lg text-amber-500 transition-colors"
+                    >
+                      <Megaphone size={16}/>
+                    </button>
                     <button onClick={() => onEdit(t)} className="p-2 hover:bg-slate-200 rounded-lg text-slate-600"><Edit size={16}/></button>
                     <button onClick={() => onDelete(t.id)} className="p-2 hover:bg-red-50 rounded-lg text-red-500"><Trash2 size={16}/></button>
                   </div>
