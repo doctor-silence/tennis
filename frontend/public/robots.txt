@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# Закрываем служебные пути
+Disallow: /api/
+Disallow: /assets/
+
+# Sitemap
+Sitemap: https://onthecourt.ru/sitemap.xml
