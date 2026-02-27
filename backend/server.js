@@ -271,16 +271,22 @@ app.get('/api/rtt/tournament', async (req, res) => {
 
 // Get tournaments list with filters
 app.get('/api/rtt/tournaments', async (req, res) => {
+    // Жёсткий таймаут 8 сек — не ждём вечно rttstat.ru
+    const timeout = setTimeout(() => {
+        if (!res.headersSent) {
+            res.json({ success: true, data: { tournaments: [], filters: {} } });
+        }
+    }, 8000);
+
     try {
         const { age, g, l1, l2, l3 } = req.query;
         const result = await rttParser.getTournamentsList({ age, gender: g, district: l1, subject: l2, city: l3 });
-        res.json(result);
+        clearTimeout(timeout);
+        if (!res.headersSent) res.json(result);
     } catch (err) {
-        console.error("❌ RTT Tournaments List Error:", err);
-        res.status(500).json({
-            success: false,
-            error: 'Ошибка при получении списка турниров: ' + err.message
-        });
+        clearTimeout(timeout);
+        console.error("❌ RTT Tournaments List Error:", err.message);
+        if (!res.headersSent) res.json({ success: true, data: { tournaments: [], filters: {} } });
     }
 });
 
@@ -460,6 +466,24 @@ app.post('/api/support/messages', async (req, res) => {
 
 // Добавляем колонку last_seen если её ещё нет
 pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP`).catch(() => {});
+
+// Создаём таблицу ghost_users если не существует
+pool.query(`
+    CREATE TABLE IF NOT EXISTS ghost_users (
+        id           SERIAL PRIMARY KEY,
+        name         TEXT NOT NULL,
+        city         TEXT,
+        level        TEXT,
+        age          INTEGER,
+        role         TEXT DEFAULT 'player',
+        rating       INTEGER DEFAULT 1000,
+        xp           INTEGER DEFAULT 0,
+        rtt_rank     INTEGER,
+        rtt_category TEXT,
+        avatar       TEXT,
+        is_ghost     BOOLEAN DEFAULT TRUE
+    )
+`).catch(() => {});
 
 // Пинг: обновляет last_seen текущего пользователя (вызывается с фронта каждые 30 сек)
 app.post('/api/users/ping', async (req, res) => {
@@ -3004,7 +3028,7 @@ const ensureNewsTable = async () => {
     `);
     await pool.query(`ALTER TABLE news ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0`);
 };
-ensureNewsTable().catch(err => console.error('Failed to ensure news table:', err));
+// ensureNewsTable вызывается внутри server.listen (см. ниже)
 
 // Public: Get all published news
 app.get('/api/news', async (req, res) => {
@@ -3097,6 +3121,12 @@ app.get('/api/admin/news', async (req, res) => {
 // Start Server and Init DB
 server.listen(PORT, async () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
+    try {
+        await ensureNewsTable();
+        console.log('✅ News table ready');
+    } catch (err) {
+        console.error('Failed to ensure news table:', err.message);
+    }
 });
 
 // --- TOURNAMENT AND GROUPS ROUTES ---

@@ -11,7 +11,7 @@ class RTTParser {
     this.baseURL = 'https://rttstat.ru';
     this.axios = axios.create({
       baseURL: this.baseURL,
-      timeout: 10000,
+      timeout: 6000,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml',
