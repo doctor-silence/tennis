@@ -388,7 +388,17 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
                                     </div>
                                 )}
                                 <div className="flex justify-between mb-3">
-                                    <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase ${t.status === 'live' ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'}`}>{t.status}</span>
+                                    <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase ${
+                                        t.status === 'live' ? 'bg-green-100 text-green-600' :
+                                        t.status === 'open' ? 'bg-blue-100 text-blue-600' :
+                                        t.status === 'finished' ? 'bg-slate-100 text-slate-400' :
+                                        'bg-yellow-50 text-yellow-500'
+                                    }`}>{
+                                        t.status === 'live' ? '🟢 В игре' :
+                                        t.status === 'open' ? '📋 Регистрация' :
+                                        t.status === 'finished' ? '✅ Завершён' :
+                                        '📝 Черновик'
+                                    }</span>
                                     <span className="text-xs font-bold text-slate-300">{formatDate(t.start_date)}</span>
                                 </div>
                                 <h3 className="text-base font-black text-slate-900 mb-3">{t.name}</h3>

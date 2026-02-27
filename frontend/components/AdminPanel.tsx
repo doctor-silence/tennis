@@ -939,10 +939,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Статус</label>
                             <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.status} onChange={e => setEditingTournament({...editingTournament, status: e.target.value as any})}>
-                                <option value="draft">Черновик</option>
-                                <option value="live">В игре</option>
+                                <option value="draft">Черновик (скрыт от игроков)</option>
+                                <option value="open">Открыт (регистрация)</option>
+                                <option value="live">В игре (идут матчи)</option>
                                 <option value="finished">Завершен</option>
                             </select>
+                            <p className="text-[10px] text-slate-400 mt-1">⚠️ «Черновик» — турнир не виден игрокам. Для видимости выберите «Открыт» или «В игре».</p>
                         </div>
                         <Button type="submit" className="w-full mt-4">Сохранить</Button>
                     </form>

@@ -808,21 +808,36 @@ app.put('/api/admin/tournaments/:id', async (req, res) => {
         category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate
     } = req.body;
     try {
-        const result = await pool.query(
-            `UPDATE tournaments 
-             SET name = $1, group_name = $2, prize_pool = $3, status = $4, type = $5, target_group_id = $6, rounds = $7,
-                 category = $8, tournament_type = $9, gender = $10, age_group = $11, system = $12, match_format = $13, start_date = $14, end_date = $15
-             WHERE id = $16 RETURNING *`,
-            [
-                name, groupName, prizePool, status, type, target_group_id, JSON.stringify(rounds),
-                category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate,
-                id
-            ]
-        );
+        // Safely serialize rounds: avoid double-serialization if already a string
+        let roundsJson = null;
+        if (rounds !== undefined && rounds !== null) {
+            roundsJson = typeof rounds === 'string' ? rounds : JSON.stringify(rounds);
+        }
+
+        // Build query dynamically: only update rounds if explicitly provided
+        let query, params;
+        if (roundsJson !== null) {
+            query = `UPDATE tournaments 
+                 SET name = $1, group_name = $2, prize_pool = $3, status = $4, type = $5, target_group_id = $6, rounds = $7,
+                     category = $8, tournament_type = $9, gender = $10, age_group = $11, system = $12, match_format = $13, start_date = $14, end_date = $15
+                 WHERE id = $16 RETURNING *`;
+            params = [name, groupName, prizePool, status, type, target_group_id, roundsJson,
+                category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate, id];
+        } else {
+            // Don't overwrite rounds — only update meta fields
+            query = `UPDATE tournaments 
+                 SET name = $1, group_name = $2, prize_pool = $3, status = $4, type = $5, target_group_id = $6,
+                     category = $7, tournament_type = $8, gender = $9, age_group = $10, system = $11, match_format = $12, start_date = $13, end_date = $14
+                 WHERE id = $15 RETURNING *`;
+            params = [name, groupName, prizePool, status, type, target_group_id,
+                category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate, id];
+        }
+
+        const result = await pool.query(query, params);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Tournament not found' });
         }
-        await logSystemEvent('info', `Admin updated tournament ${id}`, 'Admin');
+        await logSystemEvent('info', `Admin updated tournament ${id} status=${status}`, 'Admin');
         res.json({ ...result.rows[0], id: result.rows[0].id.toString() });
     } catch (err) {
         console.error("Admin Update Tournament Error:", err);
@@ -2124,13 +2139,15 @@ app.put('/api/tournaments/:id', async (req, res) => {
     } = req.body;
 
     try {
+        // Safely serialize rounds: avoid double-serialization if already a string
+        const roundsJson = typeof rounds === 'string' ? rounds : JSON.stringify(rounds);
         const result = await pool.query(
             `UPDATE tournaments 
              SET name = $1, group_name = $2, prize_pool = $3, status = $4, type = $5, target_group_id = $6, rounds = $7,
                  category = $8, tournament_type = $9, gender = $10, age_group = $11, system = $12, match_format = $13, start_date = $14, end_date = $15, participants_count = $17
              WHERE id = $16 RETURNING *`,
             [
-                name, groupName, prize_pool, status, type, target_group_id, JSON.stringify(rounds),
+                name, groupName, prize_pool, status, type, target_group_id, roundsJson,
                 category, tournament_type, gender, age_group, system, match_format, start_date, end_date,
                 id, participants_count
             ]
