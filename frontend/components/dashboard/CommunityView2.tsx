@@ -1626,16 +1626,28 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated,
                     </div>
                     <div className="flex items-center justify-between mt-3">
                         <div className="flex items-center gap-1 text-slate-400">
-                             <Tooltip text="Поиск партнера">
+                             <Tooltip
+                                text="🎾 Поиск партнёра"
+                                description="Разместите объявление о поиске партнёра для игры. Его увидят все участники сообщества во вкладке «Поиск игры»."
+                             >
                                  <button onClick={() => setPostType(postType === 'partner_search' ? 'text' : 'partner_search')} className={`p-2 rounded-full transition-colors ${postType === 'partner_search' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Swords size={18}/></button>
                              </Tooltip>
-                             <Tooltip text="Результат матча">
+                             <Tooltip
+                                text="🏆 Результат матча"
+                                description="Поделитесь итогом сыгранного матча. Пост появится во вкладке «Результаты матчей» для всех участников."
+                             >
                                  <button onClick={() => setPostType(postType === 'match_result' ? 'text' : 'match_result')} className={`p-2 rounded-full transition-colors ${postType === 'match_result' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Trophy size={18}/></button>
                              </Tooltip>
-                             <Tooltip text="Создать группу">
+                             <Tooltip
+                                text="👥 Создать группу"
+                                description="Создайте закрытую или открытую группу для общения, организации игр и турниров."
+                             >
                                 <button onClick={() => setPostType(postType === 'group' ? 'text' : 'group')} className={`p-2 rounded-full transition-colors ${postType === 'group' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Users size={18}/></button>
                              </Tooltip>
-                             <Tooltip text="Продать вещь">
+                             <Tooltip
+                                text="🛒 Продать вещь"
+                                description="Разместите объявление о продаже теннисного инвентаря. Пост появится в разделе «Барахолка»."
+                             >
                                 <button onClick={() => setPostType(postType === 'marketplace' ? 'text' : 'marketplace')} className={`p-2 rounded-full transition-colors ${postType === 'marketplace' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><ShoppingCart size={18}/></button>
                              </Tooltip>
                         </div>
