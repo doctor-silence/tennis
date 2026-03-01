@@ -1579,7 +1579,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
                                 <label className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2 block flex items-center gap-2">
                                     <ShieldCheck size={14}/> РНИ (Регистрационный номер игрока)
                                 </label>
-                                <div className="flex gap-2">
+                                <div className="grid grid-cols-[1fr_auto] gap-2">
                                     <input 
                                         type="text" 
                                         value={rni}
@@ -1587,7 +1587,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
                                             setRni(e.target.value.replace(/\D/g, ''));
                                             setRniVerified(false);
                                         }}
-                                        className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white outline-none focus:border-amber-400 placeholder:text-slate-600"
+                                        className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white outline-none focus:border-amber-400 placeholder:text-slate-600 min-w-0"
                                         placeholder="53699" 
                                         maxLength={10}
                                     />
@@ -1595,7 +1595,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
                                         type="button"
                                         onClick={handleRNIVerification}
                                         disabled={rniVerifying || !rni}
-                                        className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
+                                        className={`shrink-0 px-4 py-2 rounded-xl font-bold text-sm transition-all ${
                                             rniVerified 
                                                 ? 'bg-green-500 text-white' 
                                                 : 'bg-amber-400 text-slate-900 hover:bg-amber-300 disabled:opacity-50 disabled:cursor-not-allowed'
