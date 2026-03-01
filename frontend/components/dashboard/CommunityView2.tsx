@@ -191,8 +191,10 @@ const PartnerSearchPost = ({ post }: { post: any }) => (
 
 const TournamentMatchPost = ({ post, user, onUpdate }: { post: any, user: User, onUpdate: () => void }) => {
     const { content, author: organizer } = post;
-    const { title: tournamentName, matchData } = content;
-    const { winner, loser, score, groupName, nextRound } = matchData;
+    const { title: tournamentName, matchData } = content || {};
+    const { winner, loser, score, groupName, nextRound } = matchData || {};
+
+    if (!matchData) return null;
 
     const [isLiked, setIsLiked] = useState(post.liked_by_user);
     const [currentLikes, setCurrentLikes] = useState(parseInt(post.likes_count) || 0);
@@ -262,7 +264,7 @@ const TournamentMatchPost = ({ post, user, onUpdate }: { post: any, user: User, 
                 </div>
             </div>
             <div className="text-xs text-slate-400 mt-3 text-center">
-                Опубликовал: {organizer.name}
+                Опубликовал: {organizer?.name || 'Организатор'}
             </div>
 
             <div className="flex items-center gap-4 text-slate-500 text-sm mt-4 pt-4 border-t border-slate-100">
@@ -290,9 +292,9 @@ const TournamentMatchPost = ({ post, user, onUpdate }: { post: any, user: User, 
                         <div className="mt-4 space-y-3 pt-3 border-t border-slate-100">
                             {comments.map((comment: any) => (
                                 <div key={comment.id} className="flex gap-2 text-xs text-slate-600">
-                                    <img src={comment.author.avatar} alt={comment.author.name} className="w-5 h-5 rounded-full" />
+                                    <img src={comment.author?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.author?.name || 'User')}&background=94a3b8&color=fff`} alt={comment.author?.name || 'User'} className="w-5 h-5 rounded-full" />
                                     <div>
-                                        <span className="font-bold">{comment.author.name}</span>
+                                        <span className="font-bold">{comment.author?.name || 'Пользователь'}</span>
                                         <p className="text-slate-500">{comment.text}</p>
                                     </div>
                                     <span className="text-slate-400 ml-auto text-[10px]">{new Date(comment.created_at).toLocaleString()}</span>
@@ -308,9 +310,18 @@ const TournamentMatchPost = ({ post, user, onUpdate }: { post: any, user: User, 
 
 const MatchResultPost = ({ post, user, onUpdate }: { post: any, user: User, onUpdate: () => void }) => {
     const { author, content } = post;
-    const { opponent, score, isWinner } = content;
-    const winner = isWinner ? author : opponent;
-    const loser = isWinner ? opponent : author;
+    const { opponent, score, isWinner } = content || {};
+
+    const safeAuthor = author
+        ? { ...author, avatar: author.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(author.name || 'User')}&background=84cc16&color=fff` }
+        : { name: 'Пользователь', avatar: 'https://ui-avatars.com/api/?name=User&background=84cc16&color=fff' };
+
+    const safeOpponent = opponent
+        ? { ...opponent, avatar: opponent.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(opponent.name || 'Оппонент')}&background=94a3b8&color=fff` }
+        : { name: 'Оппонент', avatar: 'https://ui-avatars.com/api/?name=Opponent&background=94a3b8&color=fff' };
+
+    const winner = isWinner ? safeAuthor : safeOpponent;
+    const loser = isWinner ? safeOpponent : safeAuthor;
     
     const [isLiked, setIsLiked] = useState(post.liked_by_user);
     const [currentLikes, setCurrentLikes] = useState(parseInt(post.likes_count) || 0);
@@ -406,9 +417,9 @@ const MatchResultPost = ({ post, user, onUpdate }: { post: any, user: User, onUp
                         <div className="mt-4 space-y-3 pt-3 border-t border-slate-100">
                             {comments.map((comment: any) => (
                                 <div key={comment.id} className="flex gap-2 text-xs text-slate-600">
-                                    <img src={comment.author.avatar} alt={comment.author.name} className="w-5 h-5 rounded-full" />
+                                    <img src={comment.author?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.author?.name || 'User')}&background=94a3b8&color=fff`} alt={comment.author?.name || 'User'} className="w-5 h-5 rounded-full" />
                                     <div>
-                                        <span className="font-bold">{comment.author.name}</span>
+                                        <span className="font-bold">{comment.author?.name || 'Пользователь'}</span>
                                         <p className="text-slate-500">{comment.text}</p>
                                     </div>
                                     <span className="text-slate-400 ml-auto text-[10px]">{new Date(comment.created_at).toLocaleString()}</span>
