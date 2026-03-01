@@ -320,8 +320,9 @@ const MatchResultPost = ({ post, user, onUpdate }: { post: any, user: User, onUp
         ? { ...opponent, avatar: opponent.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(opponent.name || 'Оппонент')}&background=94a3b8&color=fff` }
         : { name: 'Оппонент', avatar: 'https://ui-avatars.com/api/?name=Opponent&background=94a3b8&color=fff' };
 
-    const winner = isWinner ? safeAuthor : safeOpponent;
-    const loser = isWinner ? safeOpponent : safeAuthor;
+    // Автор поста всегда слева, оппонент всегда справа.
+    // isWinner определяет только визуальный бейдж победителя.
+    const authorWon = isWinner === true;
     
     const [isLiked, setIsLiked] = useState(post.liked_by_user);
     const [currentLikes, setCurrentLikes] = useState(parseInt(post.likes_count) || 0);
@@ -369,26 +370,31 @@ const MatchResultPost = ({ post, user, onUpdate }: { post: any, user: User, onUp
                 <span>{new Date(post.created_at).toLocaleString()}</span>
             </div>
             <div className="flex items-center justify-between">
+                {/* Автор поста — всегда слева */}
                 <div className="flex items-center gap-2">
                     <div className="relative">
-                        <img src={winner.avatar} alt={winner.name} className="w-12 h-12 rounded-full border-2 border-lime-400 p-0.5" />
-                        {isWinner && <WinnerBadge />}
+                        <img src={safeAuthor.avatar} alt={safeAuthor.name} className={`w-12 h-12 rounded-full border-2 p-0.5 ${authorWon ? 'border-lime-400' : 'border-slate-300 filter grayscale'}`} />
+                        {authorWon && <WinnerBadge />}
                     </div>
                     <div>
-                        <p className="font-bold text-sm">{winner.name}</p>
-                        <p className="text-xs text-slate-500">Победитель</p>
+                        <p className="font-bold text-sm">{safeAuthor.name}</p>
+                        <p className={`text-xs font-semibold ${authorWon ? 'text-lime-600' : 'text-red-400'}`}>{authorWon ? 'Победа' : 'Поражение'}</p>
                     </div>
                 </div>
                 <div className="text-center">
                     <p className="font-bold text-lg">{score}</p>
                     <p className="text-xs text-slate-400">ХАРД</p>
                 </div>
+                {/* Оппонент — всегда справа */}
                 <div className="flex items-center gap-2">
                      <div>
-                        <p className="font-bold text-sm text-right">{loser.name}</p>
-                        <p className="text-xs text-slate-500 text-right">Оппонент</p>
+                        <p className="font-bold text-sm text-right">{safeOpponent.name}</p>
+                        <p className={`text-xs font-semibold text-right ${authorWon ? 'text-red-400' : 'text-lime-600'}`}>{authorWon ? 'Поражение' : 'Победа'}</p>
                     </div>
-                    <img src={loser.avatar} alt={loser.name} className="w-12 h-12 rounded-full filter grayscale" />
+                    <div className="relative">
+                        <img src={safeOpponent.avatar} alt={safeOpponent.name} className={`w-12 h-12 rounded-full border-2 p-0.5 ${!authorWon ? 'border-lime-400' : 'border-slate-300 filter grayscale'}`} />
+                        {!authorWon && <WinnerBadge />}
+                    </div>
                 </div>
             </div>
 
@@ -689,8 +695,8 @@ const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate, onSta
                     case 'partner_search':
                         return <PartnerSearchPost key={item.id} post={item} />;
                     case 'match_result':
-                        // Если есть tournamentName в content — это результат от турнира (публикует админ)
-                        return item.content?.tournamentName
+                        // Если есть tournamentName или player1Name — это турнирный пост от админа
+                        return (item.content?.tournamentName || item.content?.player1Name)
                             ? <TournamentMatchResultPost key={item.id} post={item} />
                             : <MatchResultPost key={item.id} post={item} user={user} onUpdate={onUpdate} />;
                     case 'marketplace':
@@ -716,14 +722,12 @@ const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate, onSta
 
      const MatchResultsFeed = () => (
          <div className="space-y-4">
-            {feedItems.filter(item => item.type === 'match_result' || item.type === 'match').map(item => {
-                if (item.type === 'match_result') {
-                    return <MatchResultPost key={item.id} post={item} user={user} onUpdate={onUpdate} />;
-                } else if (item.type === 'match') {
-                    return <TournamentMatchPost key={item.id} post={item} user={user} onUpdate={onUpdate} />;
-                }
-                return null;
-            })}
+            {feedItems
+                .filter(item => item.type === 'match_result' && !item.content?.tournamentName && !item.content?.player1Name)
+                .map(item => (
+                    <MatchResultPost key={item.id} post={item} user={user} onUpdate={onUpdate} />
+                ))
+            }
         </div>
     );
 
