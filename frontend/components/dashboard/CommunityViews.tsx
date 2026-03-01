@@ -7,6 +7,7 @@ import { Modal } from '../Shared';
 import PlayerProfileFlyout from './PlayerProfileFlyout';
 import CommunityFeatures from './CommunityFeatures';
 import LadderBanner from './LadderBanner';
+import { LadderOnboarding } from './LadderOnboarding';
 import CommunityView2 from './CommunityView2';
 import CommunityBanner from './CommunityBanner';
 
@@ -612,7 +613,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({ user, onNo
     );
 };
 
-export const CommunityView = ({ user, onNavigate, onStartConversation, feedVersion }: { user: User, onNavigate: (tab: string) => void, onStartConversation: (partnerId: string) => void, feedVersion: number }) => {
+export const CommunityView = ({ user, onNavigate, onStartConversation, feedVersion, isActive }: { user: User, onNavigate: (tab: string) => void, onStartConversation: (partnerId: string) => void, feedVersion: number, isActive?: boolean }) => {
     const [groupsCount, setGroupsCount] = useState(0);
 
     useEffect(() => {
@@ -624,12 +625,12 @@ export const CommunityView = ({ user, onNavigate, onStartConversation, feedVersi
     return (
     <div className="max-w-7xl mx-auto space-y-6">
         <CommunityBanner groupsCount={groupsCount}/>
-        <CommunityView2 user={user} onNavigate={onNavigate} onStartConversation={onStartConversation} feedVersion={feedVersion} onGroupCreated={() => {}}/>
+        <CommunityView2 user={user} onNavigate={onNavigate} onStartConversation={onStartConversation} feedVersion={feedVersion} onGroupCreated={() => {}} isActive={isActive} />
     </div>
 );
 }
 
-export const LadderView = ({ user, challenges, setChallenges, onChallengeCreated, onStartConversation }: { user: User, challenges: Challenge[], setChallenges: React.Dispatch<React.SetStateAction<Challenge[]>>, onChallengeCreated?: () => void, onStartConversation?: (partnerId: string) => void }) => {
+export const LadderView = ({ user, challenges, setChallenges, onChallengeCreated, onStartConversation, isActive }: { user: User, challenges: Challenge[], setChallenges: React.Dispatch<React.SetStateAction<Challenge[]>>, onChallengeCreated?: () => void, onStartConversation?: (partnerId: string) => void, isActive?: boolean }) => {
     const [ranking, setRanking] = useState<LadderPlayer[]>([]);
     const [viewMode, setViewMode] = useState<'ranking' | 'challenges'>('ranking');
     const [selectedOpponent, setSelectedOpponent] = useState<LadderPlayer | null>(null);
@@ -768,13 +769,14 @@ export const LadderView = ({ user, challenges, setChallenges, onChallengeCreated
 
     return (
         <div className="space-y-6">
-            <LadderBanner leaderName={ranking[0]?.name} />
+            <LadderOnboarding isActive={isActive} />
+            <div id="ladder-banner"><LadderBanner leaderName={ranking[0]?.name} /></div>
             {selectedProfile && <PlayerProfileFlyout profile={selectedProfile} onClose={() => setSelectedProfile(null)} />}
 
             {/* Header / Tabs */}
             <div className="flex flex-wrap items-center gap-4">
                 {/* Ladder Type Tabs */}
-                <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-200 inline-flex">
+                <div id="ladder-tabs-type" className="bg-white p-2 rounded-2xl shadow-sm border border-slate-200 inline-flex">
                     <button 
                         onClick={() => setLadderType('club_elo')}
                         className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${ladderType === 'club_elo' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'}`}
@@ -790,7 +792,7 @@ export const LadderView = ({ user, challenges, setChallenges, onChallengeCreated
                 </div>
 
                 {/* View Mode Tabs */}
-                <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-200 inline-flex">
+                <div id="ladder-tabs-mode" className="bg-white p-2 rounded-2xl shadow-sm border border-slate-200 inline-flex">
                     <button 
                         onClick={() => setViewMode('ranking')}
                         className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${viewMode === 'ranking' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'}`}
@@ -813,7 +815,7 @@ export const LadderView = ({ user, challenges, setChallenges, onChallengeCreated
 
             {viewMode === 'ranking' && (
                 <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden animate-fade-in-up">
-                    <div className={`p-6 text-white flex justify-between items-center ${ladderType === 'club_elo' ? 'bg-slate-900' : 'bg-orange-900'}`}>
+                    <div id="ladder-ranking-header" className={`p-6 text-white flex justify-between items-center ${ladderType === 'club_elo' ? 'bg-slate-900' : 'bg-orange-900'}`}>
                         <div>
                             <h3 className="text-xl font-bold mb-1">
                                 {ladderType === 'club_elo' ? 'Турнирная лестница клуба' : 'Официальный топ РТТ'}

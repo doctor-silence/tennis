@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import ReactDOM from 'react-dom';
+import { CommunityOnboarding } from './CommunityOnboarding';
 import { Heart, MessageCircle, Calendar, Globe, Swords, Trophy, Users, ShoppingCart, Share2, Loader2, X, PlusCircle, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '../../services/api';
 import Button from '../Button';
@@ -1451,7 +1452,7 @@ const GroupForm = ({ onPublish, user }: { onPublish: (data: any) => void, user: 
 
 // --- Main View Component ---
 
-const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated, feedVersion }: { user: User, onNavigate: (tab: string) => void, onStartConversation: (partnerId: string) => void, onGroupCreated: () => void, feedVersion: number }) => {
+const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated, feedVersion, isActive }: { user: User, onNavigate: (tab: string) => void, onStartConversation: (partnerId: string) => void, onGroupCreated: () => void, feedVersion: number, isActive?: boolean }) => {
     const [activeTab, setActiveTab] = useState('Все события');
     const [postText, setPostText] = useState('');
     const [feedItems, setFeedItems] = useState<any[]>([]);
@@ -1599,8 +1600,9 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated,
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            <CommunityOnboarding isActive={isActive} />
             <div className="lg:col-span-2">
-                <div className="flex gap-2 mb-6 overflow-x-auto pb-1 scrollbar-none" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                <div id="community-tabs" className="flex gap-2 mb-6 overflow-x-auto pb-1 scrollbar-none" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                     {['Все события', 'Группы', 'Результаты матчей', 'Поиск игры', 'Барахолка'].map(tab => (
                         <button
                             key={tab}
@@ -1612,7 +1614,7 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated,
                     ))}
                 </div>
                 
-                { activeTab !== 'Группы' && <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6">
+                { activeTab !== 'Группы' && <div id="community-post-box" className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6">
                     <div className="flex gap-3 items-center">
                         <img src={user.avatar} alt={user.name} className="w-9 h-9 rounded-full flex-shrink-0" />
                         <input 
@@ -1630,25 +1632,25 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated,
                                 text="🎾 Поиск партнёра"
                                 description="Разместите объявление о поиске партнёра для игры. Его увидят все участники сообщества во вкладке «Поиск игры»."
                              >
-                                 <button onClick={() => setPostType(postType === 'partner_search' ? 'text' : 'partner_search')} className={`p-2 rounded-full transition-colors ${postType === 'partner_search' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Swords size={18}/></button>
+                                 <button id="community-btn-partner" onClick={() => setPostType(postType === 'partner_search' ? 'text' : 'partner_search')} className={`p-2 rounded-full transition-colors ${postType === 'partner_search' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Swords size={18}/></button>
                              </Tooltip>
                              <Tooltip
                                 text="🏆 Результат матча"
                                 description="Поделитесь итогом сыгранного матча. Пост появится во вкладке «Результаты матчей» для всех участников."
                              >
-                                 <button onClick={() => setPostType(postType === 'match_result' ? 'text' : 'match_result')} className={`p-2 rounded-full transition-colors ${postType === 'match_result' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Trophy size={18}/></button>
+                                 <button id="community-btn-match" onClick={() => setPostType(postType === 'match_result' ? 'text' : 'match_result')} className={`p-2 rounded-full transition-colors ${postType === 'match_result' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Trophy size={18}/></button>
                              </Tooltip>
                              <Tooltip
                                 text="👥 Создать группу"
                                 description="Создайте закрытую или открытую группу для общения, организации игр и турниров."
                              >
-                                <button onClick={() => setPostType(postType === 'group' ? 'text' : 'group')} className={`p-2 rounded-full transition-colors ${postType === 'group' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Users size={18}/></button>
+                                <button id="community-btn-group" onClick={() => setPostType(postType === 'group' ? 'text' : 'group')} className={`p-2 rounded-full transition-colors ${postType === 'group' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><Users size={18}/></button>
                              </Tooltip>
                              <Tooltip
                                 text="🛒 Продать вещь"
                                 description="Разместите объявление о продаже теннисного инвентаря. Пост появится в разделе «Барахолка»."
                              >
-                                <button onClick={() => setPostType(postType === 'marketplace' ? 'text' : 'marketplace')} className={`p-2 rounded-full transition-colors ${postType === 'marketplace' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><ShoppingCart size={18}/></button>
+                                <button id="community-btn-shop" onClick={() => setPostType(postType === 'marketplace' ? 'text' : 'marketplace')} className={`p-2 rounded-full transition-colors ${postType === 'marketplace' ? 'bg-lime-100 text-lime-600' : 'hover:bg-slate-100'}`}><ShoppingCart size={18}/></button>
                              </Tooltip>
                         </div>
                         <Button onClick={() => handlePublishPost({text: postText})} disabled={!postText.trim()}>Опубликовать</Button>
@@ -1670,10 +1672,10 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated,
                 )}
             </div>
             <div className="hidden lg:block space-y-6">
-                <TournamentsWidget user={user} onNavigate={onNavigate} myGroups={myGroups} />
-                <TopPlayersWidget onNavigate={onNavigate} />
-                <GroupsWidget onGroupClickForModal={setSelectedGroupForModal} myGroups={myGroups} />
-                <MarketplaceWidget user={user} onNavigate={setActiveTab} />
+                <div id="community-widget-tournaments"><TournamentsWidget user={user} onNavigate={onNavigate} myGroups={myGroups} /></div>
+                <div id="community-widget-top"><TopPlayersWidget onNavigate={onNavigate} /></div>
+                <div id="community-widget-groups"><GroupsWidget onGroupClickForModal={setSelectedGroupForModal} myGroups={myGroups} /></div>
+                <div id="community-widget-marketplace"><MarketplaceWidget user={user} onNavigate={setActiveTab} /></div>
                  {selectedGroupForModal && (
                 <Modal isOpen={!!selectedGroupForModal} onClose={() => setSelectedGroupForModal(null)} title={selectedGroupForModal.name}>
                     <div className="p-6">

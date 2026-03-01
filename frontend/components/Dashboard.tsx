@@ -133,8 +133,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
         students: <StudentsView user={user} />,
         tournaments: <TournamentsView user={user} onTournamentUpdate={incrementFeedVersion} />,
         video_analysis: <VideoAnalysisView />,
-        ladder: <LadderView user={user} challenges={challenges} setChallenges={setChallenges} onChallengeCreated={fetchUnreadCount} onStartConversation={handleStartConversation} />,
-        community: <CommunityView user={user} onNavigate={handleNavigate} onStartConversation={handleStartConversation} feedVersion={feedVersion} />,
+        ladder: <LadderView user={user} challenges={challenges} setChallenges={setChallenges} onChallengeCreated={fetchUnreadCount} onStartConversation={handleStartConversation} isActive={activeTab === 'ladder'} />,
+        community: <CommunityView user={user} onNavigate={handleNavigate} onStartConversation={handleStartConversation} feedVersion={feedVersion} isActive={activeTab === 'community'} />,
         my_applications: <MyApplications user={user} />,
         rtt_stats: <RttStatsView user={user} />,
     };
