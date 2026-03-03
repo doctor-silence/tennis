@@ -175,6 +175,58 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [itemToDeleteId, setItemToDeleteId] = useState<string | null>(null);
     const [deleteActionType, setDeleteActionType] = useState<'court' | 'user' | 'product' | 'group' | 'tournament' | 'news' | null>(null);
 
+    // 2FA State
+    const [twoFaStep, setTwoFaStep] = useState<'idle' | 'qr' | 'verify' | 'disable'>('idle');
+    const [twoFaQrCode, setTwoFaQrCode] = useState<string>('');
+    const [twoFaToken, setTwoFaToken] = useState<string>('');
+    const [twoFaLoading, setTwoFaLoading] = useState(false);
+    const [twoFaEnabled, setTwoFaEnabled] = useState<boolean>(user?.totp_enabled ?? false);
+
+    const handle2faSetup = async () => {
+        setTwoFaLoading(true);
+        try {
+            const data = await api.auth.setup2fa(String(user.id));
+            setTwoFaQrCode(data.qrCode);
+            setTwoFaStep('qr');
+        } catch {
+            toast('Ошибка при генерации 2FA', 'error');
+        } finally {
+            setTwoFaLoading(false);
+        }
+    };
+
+    const handle2faEnable = async () => {
+        if (twoFaToken.length !== 6) return;
+        setTwoFaLoading(true);
+        try {
+            await api.auth.enable2fa(String(user.id), twoFaToken);
+            setTwoFaEnabled(true);
+            setTwoFaStep('idle');
+            setTwoFaToken('');
+            toast('2FA успешно включена!');
+        } catch {
+            toast('Неверный код. Попробуйте снова.', 'error');
+        } finally {
+            setTwoFaLoading(false);
+        }
+    };
+
+    const handle2faDisable = async () => {
+        if (twoFaToken.length !== 6) return;
+        setTwoFaLoading(true);
+        try {
+            await api.auth.disable2fa(String(user.id), twoFaToken);
+            setTwoFaEnabled(false);
+            setTwoFaStep('idle');
+            setTwoFaToken('');
+            toast('2FA отключена');
+        } catch {
+            toast('Неверный код. Попробуйте снова.', 'error');
+        } finally {
+            setTwoFaLoading(false);
+        }
+    };
+
     // Initial Data Load
     useEffect(() => {
         loadData();
@@ -589,6 +641,84 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><h3 className="font-bold text-lg mb-6">Динамика продаж</h3><div className="h-64 flex items-end justify-between gap-2">{[40, 65, 45, 80, 55, 90, 70, 85, 60, 75, 95, 100].map((h, i) => (<div key={i} className="w-full bg-slate-100 rounded-t-lg relative group overflow-hidden"><div className="absolute bottom-0 w-full bg-slate-900 group-hover:bg-lime-500 transition-colors duration-300" style={{ height: `${h}%` }}></div></div>))}</div><div className="flex justify-between mt-4 text-xs text-slate-400 font-bold uppercase"><span>Янв</span><span>Май</span><span>Дек</span></div></div>
                                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><h3 className="font-bold text-lg mb-6">Распределение подписок</h3><div className="space-y-4"><div className="space-y-2"><div className="flex justify-between text-sm font-medium"><span>Amateur (Free)</span><span className="text-slate-500">65%</span></div><div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-slate-300 w-[65%]"></div></div></div><div className="space-y-2"><div className="flex justify-between text-sm font-medium"><span>PRO Player</span><span className="text-slate-500">25%</span></div><div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-lime-400 w-[25%]"></div></div></div><div className="space-y-2"><div className="flex justify-between text-sm font-medium"><span>Coach PRO</span><span className="text-slate-500">10%</span></div><div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-slate-900 w-[10%]"></div></div></div></div></div>
+                            </div>
+
+                            {/* 2FA Security */}
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+                                        <Shield size={20} className="text-slate-700" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-lg">Двухфакторная аутентификация</h3>
+                                        <p className="text-sm text-slate-500">Защита аккаунта с помощью TOTP (Google Authenticator)</p>
+                                    </div>
+                                    <div className="ml-auto">
+                                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${twoFaEnabled ? 'bg-lime-100 text-lime-700' : 'bg-red-100 text-red-600'}`}>
+                                            {twoFaEnabled ? '✓ Включена' : '✗ Отключена'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {twoFaStep === 'idle' && (
+                                    <div className="flex gap-3">
+                                        {!twoFaEnabled ? (
+                                            <button onClick={handle2faSetup} disabled={twoFaLoading}
+                                                className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-700 disabled:opacity-50 transition-colors">
+                                                {twoFaLoading ? <Loader2 size={14} className="animate-spin" /> : <Shield size={14} />}
+                                                Подключить 2FA
+                                            </button>
+                                        ) : (
+                                            <button onClick={() => { setTwoFaStep('disable'); setTwoFaToken(''); }}
+                                                className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-600 rounded-xl text-sm font-bold hover:bg-red-200 transition-colors">
+                                                <X size={14} /> Отключить 2FA
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+
+                                {twoFaStep === 'qr' && (
+                                    <div className="space-y-4">
+                                        <p className="text-sm text-slate-600">1. Отсканируйте QR-код в <span className="font-bold">Google Authenticator</span> или совместимом приложении:</p>
+                                        <div className="bg-slate-50 rounded-xl p-4 inline-block border border-slate-200">
+                                            <img src={twoFaQrCode} alt="2FA QR Code" className="w-48 h-48" />
+                                        </div>
+                                        <p className="text-sm text-slate-600">2. Введите код из приложения для подтверждения:</p>
+                                        <div className="flex gap-3 items-center">
+                                            <input type="text" inputMode="numeric" maxLength={6}
+                                                value={twoFaToken} onChange={(e) => setTwoFaToken(e.target.value.replace(/\D/g, ''))}
+                                                placeholder="000000"
+                                                className="w-36 border border-slate-300 rounded-xl px-4 py-2 text-center text-xl tracking-widest focus:ring-2 focus:ring-lime-400 outline-none"
+                                            />
+                                            <button onClick={handle2faEnable} disabled={twoFaLoading || twoFaToken.length !== 6}
+                                                className="px-4 py-2 bg-lime-500 text-white rounded-xl text-sm font-bold hover:bg-lime-600 disabled:opacity-50 transition-colors flex items-center gap-2">
+                                                {twoFaLoading ? <Loader2 size={14} className="animate-spin" /> : null} Подтвердить
+                                            </button>
+                                            <button onClick={() => { setTwoFaStep('idle'); setTwoFaToken(''); }}
+                                                className="text-sm text-slate-400 hover:text-slate-600">Отмена</button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {twoFaStep === 'disable' && (
+                                    <div className="space-y-3">
+                                        <p className="text-sm text-slate-600">Введите текущий код из приложения для отключения 2FA:</p>
+                                        <div className="flex gap-3 items-center">
+                                            <input type="text" inputMode="numeric" maxLength={6}
+                                                value={twoFaToken} onChange={(e) => setTwoFaToken(e.target.value.replace(/\D/g, ''))}
+                                                placeholder="000000"
+                                                className="w-36 border border-slate-300 rounded-xl px-4 py-2 text-center text-xl tracking-widest focus:ring-2 focus:ring-red-400 outline-none"
+                                                autoFocus
+                                            />
+                                            <button onClick={handle2faDisable} disabled={twoFaLoading || twoFaToken.length !== 6}
+                                                className="px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-bold hover:bg-red-600 disabled:opacity-50 transition-colors flex items-center gap-2">
+                                                {twoFaLoading ? <Loader2 size={14} className="animate-spin" /> : null} Отключить
+                                            </button>
+                                            <button onClick={() => { setTwoFaStep('idle'); setTwoFaToken(''); }}
+                                                className="text-sm text-slate-400 hover:text-slate-600">Отмена</button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

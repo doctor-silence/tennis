@@ -9,6 +9,8 @@ const rateLimit = require('express-rate-limit');
 const pool = require('./db');
 // const initDb = require('./initDb');
 const rttParser = require('./rttParser');
+const speakeasy = require('speakeasy');
+const QRCode = require('qrcode');
 
 const app = express();
 const server = http.createServer(app);
@@ -146,7 +148,7 @@ app.post('/api/auth/register', async (req, res) => {
 
 // Login
 app.post('/api/auth/login', async (req, res) => {
-    const { email, password } = req.body;
+    const { email, password, totpCode } = req.body;
 
     try {
         const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
@@ -170,9 +172,26 @@ app.post('/api/auth/login', async (req, res) => {
             return res.status(401).json({ error: authError });
         }
 
+        // 2FA: если включена — требуем TOTP код
+        if (user.totp_enabled && user.totp_secret) {
+            if (!totpCode) {
+                return res.status(200).json({ requires2fa: true });
+            }
+            const valid = speakeasy.totp.verify({
+                secret: user.totp_secret,
+                encoding: 'base32',
+                token: totpCode,
+                window: 1
+            });
+            if (!valid) {
+                await logSystemEvent('warning', `Invalid 2FA code for ${email}`, 'Auth');
+                return res.status(401).json({ error: 'Неверный код 2FA' });
+            }
+        }
+
         await logSystemEvent('info', `User logged in: ${email}`, 'Auth');
 
-        const { password: _, ...userInfo } = user;
+        const { password: _, totp_secret: __, ...userInfo } = user;
         
         res.json({
             ...userInfo,
@@ -184,6 +203,76 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (err) {
         console.error("❌ Login Error:", err);
         res.status(500).json({ error: 'Ошибка при входе: ' + err.message });
+    }
+});
+
+// --- 2FA ROUTES ---
+
+// Шаг 1: генерируем секрет и QR-код
+app.post('/api/auth/2fa/setup', async (req, res) => {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId required' });
+    try {
+        const userRes = await pool.query('SELECT role, totp_enabled FROM users WHERE id = $1', [userId]);
+        if (!userRes.rows.length) return res.status(404).json({ error: 'User not found' });
+        if (userRes.rows[0].role !== 'admin') return res.status(403).json({ error: 'Только для admin' });
+        if (userRes.rows[0].totp_enabled) return res.status(400).json({ error: '2FA уже включена' });
+
+        const secret = speakeasy.generateSecret({ name: `НаКорте (${userId})`, length: 20 });
+        await pool.query('UPDATE users SET totp_secret = $1 WHERE id = $2', [secret.base32, userId]);
+
+        const qrUrl = await QRCode.toDataURL(secret.otpauth_url);
+        res.json({ qrCode: qrUrl, secret: secret.base32 });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Шаг 2: подтверждаем первый код и включаем 2FA
+app.post('/api/auth/2fa/enable', async (req, res) => {
+    const { userId, token } = req.body;
+    if (!userId || !token) return res.status(400).json({ error: 'userId и token обязательны' });
+    try {
+        const userRes = await pool.query('SELECT totp_secret FROM users WHERE id = $1', [userId]);
+        if (!userRes.rows.length || !userRes.rows[0].totp_secret) return res.status(400).json({ error: 'Сначала выполните setup' });
+
+        const valid = speakeasy.totp.verify({
+            secret: userRes.rows[0].totp_secret,
+            encoding: 'base32',
+            token,
+            window: 1
+        });
+        if (!valid) return res.status(400).json({ error: 'Неверный код. Проверьте приложение.' });
+
+        await pool.query('UPDATE users SET totp_enabled = TRUE WHERE id = $1', [userId]);
+        await logSystemEvent('info', `2FA enabled for user ${userId}`, 'Auth');
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Отключение 2FA
+app.post('/api/auth/2fa/disable', async (req, res) => {
+    const { userId, token } = req.body;
+    if (!userId || !token) return res.status(400).json({ error: 'userId и token обязательны' });
+    try {
+        const userRes = await pool.query('SELECT totp_secret, totp_enabled FROM users WHERE id = $1', [userId]);
+        if (!userRes.rows.length || !userRes.rows[0].totp_enabled) return res.status(400).json({ error: '2FA не включена' });
+
+        const valid = speakeasy.totp.verify({
+            secret: userRes.rows[0].totp_secret,
+            encoding: 'base32',
+            token,
+            window: 1
+        });
+        if (!valid) return res.status(400).json({ error: 'Неверный код' });
+
+        await pool.query('UPDATE users SET totp_enabled = FALSE, totp_secret = NULL WHERE id = $1', [userId]);
+        await logSystemEvent('warning', `2FA disabled for user ${userId}`, 'Auth');
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
 });
 

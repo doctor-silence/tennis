@@ -467,7 +467,7 @@ export const api = {
             if (!res.ok) throw new Error(data.error || 'Ошибка регистрации. Проверьте сервер.');
             return data;
         },
-        login: async (credentials: any): Promise<User> => {
+        login: async (credentials: any): Promise<User | { requires2fa: true }> => {
             let res;
             try {
                 res = await fetch(`${API_URL}/auth/login`, {
@@ -477,18 +477,43 @@ export const api = {
                 });
             } catch (networkError) {
                 console.warn("Backend offline. Falling back to Demo Mode.");
-                
-                if (credentials.email === 'admin@tennis.pro') {
-                    return MOCK_ADMIN;
-                }
-                
+                if (credentials.email === 'admin@tennis.pro') return MOCK_ADMIN;
                 return MOCK_USER;
             }
 
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Ошибка входа');
-            
+            // Сервер просит 2FA код
+            if (data.requires2fa) return { requires2fa: true };
             return data;
+        },
+        setup2fa: async (userId: string): Promise<{ qrCode: string; secret: string }> => {
+            const res = await fetch(`${API_URL}/auth/2fa/setup`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Ошибка setup 2FA');
+            return data;
+        },
+        enable2fa: async (userId: string, token: string): Promise<void> => {
+            const res = await fetch(`${API_URL}/auth/2fa/enable`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, token })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Ошибка активации 2FA');
+        },
+        disable2fa: async (userId: string, token: string): Promise<void> => {
+            const res = await fetch(`${API_URL}/auth/2fa/disable`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, token })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Ошибка отключения 2FA');
         }
     },
 

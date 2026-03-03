@@ -19,6 +19,7 @@ import {
   Crown,
   BarChart3,
   Video,
+  Shield,
   ShieldCheck,
   User as UserIcon,
   Search,
@@ -1241,7 +1242,11 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
   const [age, setAge] = useState('');
   const [role, setRole] = useState<'amateur' | 'rtt_pro' | 'coach'>('amateur');
   const [level, setLevel] = useState('NTRP 2.0 (Новичок)');
-  
+
+  // 2FA States
+  const [requires2fa, setRequires2fa] = useState(false);
+  const [totpCode, setTotpCode] = useState('');
+
   // RTT Specific States
   const [rttAgeCategory, setRttAgeCategory] = useState('Взрослые');
   const [rttPoints, setRttPoints] = useState(''); // Очки классификации
@@ -1277,8 +1282,13 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
     setError('');
     setLoading(true);
     try {
-        const user = await api.auth.login({ email, password });
-        onComplete(user);
+        const result = await api.auth.login({ email, password, totpCode: requires2fa ? totpCode : undefined });
+        if ('requires2fa' in result && result.requires2fa) {
+            setRequires2fa(true);
+            setLoading(false);
+            return;
+        }
+        onComplete(result as any);
     } catch (err: any) {
         setError(err.message || 'Ошибка входа');
     } finally {
@@ -1404,7 +1414,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
          )}
 
          {/* LOGIN FORM */}
-         {authMode === 'login' && (
+         {authMode === 'login' && !requires2fa && (
              <form onSubmit={handleLoginSubmit} className="space-y-4">
                 <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Email</label>
@@ -1438,6 +1448,39 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
                         Регистрация
                     </button>
                 </div>
+             </form>
+         )}
+
+         {/* 2FA STEP */}
+         {authMode === 'login' && requires2fa && (
+             <form onSubmit={handleLoginSubmit} className="space-y-4">
+                <div className="text-center mb-2">
+                    <div className="w-16 h-16 bg-lime-400/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Shield size={32} className="text-lime-400" />
+                    </div>
+                    <p className="text-slate-300 text-sm">Введите 6-значный код из приложения<br/><span className="text-slate-500">Google Authenticator / Яндекс Ключ</span></p>
+                </div>
+                <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Код 2FA</label>
+                    <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]{6}"
+                        maxLength={6}
+                        value={totpCode}
+                        onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
+                        className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white text-center text-2xl tracking-widest focus:ring-2 focus:ring-lime-400 focus:border-transparent outline-none"
+                        placeholder="000000"
+                        autoFocus
+                        required
+                    />
+                </div>
+                <Button variant="secondary" className="w-full mt-4 text-base" type="submit" disabled={loading || totpCode.length !== 6}>
+                    {loading ? <Loader2 className="animate-spin" size={20} /> : 'Подтвердить'}
+                </Button>
+                <button type="button" onClick={() => { setRequires2fa(false); setTotpCode(''); setError(''); }} className="w-full text-center text-sm text-slate-500 hover:text-slate-400 transition-colors mt-2">
+                    ← Назад
+                </button>
              </form>
          )}
 

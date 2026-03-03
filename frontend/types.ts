@@ -16,6 +16,7 @@ export interface User {
   avatar: string;
   is_private?: boolean;
   notifications_enabled?: boolean;
+  totp_enabled?: boolean;
 }
 
 export interface MatchStats {
