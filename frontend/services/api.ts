@@ -1087,16 +1087,22 @@ export const api = {
 
     // --- ADMIN API ---
     admin: {
+        _headers: (): Record<string, string> => {
+            try {
+                const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
+                return { 'Content-Type': 'application/json', 'x-admin-id': user.id || '' };
+            } catch { return { 'Content-Type': 'application/json' }; }
+        },
         getLogs: async (): Promise<SystemLog[]> => {
              try {
-                 const res = await fetch(`${API_URL}/admin/logs`);
+                 const res = await fetch(`${API_URL}/admin/logs`, { headers: api.admin._headers() });
                  if (!res.ok) return [];
                  return await res.json();
              } catch(e) { return []; }
         },
         getStats: async () => {
             try {
-                 const res = await fetch(`${API_URL}/admin/stats`);
+                 const res = await fetch(`${API_URL}/admin/stats`, { headers: api.admin._headers() });
                  if (!res.ok) throw new Error("Failed");
                  return await res.json();
             } catch(e) { 
@@ -1105,7 +1111,7 @@ export const api = {
         },
         getUsers: async (): Promise<User[]> => {
             try {
-                const res = await fetch(`${API_URL}/admin/users`);
+                const res = await fetch(`${API_URL}/admin/users`, { headers: api.admin._headers() });
                 if (!res.ok) return [];
                 return await res.json();
             } catch(e) { return []; }
@@ -1114,7 +1120,7 @@ export const api = {
             try {
                 const res = await fetch(`${API_URL}/admin/users`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: api.admin._headers(),
                     body: JSON.stringify(data)
                 });
                 if (!res.ok) throw new Error('Failed to create user');
@@ -1128,7 +1134,7 @@ export const api = {
             try {
                 const res = await fetch(`${API_URL}/admin/users/${id}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: api.admin._headers(),
                     body: JSON.stringify(data)
                 });
                 if (!res.ok) {
@@ -1137,12 +1143,12 @@ export const api = {
                 }
             } catch (e) {
                 console.error(e);
-                throw e; // Re-throw the error to be caught by the calling component
+                throw e;
             }
         },
         deleteUser: async (id: string) => {
             try {
-                await fetch(`${API_URL}/admin/users/${id}`, { method: 'DELETE' });
+                await fetch(`${API_URL}/admin/users/${id}`, { method: 'DELETE', headers: api.admin._headers() });
             } catch (e) { console.error(e); }
         },
         // Products
@@ -1270,7 +1276,7 @@ export const api = {
         },
         getGroups: async (userId: string): Promise<Group[]> => {
             try {
-                const res = await fetch(`${API_URL}/admin/groups?userId=${userId}`);
+                const res = await fetch(`${API_URL}/admin/groups?userId=${userId}`, { headers: api.admin._headers() });
                 if (!res.ok) return [];
                 return await res.json();
             } catch (e) {
@@ -1281,7 +1287,7 @@ export const api = {
             try {
                 const res = await fetch(`${API_URL}/admin/groups`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: api.admin._headers(),
                     body: JSON.stringify({ ...group, creatorId: userId })
                 });
         
@@ -1300,7 +1306,7 @@ export const api = {
             try {
                 const res = await fetch(`${API_URL}/admin/groups/${id}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: api.admin._headers(),
                     body: JSON.stringify({ ...group, userId })
                 });
         
@@ -1317,7 +1323,7 @@ export const api = {
             try {
                 const res = await fetch(`${API_URL}/admin/groups/${id}`, {
                     method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: api.admin._headers(),
                     body: JSON.stringify({ userId })
                 });
         
@@ -1332,7 +1338,7 @@ export const api = {
         },
         getTournaments: async (): Promise<Tournament[]> => {
             try {
-                const res = await fetch(`${API_URL}/admin/tournaments`);
+                const res = await fetch(`${API_URL}/admin/tournaments`, { headers: api.admin._headers() });
                 if (!res.ok) return [];
                 return await res.json();
             } catch (e) {
@@ -1343,7 +1349,7 @@ export const api = {
             try {
                 const res = await fetch(`${API_URL}/admin/tournaments`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: api.admin._headers(),
                     body: JSON.stringify(tournament)
                 });
         
@@ -1362,7 +1368,7 @@ export const api = {
             try {
                 const res = await fetch(`${API_URL}/admin/tournaments/${id}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: api.admin._headers(),
                     body: JSON.stringify(tournament)
                 });
         
@@ -1378,7 +1384,8 @@ export const api = {
         deleteTournament: async (id: string): Promise<void> => {
             try {
                 const res = await fetch(`${API_URL}/admin/tournaments/${id}`, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    headers: api.admin._headers()
                 });
         
                 if (!res.ok) {
@@ -1438,7 +1445,7 @@ export const api = {
             }
         },
         adminGetAll: async (): Promise<NewsArticle[]> => {
-            const res = await fetch(`${API_URL}/admin/news`);
+            const res = await fetch(`${API_URL}/admin/news`, { headers: api.admin._headers() });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({ error: res.statusText }));
                 throw new Error(err.error || 'Failed to fetch all news');

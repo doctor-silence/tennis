@@ -14,7 +14,11 @@ const server = http.createServer(app);
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:4173', 'https://onthecourt.ru'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'x-admin-id']
+}));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
@@ -524,9 +528,30 @@ app.get('/api/users/online-stats', async (req, res) => {
     }
 });
 
+// --- ADMIN MIDDLEWARE ---
+const requireAdmin = async (req, res, next) => {
+    // В dev-режиме можно задать DEV_ADMIN_ID в .env чтобы не менять аккаунт
+    const devFallback = process.env.NODE_ENV !== 'production' ? process.env.DEV_ADMIN_ID : null;
+    const rawId = req.headers['x-admin-id'] || req.body?.adminId || req.query?.adminId;
+    // Если id невалидный (мок, пустой) — используем devFallback
+    const parsedId = rawId && /^\d+$/.test(String(rawId)) ? rawId : null;
+    const adminId = parsedId || devFallback;
+    if (!adminId) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+        const result = await pool.query("SELECT role FROM users WHERE id = $1", [adminId]);
+        if (!result.rows.length || result.rows[0].role !== 'admin') {
+            return res.status(403).json({ error: 'Forbidden', hint: `User ${adminId} is not admin` });
+        }
+        next();
+    } catch (e) {
+        console.error('requireAdmin error:', e.message);
+        return res.status(500).json({ error: 'Auth check failed' });
+    }
+};
+
 // --- ADMIN ROUTES ---
 
-app.get('/api/admin/stats', async (req, res) => {
+app.get('/api/admin/stats', requireAdmin, async (req, res) => {
     try {
         const usersCount = await pool.query('SELECT COUNT(*) FROM users');
         const newSignups = await pool.query("SELECT COUNT(*) FROM users WHERE created_at > NOW() - INTERVAL '30 days'");
@@ -543,7 +568,7 @@ app.get('/api/admin/stats', async (req, res) => {
     }
 });
 
-app.get('/api/admin/logs', async (req, res) => {
+app.get('/api/admin/logs', requireAdmin, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM system_logs ORDER BY timestamp DESC LIMIT 50');
         res.json(result.rows.map(r => ({
@@ -558,7 +583,7 @@ app.get('/api/admin/logs', async (req, res) => {
     }
 });
 
-app.get('/api/admin/users', async (req, res) => {
+app.get('/api/admin/users', requireAdmin, async (req, res) => {
     try {
         const result = await pool.query('SELECT id, name, email, role, city, avatar, rating, level, age, rtt_rank, rtt_category, xp FROM users ORDER BY id DESC');
         res.json(result.rows.map(u => ({
@@ -572,7 +597,7 @@ app.get('/api/admin/users', async (req, res) => {
     }
 });
 
-app.post('/api/admin/users', async (req, res) => {
+app.post('/api/admin/users', requireAdmin, async (req, res) => {
     const { name, email, password, role, city, age, rating, level, rttRank, rttCategory } = req.body;
     try {
         const userCheck = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
@@ -612,7 +637,7 @@ app.post('/api/admin/users', async (req, res) => {
 });
 
 
-app.put('/api/admin/users/:id', async (req, res) => {
+app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { name, role, city, rating, level, rttRank, rttCategory, age, xp, avatar, is_private, notifications_enabled } = req.body;
 
@@ -646,7 +671,7 @@ app.put('/api/admin/users/:id', async (req, res) => {
 });
 
 
-app.delete('/api/admin/users/:id', async (req, res) => {
+app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     try {
         await pool.query('DELETE FROM users WHERE id = $1', [id]);
@@ -657,7 +682,7 @@ app.delete('/api/admin/users/:id', async (req, res) => {
     }
 });
 
-app.get('/api/admin/groups', async (req, res) => {
+app.get('/api/admin/groups', requireAdmin, async (req, res) => {
     const {userId} = req.query;
 
     try {
@@ -700,7 +725,7 @@ app.get('/api/admin/groups', async (req, res) => {
     }
 });
 
-app.post('/api/admin/groups', async (req, res) => {
+app.post('/api/admin/groups', requireAdmin, async (req, res) => {
     const { name, description, location, contact, creatorId } = req.body;
     if (!name || !creatorId) {
         return res.status(400).json({ error: 'Name and creatorId are required' });
@@ -729,7 +754,7 @@ app.post('/api/admin/groups', async (req, res) => {
     }
 });
 
-app.put('/api/admin/groups/:id', async (req, res) => {
+app.put('/api/admin/groups/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { name, description, location, contact, avatar } = req.body;
     try {
@@ -748,7 +773,7 @@ app.put('/api/admin/groups/:id', async (req, res) => {
     }
 });
 
-app.delete('/api/admin/groups/:id', async (req, res) => {
+app.delete('/api/admin/groups/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     const client = await pool.connect();
     try {
@@ -768,7 +793,7 @@ app.delete('/api/admin/groups/:id', async (req, res) => {
     }
 });
 
-app.get('/api/admin/tournaments', async (req, res) => {
+app.get('/api/admin/tournaments', requireAdmin, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM tournaments ORDER BY start_date DESC NULLS LAST, id DESC');
         res.json(result.rows.map(t => ({ ...t, id: t.id.toString() })));
@@ -778,7 +803,7 @@ app.get('/api/admin/tournaments', async (req, res) => {
     }
 });
 
-app.post('/api/admin/tournaments', async (req, res) => {
+app.post('/api/admin/tournaments', requireAdmin, async (req, res) => {
     const { 
         name, groupName, prizePool, status, type, target_group_id, rounds, userId,
         category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate 
@@ -804,7 +829,7 @@ app.post('/api/admin/tournaments', async (req, res) => {
     }
 });
 
-app.put('/api/admin/tournaments/:id', async (req, res) => {
+app.put('/api/admin/tournaments/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { 
         name, groupName, prizePool, status, type, target_group_id, rounds,
@@ -848,7 +873,7 @@ app.put('/api/admin/tournaments/:id', async (req, res) => {
     }
 });
 
-app.delete('/api/admin/tournaments/:id', async (req, res) => {
+app.delete('/api/admin/tournaments/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     try {
         await pool.query('DELETE FROM tournaments WHERE id = $1', [id]);
@@ -3131,7 +3156,7 @@ app.delete('/api/news/:id', async (req, res) => {
 });
 
 // Admin: Get ALL news (including drafts)
-app.get('/api/admin/news', async (req, res) => {
+app.get('/api/admin/news', requireAdmin, async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT id, title, summary, content, image, author, category, published_at, is_published, views
