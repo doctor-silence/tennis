@@ -1445,7 +1445,7 @@ export const api = {
         create: async (article: Partial<NewsArticle>): Promise<NewsArticle> => {
             const res = await fetch(`${API_URL}/news`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: api.admin._headers(),
                 body: JSON.stringify(article)
             });
             const json = await res.json();
@@ -1455,7 +1455,7 @@ export const api = {
         update: async (id: string, article: Partial<NewsArticle>): Promise<NewsArticle> => {
             const res = await fetch(`${API_URL}/news/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: api.admin._headers(),
                 body: JSON.stringify(article)
             });
             const json = await res.json();
@@ -1463,7 +1463,10 @@ export const api = {
             return json;
         },
         delete: async (id: string): Promise<void> => {
-            const res = await fetch(`${API_URL}/news/${id}`, { method: 'DELETE' });
+            const res = await fetch(`${API_URL}/news/${id}`, {
+                method: 'DELETE',
+                headers: api.admin._headers()
+            });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({ error: res.statusText }));
                 throw new Error(err.error || 'Failed to delete news');
