@@ -4,6 +4,8 @@ const cors = require('cors');
 const http = require('http');
 const OpenAI = require('openai');
 const bcrypt = require('bcryptjs');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const pool = require('./db');
 // const initDb = require('./initDb');
 const rttParser = require('./rttParser');
@@ -14,6 +16,7 @@ const server = http.createServer(app);
 const PORT = process.env.PORT || 3001;
 
 // Middleware
+app.use(helmet({ contentSecurityPolicy: false })); // Security headers
 app.use(cors({
     origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:4173', 'https://onthecourt.ru'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -21,6 +24,24 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+
+// Rate limiting
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 минут
+    max: 20, // не более 20 попыток
+    message: { error: 'Слишком много попыток. Попробуйте через 15 минут.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+const apiLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 минута
+    max: 200,
+    message: { error: 'Слишком много запросов.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+app.use('/api/auth', authLimiter);
+app.use('/api', apiLimiter);
 
 // Constants
 const SUPPORT_ADMIN_ID = 1;
@@ -265,6 +286,13 @@ app.get('/api/rtt/tournament', async (req, res) => {
                 success: false,
                 error: 'URL турнира не указан' 
             });
+        }
+
+        // SSRF защита: разрешаем только rttstat.ru
+        let parsedUrl;
+        try { parsedUrl = new URL(url); } catch { return res.status(400).json({ success: false, error: 'Некорректный URL' }); }
+        if (!['rttstat.ru', 'www.rttstat.ru'].includes(parsedUrl.hostname)) {
+            return res.status(400).json({ success: false, error: 'Недопустимый домен' });
         }
 
         console.log("🎾 Запрос детальной информации о турнире:", url);
@@ -930,7 +958,7 @@ app.get('/api/courts', async (req, res) => {
     }
 });
 
-app.post('/api/courts', async (req, res) => {
+app.post('/api/courts', requireAdmin, async (req, res) => {
     let { name, address, surface, pricePerHour, image, rating, website } = req.body;
     // Если base64 > 800KB — слишком большое, отклоняем
     if (image && image.startsWith('data:') && image.length > 800000) {
@@ -959,7 +987,7 @@ app.post('/api/courts', async (req, res) => {
     }
 });
 
-app.put('/api/courts/:id', async (req, res) => {
+app.put('/api/courts/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     let { name, address, surface, pricePerHour, image, rating, website } = req.body;
     if (image && image.startsWith('data:') && image.length > 800000) {
@@ -978,7 +1006,7 @@ app.put('/api/courts/:id', async (req, res) => {
     }
 });
 
-app.delete('/api/courts/:id', async (req, res) => {
+app.delete('/api/courts/:id', requireAdmin, async (req, res) => {
     try {
         await pool.query('DELETE FROM courts WHERE id = $1', [req.params.id]);
         await logSystemEvent('warning', `Court deleted: ${req.params.id}`, 'Admin');
@@ -1011,7 +1039,7 @@ app.get('/api/products', async (req, res) => {
     }
 });
 
-app.post('/api/products', async (req, res) => {
+app.post('/api/products', requireAdmin, async (req, res) => {
     const { title, category, price, image } = req.body;
     try {
         const result = await pool.query(
@@ -1026,7 +1054,7 @@ app.post('/api/products', async (req, res) => {
     }
 });
 
-app.put('/api/products/:id', async (req, res) => {
+app.put('/api/products/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { title, category, price, image } = req.body;
     try {
@@ -1040,7 +1068,7 @@ app.put('/api/products/:id', async (req, res) => {
     }
 });
 
-app.delete('/api/products/:id', async (req, res) => {
+app.delete('/api/products/:id', requireAdmin, async (req, res) => {
     try {
         await pool.query('DELETE FROM products WHERE id = $1', [req.params.id]);
         await logSystemEvent('warning', `Product deleted: ${req.params.id}`, 'Shop');
@@ -3115,7 +3143,7 @@ app.get('/api/news/:id', async (req, res) => {
 });
 
 // Public: Create news article
-app.post('/api/news', async (req, res) => {
+app.post('/api/news', requireAdmin, async (req, res) => {
     const { title, summary, content, image, author, category, is_published, views } = req.body;
     try {
         const result = await pool.query(
@@ -3133,7 +3161,7 @@ app.post('/api/news', async (req, res) => {
 });
 
 // Public: Update news article
-app.put('/api/news/:id', async (req, res) => {
+app.put('/api/news/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { title, summary, content, image, author, category, is_published, views } = req.body;
     try {
@@ -3150,7 +3178,7 @@ app.put('/api/news/:id', async (req, res) => {
 });
 
 // Public: Delete news article
-app.delete('/api/news/:id', async (req, res) => {
+app.delete('/api/news/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     try {
         await pool.query('DELETE FROM news WHERE id = $1', [id]);
