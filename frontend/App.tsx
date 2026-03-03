@@ -1240,7 +1240,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
   const [city, setCity] = useState('');
   const [age, setAge] = useState('');
   const [role, setRole] = useState<'amateur' | 'rtt_pro' | 'coach'>('amateur');
-  const [level, setLevel] = useState('NTRP 3.0');
+  const [level, setLevel] = useState('NTRP 2.0 (Новичок)');
   
   // RTT Specific States
   const [rttAgeCategory, setRttAgeCategory] = useState('Взрослые');

@@ -131,12 +131,15 @@ export const CommunityOnboarding: React.FC<{ isActive?: boolean }> = ({ isActive
     useEffect(() => {
         updateRect();
         window.addEventListener('resize', updateRect);
-        window.addEventListener('scroll', updateRect, true);
         return () => {
             window.removeEventListener('resize', updateRect);
-            window.removeEventListener('scroll', updateRect, true);
         };
     }, [updateRect]);
+
+    // Скрываем тур если вкладка переключилась
+    useEffect(() => {
+        if (!isActive && visible) setVisible(false);
+    }, [isActive, visible]);
 
     const finish = () => { localStorage.setItem(STORAGE_KEY, '1'); setVisible(false); };
     const next = () => step < STEPS.length - 1 ? setStep(s => s + 1) : finish();
@@ -173,12 +176,12 @@ export const CommunityOnboarding: React.FC<{ isActive?: boolean }> = ({ isActive
 
     return ReactDOM.createPortal(
         <>
-            {/* фон */}
-            <div
+            {/* фон — показываем только когда элемент найден */}
+            {rect && <div
                 className="fixed inset-0 z-[9990] cursor-pointer"
                 style={{ background: 'rgba(15,23,42,0.65)' }}
                 onClick={finish}
-            />
+            />}
 
             {/* подсветка элемента */}
             {rect && (
@@ -195,8 +198,8 @@ export const CommunityOnboarding: React.FC<{ isActive?: boolean }> = ({ isActive
                 />
             )}
 
-            {/* тултип */}
-            <div
+            {/* тултип — показываем только когда элемент найден */}
+            {rect && <div
                 className="fixed z-[9999] bg-white rounded-2xl shadow-2xl p-5"
                 style={{
                     top: tipTop,
@@ -255,7 +258,7 @@ export const CommunityOnboarding: React.FC<{ isActive?: boolean }> = ({ isActive
                         <div style={{ width: 0, height: 0, borderLeft: '9px solid transparent', borderRight: '9px solid transparent', borderTop: '9px solid white' }} />
                     </div>
                 )}
-            </div>
+            </div>}
         </>,
         document.body
     );
