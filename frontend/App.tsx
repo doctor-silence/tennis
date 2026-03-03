@@ -1339,6 +1339,8 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
     try {
         // Validation
         if (!name || !city || !age) throw new Error("Заполните основные данные профиля");
+        const ageNum = parseInt(age);
+        if (isNaN(ageNum) || ageNum < 5 || ageNum > 99) throw new Error("Укажите корректный возраст (5–99 лет)");
         if (role === 'rtt_pro') {
             if (!rni) throw new Error("Укажите РНИ для профи РТТ");
             if (!rttPoints) throw new Error("Укажите очки классификации");
@@ -1350,7 +1352,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
             email, 
             password,
             city,
-            age: parseInt(age),
+            age: ageNum,
             role,
             level: role === 'amateur' ? level : (role === 'coach' ? 'Coach' : undefined),
             // Mapping new RTT fields
@@ -1525,9 +1527,14 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
                         <input 
                             type="number" 
                             value={age}
-                            onChange={(e) => setAge(e.target.value)}
+                            onChange={(e) => {
+                                const v = e.target.value;
+                                if (v === '' || (parseInt(v) >= 5 && parseInt(v) <= 99)) setAge(v);
+                            }}
                             className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-lime-400 focus:border-transparent outline-none" 
-                            placeholder="25" 
+                            placeholder="25"
+                            min={5}
+                            max={99}
                             required
                         />
                     </div>

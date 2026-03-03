@@ -72,6 +72,11 @@ app.post('/api/auth/register', async (req, res) => {
             return res.status(400).json({ error: 'Пароль должен содержать минимум 6 символов' });
         }
 
+        const ageNum = age !== undefined && age !== null ? parseInt(age) : null;
+        if (ageNum !== null && (isNaN(ageNum) || ageNum < 5 || ageNum > 99)) {
+            return res.status(400).json({ error: 'Укажите корректный возраст (5–99 лет)' });
+        }
+
         const userCheck = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
         if (userCheck.rows.length > 0) {
             return res.status(400).json({ error: 'Пользователь с таким email уже существует' });
@@ -92,7 +97,7 @@ app.post('/api/auth/register', async (req, res) => {
                 defaultAvatar, 
                 role || 'amateur', 
                 rating || 0,
-                age || null,
+                ageNum,
                 level || '',
                 rttRank || 0,
                 rttCategory || null,
