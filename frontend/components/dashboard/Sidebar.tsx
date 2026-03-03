@@ -63,7 +63,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogo
         
         <nav className="space-y-2 overflow-y-auto max-h-[calc(100vh-200px)] hide-scrollbar pb-4">
           <SidebarItem icon={<UserIcon size={20} />} label="Мой Профиль" active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
-          {user.role === 'rtt_pro' && (
+          {(user.role === 'rtt_pro' || user.role === 'coach') && (
             <SidebarItem icon={<BarChart3 size={20} />} label="Статистика РТТ" active={activeTab === 'rtt_stats'} onClick={() => setActiveTab('rtt_stats')} />
           )}
           <SidebarItem icon={<Search size={20} />} label="Поиск Партнера" active={activeTab === 'search'} onClick={() => setActiveTab('search')} />

@@ -208,7 +208,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
         <nav className="flex-1 overflow-y-auto p-4 space-y-1">
           {[
             { tab: 'profile' as DashboardTab, icon: <UserIcon size={18}/>, label: 'Мой Профиль' },
-            ...(user.role === 'rtt_pro' ? [{ tab: 'rtt_stats' as DashboardTab, icon: <BarChart3 size={18}/>, label: 'Статистика РТТ' }] : []),
+            ...(user.role === 'rtt_pro' || user.role === 'coach' ? [{ tab: 'rtt_stats' as DashboardTab, icon: <BarChart3 size={18}/>, label: 'Статистика РТТ' }] : []),
             { tab: 'search' as DashboardTab, icon: <Search size={18}/>, label: 'Поиск Партнёра' },
             { tab: 'courts' as DashboardTab, icon: <MapPin size={18}/>, label: 'Бронирование' },
             { tab: 'ladder' as DashboardTab, icon: <Swords size={18}/>, label: 'Турнирная лестница', badge: unreadLadderNotifications > 0 ? unreadLadderNotifications : null },
