@@ -77,7 +77,7 @@ app.get('/api/health', async (req, res) => {
         res.json({ status: 'ok', message: 'Backend + DB Connected', time: result.rows[0].now });
     } catch (err) {
         logSystemEvent('error', `Health check failed: ${err.message}`, 'System');
-        res.status(500).json({ status: 'error', message: 'Database connection failed', error: err.message });
+        res.status(500).json({ status: 'error', message: 'Database connection failed' });
     }
 });
 
@@ -2815,15 +2815,18 @@ app.post('/api/tactics', async (req, res) => {
 // PUT (update) an existing tactic
 app.put('/api/tactic/:tacticId', async (req, res) => {
     const { tacticId } = req.params;
-    const { name, trajectories } = req.body;
+    const { name, trajectories, userId } = req.body;
+    if (!userId) return res.status(401).json({ error: 'userId required' });
     try {
+        // Проверяем владельца
+        const own = await pool.query('SELECT user_id FROM tactics WHERE id = $1', [tacticId]);
+        if (own.rows.length === 0) return res.status(404).json({ error: 'Tactic not found' });
+        if (String(own.rows[0].user_id) !== String(userId)) return res.status(403).json({ error: 'Forbidden' });
+
         const result = await pool.query(
             'UPDATE tactics SET name = $1, tactics_data = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
             [name, JSON.stringify(trajectories), tacticId]
         );
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Tactic not found' });
-        }
         res.json(result.rows[0]);
     } catch (err) {
         console.error("Update Tactic Error:", err);
@@ -2834,7 +2837,13 @@ app.put('/api/tactic/:tacticId', async (req, res) => {
 // DELETE a tactic
 app.delete('/api/tactic/:tacticId', async (req, res) => {
     const { tacticId } = req.params;
+    const { userId } = req.body;
+    if (!userId) return res.status(401).json({ error: 'userId required' });
     try {
+        const own = await pool.query('SELECT user_id FROM tactics WHERE id = $1', [tacticId]);
+        if (own.rows.length === 0) return res.status(404).json({ error: 'Tactic not found' });
+        if (String(own.rows[0].user_id) !== String(userId)) return res.status(403).json({ error: 'Forbidden' });
+
         await pool.query('DELETE FROM tactics WHERE id = $1', [tacticId]);
         res.status(200).json({ success: true });
     } catch (err) {

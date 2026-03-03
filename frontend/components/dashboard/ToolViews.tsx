@@ -93,7 +93,7 @@ export const TacticsView = ({ user }: { user: User }) => {
         try {
             setIsLoading(true);
             setError('');
-            await api.tactics.delete(tacticToDelete.id);
+            await api.tactics.delete(tacticToDelete.id, String(user.id));
             setSavedTactics(savedTactics.filter(t => t.id !== tacticToDelete.id));
             setTacticToDelete(null);
         } catch (err) {

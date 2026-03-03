@@ -1678,7 +1678,7 @@ export const api = {
             }
             return await res.json();
         },
-        update: async (tacticId: string, data: { name: string, trajectories: any[] }): Promise<Trajectory> => {
+        update: async (tacticId: string, data: { name: string, trajectories: any[], userId: string }): Promise<Trajectory> => {
             const res = await fetch(`${API_URL}/tactic/${tacticId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -1690,9 +1690,11 @@ export const api = {
             }
             return await res.json();
         },
-        delete: async (tacticId: string): Promise<void> => {
+        delete: async (tacticId: string, userId: string): Promise<void> => {
             const res = await fetch(`${API_URL}/tactic/${tacticId}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId })
             });
             if (!res.ok) {
                 const err = await res.json();
