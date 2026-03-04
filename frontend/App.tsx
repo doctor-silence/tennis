@@ -199,13 +199,13 @@ const PublicHeader = ({ onLogin, onRegister, onNavigate, transparent = false }: 
   <header className={`fixed top-0 w-full z-50 transition-all duration-300 ${transparent ? 'bg-transparent border-transparent' : 'glass-panel border-b-0 bg-white/80 backdrop-blur-md'}`} style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
       <div 
-        className="flex items-center cursor-pointer group flex-shrink-0" 
+        className="flex items-center cursor-pointer group flex-shrink-0 self-center" 
         onClick={() => onNavigate('landing')}
       >
         <img
           src="/assets/logo.svg"
           alt="НаКорте"
-          className="h-12 sm:h-20 w-auto group-hover:opacity-90 transition-opacity"
+          className="h-10 sm:h-14 w-auto group-hover:opacity-90 transition-opacity block"
           style={transparent ? {} : { filter: 'invert(1)' }}
         />
       </div>
