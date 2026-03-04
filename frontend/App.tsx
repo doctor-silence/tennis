@@ -578,9 +578,6 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
               <Button size="lg" variant="secondary" onClick={onRegisterClick} className="w-full sm:w-auto gap-2 shadow-lg shadow-lime-400/20 hover:shadow-lime-400/40 transform hover:-translate-y-1 transition-all">
                 Начать сейчас <ArrowRight size={18} />
               </Button>
-              <Button variant="glass" size="lg" className="w-full sm:w-auto hover:bg-white/20" onClick={onLoginClick}>
-                Демо доступ
-              </Button>
             </div>
             
 
