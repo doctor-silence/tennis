@@ -197,15 +197,15 @@ const App = () => {
 // --- Shared Header Component ---
 const PublicHeader = ({ onLogin, onRegister, onNavigate, transparent = false }: any) => (
   <header className={`fixed top-0 w-full z-50 transition-all duration-300 ${transparent ? 'bg-transparent border-transparent' : 'glass-panel border-b-0 bg-white/80 backdrop-blur-md'}`} style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
       <div 
-        className="flex items-center cursor-pointer group" 
+        className="flex items-center cursor-pointer group flex-shrink-0" 
         onClick={() => onNavigate('landing')}
       >
         <img
           src="/assets/logo.svg"
           alt="НаКорте"
-          className="h-20 w-auto group-hover:opacity-90 transition-opacity"
+          className="h-12 sm:h-20 w-auto group-hover:opacity-90 transition-opacity"
           style={transparent ? {} : { filter: 'invert(1)' }}
         />
       </div>
@@ -222,9 +222,9 @@ const PublicHeader = ({ onLogin, onRegister, onNavigate, transparent = false }: 
         </a>
       </nav>
 
-      <div className="flex items-center gap-4">
-        <button onClick={onLogin} className={`font-bold hover:text-lime-500 transition-colors text-sm ${transparent ? 'text-white' : 'text-slate-900'}`}>Войти</button>
-        <Button onClick={onRegister} size="sm" variant={transparent ? 'secondary' : 'primary'}>Регистрация</Button>
+      <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+        <button onClick={onLogin} className={`font-bold hover:text-lime-500 transition-colors text-sm whitespace-nowrap ${transparent ? 'text-white' : 'text-slate-900'}`}>Войти</button>
+        <Button onClick={onRegister} size="sm" variant={transparent ? 'secondary' : 'primary'} className="text-xs sm:text-sm px-3 sm:px-4">Регистрация</Button>
       </div>
     </div>
   </header>
@@ -547,7 +547,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
       <PublicHeader onLogin={onLoginClick} onRegister={onRegisterClick} onNavigate={onNavigate} />
 
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center bg-slate-900 overflow-hidden" style={{ paddingTop: 'calc(5rem + env(safe-area-inset-top, 0px))' }}>
+      <section className="relative min-h-screen flex items-center bg-slate-900 overflow-hidden" style={{ paddingTop: 'calc(6rem + env(safe-area-inset-top, 0px))' }}>
         {/* Animated Abstract Background */}
         <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-lime-400/20 rounded-full blur-[120px] animate-pulse"></div>
         <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-emerald-600/20 rounded-full blur-[100px]"></div>
@@ -560,7 +560,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-2 gap-12 items-center">
           <div className="text-left animate-fade-in-up">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-lime-400 text-xs font-bold uppercase tracking-wider mb-8 hover:bg-white/20 transition-colors cursor-default">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-lime-400 text-xs font-bold uppercase tracking-wider mb-6 sm:mb-8 mt-4 sm:mt-0 hover:bg-white/20 transition-colors cursor-default">
               <Zap size={14} className="fill-lime-400" />
               <span>Революция в любительском спорте</span>
             </div>
@@ -583,14 +583,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
               </Button>
             </div>
             
-            <div className="mt-12 flex items-center gap-6 text-slate-400 text-sm font-medium">
-               <div className="flex -space-x-3">
-                 {[1,2,3,4].map(i => (
-                   <img key={i} src="/assets/avatar-placeholder.svg" className="w-10 h-10 rounded-full border-2 border-slate-900" alt=""/>
-                 ))}
-               </div>
-               <p><span className="text-white font-bold">1,000+</span> игроков уже в игре</p>
-            </div>
+
           </div>
 
           <div className="relative hidden lg:block animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
@@ -626,27 +619,29 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
       </section>
 
       {/* How It Works Section */}
-      <section className="py-20 bg-white border-b border-slate-100">
+      <section className="py-10 sm:py-20 bg-white border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-4 text-center">
-           <div className="mb-12">
+           <div className="mb-6 sm:mb-12">
              <span className="text-lime-600 font-bold tracking-wider uppercase text-xs">Простой старт</span>
              <h2 className="text-3xl font-bold text-slate-900 mt-2">Как это работает</h2>
            </div>
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-12 relative">
               {/* Connector Line */}
               <div className="hidden md:block absolute top-12 left-0 w-full h-0.5 bg-slate-100 z-0"></div>
               
               {[
-                { icon: <UserIcon size={32}/>, title: "Создай профиль", desc: "Укажи свой уровень игры (NTRP) и город." },
-                { icon: <Search size={32}/>, title: "Найди партнера", desc: "Выбери соперника по уровню и удобному времени." },
-                { icon: <Trophy size={32}/>, title: "Играй и побеждай", desc: "Бронируй корт в приложении и фиксируй счет." }
+                { icon: <UserIcon size={28}/>, title: "Создай профиль", desc: "Укажи свой уровень игры (NTRP) и город." },
+                { icon: <Search size={28}/>, title: "Найди партнера", desc: "Выбери соперника по уровню и удобному времени." },
+                { icon: <Trophy size={28}/>, title: "Играй и побеждай", desc: "Бронируй корт в приложении и фиксируй счет." }
               ].map((step, i) => (
-                 <div key={i} className="relative z-10 bg-white p-6 group">
-                    <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                 <div key={i} className="relative z-10 bg-white p-4 sm:p-6 group flex md:flex-col items-center md:items-center gap-4 md:gap-0 text-left md:text-center">
+                    <div className="w-16 h-16 sm:w-24 sm:h-24 bg-slate-50 rounded-full flex items-center justify-center flex-shrink-0 border-4 border-white shadow-lg group-hover:scale-110 transition-transform duration-300">
                        <div className="text-slate-900 group-hover:text-lime-600 transition-colors">{step.icon}</div>
                     </div>
-                    <h3 className="font-bold text-xl mb-2">{step.title}</h3>
-                    <p className="text-slate-500 text-sm leading-relaxed">{step.desc}</p>
+                    <div>
+                      <h3 className="font-bold text-lg sm:text-xl mb-1 sm:mb-2 md:mt-4">{step.title}</h3>
+                      <p className="text-slate-500 text-sm leading-relaxed">{step.desc}</p>
+                    </div>
                  </div>
               ))}
            </div>
@@ -654,12 +649,12 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
       </section>
 
       {/* Bento Grid Features */}
-      <section className="py-32 bg-white overflow-hidden">
+      <section className="py-12 sm:py-32 bg-white overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-20">
+          <div className="text-center mb-8 sm:mb-20">
             <span className="text-lime-600 font-bold tracking-wider uppercase text-xs">Возможности</span>
-            <h2 className="text-5xl font-bold text-slate-900 mt-3 mb-4 tracking-tight">Всё для тенниса<br/>в одном месте</h2>
-            <p className="text-slate-400 max-w-xl mx-auto text-lg font-light">Мы убрали лишнее, оставив только то, что нужно для прогресса.</p>
+            <h2 className="text-4xl sm:text-5xl font-bold text-slate-900 mt-3 mb-4 tracking-tight">Всё для тенниса<br/>в одном месте</h2>
+            <p className="text-slate-400 max-w-xl mx-auto text-base sm:text-lg font-light">Мы убрали лишнее, оставив только то, что нужно для прогресса.</p>
           </div>
 
           {/* Row 1 */}
@@ -678,10 +673,10 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                     <h3 className="text-3xl font-bold mb-4 text-white tracking-tight">Умный поиск партнеров</h3>
                     <p className="text-slate-400 text-base max-w-md leading-relaxed">Алгоритм подбирает соперников не только по уровню NTRP или очкам РТТ, но и по стилю игры, возрасту и локации.</p>
                   </div>
-                  <div className="mt-10 flex gap-3">
-                     <div className="bg-white/5 border border-white/10 backdrop-blur px-4 py-2 rounded-full text-white/60 font-medium text-sm group-hover:border-white/20 transition-colors">Спарринг</div>
-                     <div className="bg-white/5 border border-white/10 backdrop-blur px-4 py-2 rounded-full text-white/60 font-medium text-sm group-hover:border-white/20 transition-colors">Турнир</div>
-                     <div className="bg-lime-400/10 border border-lime-400/30 backdrop-blur px-4 py-2 rounded-full text-lime-400 font-bold text-sm">Тренировка</div>
+                  <div className="mt-6 sm:mt-10 flex flex-wrap gap-2 sm:gap-3">
+                     <div className="bg-white/5 border border-white/10 backdrop-blur px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white/60 font-medium text-xs sm:text-sm group-hover:border-white/20 transition-colors">Спарринг</div>
+                     <div className="bg-white/5 border border-white/10 backdrop-blur px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white/60 font-medium text-xs sm:text-sm group-hover:border-white/20 transition-colors">Турнир</div>
+                     <div className="bg-lime-400/10 border border-lime-400/30 backdrop-blur px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-lime-400 font-bold text-xs sm:text-sm">Тренировка</div>
                   </div>
                 </div>
              </div>
