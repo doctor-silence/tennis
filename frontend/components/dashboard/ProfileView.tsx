@@ -152,7 +152,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
 
   const handleSaveProfile = async () => {
       try {
-          await api.admin.updateUser(user.id, editFormData);
+          await api.updateProfile(user.id, editFormData);
           onUserUpdate(editFormData);
           setShowEditModal(false);
       } catch (e) {
@@ -171,7 +171,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
       setCurrentTrainingIndex((prevIndex) => (prevIndex + 1) % trainings.length);
 
       try {
-          await api.admin.updateUser(user.id, { xp: newXp });
+          await api.updateProfile(user.id, { xp: newXp });
       } catch (e) {
           console.error("Failed to save XP", e);
       }

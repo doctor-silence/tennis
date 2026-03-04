@@ -1029,6 +1029,21 @@ export const api = {
         } catch {}
     },
 
+    updateProfile: async (userId: string | number, data: Partial<User>): Promise<void> => {
+        const res = await fetch(`${API_URL}/users/${userId}/profile`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-user-id': String(userId),
+            },
+            body: JSON.stringify(data),
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Failed to update profile');
+        }
+    },
+
     getOnlineStats: async (): Promise<{ online: number; total: number }> => {
         try {
             const res = await fetch(`${API_URL}/users/online-stats`);

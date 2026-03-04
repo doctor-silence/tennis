@@ -22,7 +22,7 @@ app.use(helmet({ contentSecurityPolicy: false })); // Security headers
 app.use(cors({
     origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:4173', 'https://onthecourt.ru'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'x-admin-id']
+    allowedHeaders: ['Content-Type', 'x-admin-id', 'x-user-id']
 }));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
@@ -624,6 +624,34 @@ app.post('/api/users/ping', async (req, res) => {
         res.json({ ok: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+// Обновление своего профиля (без прав админа)
+app.put('/api/users/:id/profile', async (req, res) => {
+    const { id } = req.params;
+    const requestUserId = req.headers['x-user-id'];
+    if (!requestUserId || String(requestUserId) !== String(id)) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+    const { name, city, age, avatar, xp, is_private, notifications_enabled } = req.body;
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        if (name !== undefined) await client.query('UPDATE users SET name = $1 WHERE id = $2', [name, id]);
+        if (city !== undefined) await client.query('UPDATE users SET city = $1 WHERE id = $2', [city, id]);
+        if (age !== undefined) await client.query('UPDATE users SET age = $1 WHERE id = $2', [age, id]);
+        if (avatar !== undefined) await client.query('UPDATE users SET avatar = $1 WHERE id = $2', [avatar, id]);
+        if (xp !== undefined) await client.query('UPDATE users SET xp = $1 WHERE id = $2', [xp, id]);
+        if (is_private !== undefined) await client.query('UPDATE users SET is_private = $1 WHERE id = $2', [is_private, id]);
+        if (notifications_enabled !== undefined) await client.query('UPDATE users SET notifications_enabled = $1 WHERE id = $2', [notifications_enabled, id]);
+        await client.query('COMMIT');
+        res.json({ success: true });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
     }
 });
 
