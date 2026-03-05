@@ -2,7 +2,7 @@ import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Matc
 import * as THREE from 'three'; // Import THREE for Vector3 deserialization
 
 // Frontend API Service
-const API_URL = import.meta.env.DEV ? 'http://localhost:3001/api' : 'https://onthecourt.ru/api';
+export const API_URL = import.meta.env.DEV ? 'http://localhost:3001/api' : 'https://onthecourt.ru/api';
 
 // --- MOCK DATA FALLBACKS (For Demo/Offline Mode) ---
 
@@ -732,7 +732,8 @@ export const api = {
                 if (!res.ok) throw new Error('Failed to fetch matches');
                 return await res.json();
             } catch (e) {
-                return MOCK_MATCHES;
+                console.error('matches.getAll error:', e);
+                return [];
             }
         },
         add: async (matchData: any): Promise<Match> => {
@@ -1042,6 +1043,21 @@ export const api = {
             const err = await res.json();
             throw new Error(err.error || 'Failed to update profile');
         }
+    },
+
+    rttSyncMatches: async (userId: string | number): Promise<{ added: number; total: number; message?: string }> => {
+        const res = await fetch(`${API_URL}/rtt/sync-matches/${userId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-user-id': String(userId),
+            },
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Sync failed');
+        }
+        return res.json();
     },
 
     getOnlineStats: async (): Promise<{ online: number; total: number }> => {

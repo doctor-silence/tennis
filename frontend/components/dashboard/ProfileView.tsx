@@ -7,7 +7,7 @@ import {
 import { User, Match, Tournament } from '../../types';
 import Button from '../Button';
 import { StatCard, ProgressChart, Modal } from '../Shared';
-import { api } from '../../services/api';
+import { api, API_URL } from '../../services/api';
 
 const trainings = [
     {
@@ -53,6 +53,119 @@ interface ProfileViewProps {
   onUserUpdate: (data: Partial<User>) => void;
 }
 
+// Виджет ближайших турниров по округу с rttstat.ru
+const NearbyTournamentsWidget: React.FC<{ userId: string; city: string }> = ({ userId, city }) => {
+  const [tournaments, setTournaments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [districtName, setDistrictName] = useState('');
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch(`${API_URL}/rtt/nearby-tournaments/${userId}`);
+        const data = await res.json();
+        if (data.success) {
+          setTournaments(data.tournaments || []);
+          // Определяем название округа из первого турнира или по городу
+          if (data.district) {
+            const names: Record<string, string> = {
+              '2': 'Центральный ФО', '374': 'Северо-Западный ФО', '834': 'Приволжский ФО',
+              '1237': 'Сибирский ФО', '1090': 'Уральский ФО', '593': 'Южный ФО',
+              '755': 'Северо-Кавказский ФО', '1419': 'Дальневосточный ФО'
+            };
+            setDistrictName(names[data.district] || '');
+          }
+        }
+      } catch {}
+      finally { setLoading(false); }
+    };
+    load();
+  }, [userId]);
+
+  if (loading) return <div className="flex justify-center py-4"><Loader2 className="animate-spin text-slate-300" size={20}/></div>;
+
+  if (!tournaments.length) return (
+    <p className="text-slate-400 text-sm py-2 text-center">Турниры в вашем округе не найдены</p>
+  );
+
+  return (
+    <div className="space-y-2">
+      {districtName && <p className="text-xs text-slate-400 mb-3">{districtName} • топ-10 ближайших</p>}
+      <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+        {tournaments.map((t: any, i: number) => (
+          <a
+            key={i}
+            href={t.link || '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-amber-50 hover:border-amber-200 transition-colors group cursor-pointer"
+          >
+            <div className="flex-shrink-0 w-10 text-center">
+              <div className="text-xs font-bold text-amber-600 leading-tight">{t.startDate?.slice(0,5) || '—'}</div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-bold text-sm text-slate-900 group-hover:text-amber-700 leading-snug">{t.name}</div>
+              <div className="text-xs text-slate-400 mt-0.5">{[t.city, t.ageGroup, t.category].filter(Boolean).join(' · ')}</div>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Виджет матчей РТТ с rttstat.ru
+const RttMatchesWidget: React.FC<{ userId: string; rni: string }> = ({ userId, rni }) => {
+  const [rttMatches, setRttMatches] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`${API_URL}/rtt/stats/${rni}`);
+        const data = await res.json();
+        if (data.success && data.data?.matches) {
+          setRttMatches(data.data.matches);
+        } else {
+          setError(data.error || 'Нет данных');
+        }
+      } catch {
+        setError('Ошибка загрузки');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [rni]);
+
+  if (loading) return <div className="flex justify-center py-6"><Loader2 className="animate-spin text-slate-300" /></div>;
+  if (error) return <p className="text-slate-400 text-sm py-2">{error}</p>;
+  if (!rttMatches.length) return <p className="text-slate-400 text-sm py-2">Матчи на rttstat.ru не найдены.</p>;
+
+  return (
+    <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+      {rttMatches.map((m: any, i: number) => (
+        <div key={i} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+          <div className={`w-1.5 h-10 rounded-full flex-shrink-0 ${m.result === 'win' ? 'bg-lime-500' : 'bg-red-400'}`} />
+          <div className="flex-1 min-w-0">
+            <div className="font-bold text-sm truncate">vs. {m.opponent}</div>
+            <div className="text-xs text-slate-400 truncate">{m.tournament || '—'} • {m.date}</div>
+          </div>
+          <div className="text-right flex-shrink-0">
+            <div className="font-bold text-sm">{m.score || '—'}</div>
+            <div className={`text-xs font-bold ${m.result === 'win' ? 'text-lime-600' : 'text-red-500'}`}>
+              {m.result === 'win' ? 'Победа' : 'Поражение'}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddStatsModal, setShowAddStatsModal] = useState(false);
@@ -63,7 +176,28 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
   
   const [matches, setMatches] = useState<Match[]>([]);
   const [loadingMatches, setLoadingMatches] = useState(true);
+  const [matchesError, setMatchesError] = useState(false);
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
+  const [syncingRtt, setSyncingRtt] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+
+  const handleRttSync = async () => {
+      setSyncingRtt(true);
+      setSyncResult(null);
+      try {
+          const data = await api.rttSyncMatches(user.id);
+          setSyncResult(data.added > 0 ? `Добавлено ${data.added} матчей из РТТ` : 'Новых матчей нет');
+          if (data.added > 0) {
+              const updated = await api.matches.getAll(user.id);
+              setMatches(updated);
+          }
+      } catch (e: any) {
+          setSyncResult(e.message || 'Ошибка синхронизации');
+      } finally {
+          setSyncingRtt(false);
+          setTimeout(() => setSyncResult(null), 4000);
+      }
+  };
   
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [nearestTournament, setNearestTournament] = useState<Tournament | null>(null);
@@ -123,11 +257,13 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
   useEffect(() => {
       const fetchMatches = async () => {
           setLoadingMatches(true);
+          setMatchesError(false);
           try {
-              const data = await api.matches.getAll(user.id);
+              const data = await api.matches.getAll(String(user.id));
               setMatches(data);
           } catch(e) {
               console.error(e);
+              setMatchesError(true);
           } finally {
               setLoadingMatches(false);
           }
@@ -292,6 +428,8 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
           </div>
           {loadingMatches ? (
               <div className="flex justify-center py-4"><Loader2 className="animate-spin text-slate-400"/></div>
+          ) : matchesError ? (
+              <div className="text-center py-6 text-red-400 text-sm">Ошибка загрузки матчей. Проверьте подключение.</div>
           ) : matches.length > 0 ? (
               <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
                 {matches.map((m) => (
@@ -352,6 +490,32 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
               <p className="text-slate-400 text-sm">Пока нет сыгранных матчей.</p>
           )}
         </div>
+
+        {/* RTT Matches Widget — только для игроков с RНИ */}
+        {user.rni && (
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="text-xl font-bold flex items-center gap-2">
+                  <span className="text-lime-600">⚡</span> Матчи РТТ
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">РНИ: {user.rni}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {syncResult && <span className="text-xs text-slate-500">{syncResult}</span>}
+                <button
+                  onClick={handleRttSync}
+                  disabled={syncingRtt}
+                  className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-lime-50 border border-lime-200 text-lime-700 hover:bg-lime-100 transition-colors disabled:opacity-50"
+                >
+                  {syncingRtt ? <Loader2 size={13} className="animate-spin" /> : <Activity size={13} />}
+                  {syncingRtt ? 'Загрузка...' : 'Синх. РТТ'}
+                </button>
+              </div>
+            </div>
+            <RttMatchesWidget userId={user.id} rni={user.rni} />
+          </div>
+        )}
       </div>
       
       <div className="space-y-6">
@@ -377,27 +541,8 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
         </div>
 
         <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
-            <h3 className="font-bold mb-4 flex items-center gap-2"><Trophy className="text-amber-500" size={18}/> Ближайший турнир</h3>
-            <div className="space-y-3">
-                { nearestTournament ? (
-                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                        <div className="text-xs font-bold text-slate-400 uppercase mb-1">{formatDate(nearestTournament.start_date).day} {formatDate(nearestTournament.start_date).month}, {formatDate(nearestTournament.start_date).dayOfWeek}</div>
-                        <div className="font-bold text-slate-900">{nearestTournament.name}</div>
-                        <div className="text-sm text-slate-500 mt-1">{nearestTournament.groupName || 'Открытый'} • {nearestTournament.category}</div>
-                    </div>
-                ) : (
-                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-center text-sm text-slate-500">
-                        Нет ближайших турниров
-                    </div>
-                )}
-                <Button 
-                    variant="outline" 
-                    className="w-full text-sm" 
-                    onClick={() => setShowTournamentsModal(true)}
-                >
-                    Календарь турниров
-                </Button>
-            </div>
+            <h3 className="font-bold mb-4 flex items-center gap-2"><Trophy className="text-amber-500" size={18}/> Ближайшие турниры</h3>
+            <NearbyTournamentsWidget userId={user.id} city={user.city} />
         </div>
       </div>
     </div>
@@ -531,10 +676,15 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
                 <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-500 uppercase">Возраст</label>
                     <input 
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" 
-                        value={editFormData.age} 
-                        onChange={e => setEditFormData({...editFormData, age: parseInt(e.target.value)})}
+                        value={editFormData.age ?? ''}
+                        onChange={e => {
+                            const val = e.target.value.replace(/\D/g, '');
+                            setEditFormData({...editFormData, age: val === '' ? undefined : parseInt(val)});
+                        }}
                     />
                 </div>
             </div>

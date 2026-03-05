@@ -328,6 +328,85 @@ app.get('/api/rtt/search', async (req, res) => {
     }
 });
 
+// Маппинг городов → федеральный округ (district id на rttstat.ru)
+const CITY_TO_DISTRICT = {
+    // Центральный ФО
+    'Москва': '2', 'Московская область': '2', 'Воронеж': '2', 'Ярославль': '2',
+    'Тула': '2', 'Рязань': '2', 'Тверь': '2', 'Брянск': '2', 'Калуга': '2',
+    'Орёл': '2', 'Липецк': '2', 'Тамбов': '2', 'Иваново': '2', 'Кострома': '2',
+    'Смоленск': '2', 'Курск': '2', 'Белгород': '2', 'Владимир': '2',
+    // Северо-Западный ФО
+    'Санкт-Петербург': '374', 'Петербург': '374', 'Мурманск': '374',
+    'Архангельск': '374', 'Вологда': '374', 'Псков': '374', 'Новгород': '374',
+    'Калининград': '374', 'Петрозаводск': '374', 'Сыктывкар': '374',
+    // Приволжский ФО
+    'Казань': '834', 'Нижний Новгород': '834', 'Самара': '834', 'Уфа': '834',
+    'Пермь': '834', 'Оренбург': '834', 'Саратов': '834', 'Тольятти': '834',
+    'Пенза': '834', 'Киров': '834', 'Ульяновск': '834', 'Чебоксары': '834',
+    'Ижевск': '834', 'Йошкар-Ола': '834', 'Саранск': '834',
+    // Сибирский ФО
+    'Новосибирск': '1237', 'Омск': '1237', 'Красноярск': '1237', 'Барнаул': '1237',
+    'Иркутск': '1237', 'Томск': '1237', 'Кемерово': '1237', 'Новокузнецк': '1237',
+    'Чита': '1237', 'Улан-Удэ': '1237', 'Абакан': '1237', 'Кызыл': '1237',
+    // Уральский ФО
+    'Екатеринбург': '1090', 'Челябинск': '1090', 'Тюмень': '1090', 'Сургут': '1090',
+    'Нижний Тагил': '1090', 'Магнитогорск': '1090', 'Курган': '1090',
+    'Ханты-Мансийск': '1090', 'Салехард': '1090',
+    // Южный ФО
+    'Краснодар': '593', 'Ростов-на-Дону': '593', 'Волгоград': '593', 'Астрахань': '593',
+    'Ставрополь': '593', 'Сочи': '593', 'Новороссийск': '593', 'Симферополь': '593',
+    'Севастополь': '593', 'Элиста': '593', 'Майкоп': '593',
+    // Северо-Кавказский ФО
+    'Махачкала': '755', 'Грозный': '755', 'Владикавказ': '755', 'Нальчик': '755',
+    'Пятигорск': '755', 'Черкесск': '755', 'Назрань': '755',
+    // Дальневосточный ФО
+    'Хабаровск': '1419', 'Владивосток': '1419', 'Якутск': '1419', 'Благовещенск': '1419',
+    'Южно-Сахалинск': '1419', 'Петропавловск-Камчатский': '1419', 'Магадан': '1419',
+};
+
+function getDistrictByCity(city) {
+    if (!city) return null;
+    for (const [key, val] of Object.entries(CITY_TO_DISTRICT)) {
+        if (city.toLowerCase().includes(key.toLowerCase())) return val;
+    }
+    return null;
+}
+
+// Ближайшие турниры по округу пользователя
+app.get('/api/rtt/nearby-tournaments/:userId', async (req, res) => {
+    const { userId } = req.params;
+    try {
+        const userResult = await pool.query('SELECT city, rtt_category FROM users WHERE id = $1', [userId]);
+        if (!userResult.rows.length) return res.status(404).json({ error: 'User not found' });
+
+        const { city, rtt_category } = userResult.rows[0];
+        const district = getDistrictByCity(city);
+
+        const filters = {};
+        if (district) filters.district = district;
+
+        const data = await rttParser.getTournamentsList(filters);
+        if (!data.success) return res.status(500).json({ error: data.error });
+
+        // Берём ближайшие 10 турниров (сортируем по дате)
+        const sorted = data.data.tournaments
+            .filter(t => t.startDate)
+            .sort((a, b) => {
+                const parseDate = d => {
+                    const m = d.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+                    return m ? new Date(`${m[3]}-${m[2]}-${m[1]}`) : new Date(0);
+                };
+                return parseDate(a.startDate) - parseDate(b.startDate);
+            })
+            .slice(0, 10);
+
+        res.json({ success: true, district, city, tournaments: sorted });
+    } catch (err) {
+        console.error('nearby-tournaments error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Get player full stats (tournaments and matches)
 app.get('/api/rtt/stats/:rni', async (req, res) => {
     const { rni } = req.params;
@@ -2820,24 +2899,107 @@ app.delete('/api/lessons/:id', async (req, res) => {
 
 // --- MATCH STATISTICS ROUTES ---
 
+// Синхронизация матчей из РТТ в личный кабинет
+app.post('/api/rtt/sync-matches/:userId', async (req, res) => {
+    const { userId } = req.params;
+    const requestUserId = req.headers['x-user-id'];
+
+    if (!requestUserId || String(requestUserId) !== String(userId)) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    try {
+        // Берём RНИ пользователя
+        const userResult = await pool.query('SELECT rni FROM users WHERE id = $1', [userId]);
+        if (!userResult.rows.length) return res.status(404).json({ error: 'User not found' });
+
+        const rni = userResult.rows[0].rni;
+        if (!rni) return res.status(400).json({ error: 'У пользователя не привязан РНИ' });
+
+        // Парсим матчи с rttstat.ru
+        const statsData = await rttParser.getPlayerTournamentsAndMatches(rni);
+        const rttMatches = statsData?.data?.matches || [];
+
+        if (!rttMatches.length) {
+            return res.json({ success: true, added: 0, message: 'Матчи на rttstat.ru не найдены' });
+        }
+
+        // Получаем уже существующие матчи пользователя чтобы не дублировать
+        const existing = await pool.query(
+            'SELECT opponent_name, date FROM matches WHERE user_id = $1',
+            [userId]
+        );
+        const existingSet = new Set(
+            existing.rows.map(r => `${r.opponent_name}__${r.date}`)
+        );
+
+        let added = 0;
+        for (const m of rttMatches) {
+            const key = `${m.opponent}__${m.date}`;
+            if (existingSet.has(key)) continue;
+
+            // Конвертируем дату из ДД.ММ.ГГГГ → ГГГГ-ММ-ДД
+            let parsedDate = null;
+            if (m.date) {
+                const parts = m.date.split('.');
+                if (parts.length === 3) {
+                    parsedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                } else {
+                    // Попробуем как есть
+                    const d = new Date(m.date);
+                    if (!isNaN(d.getTime())) parsedDate = d.toISOString().split('T')[0];
+                }
+            }
+
+            const stats = {
+                tournament: m.tournament || null,
+                ageGroup: m.ageGroup || null,
+                opponentPoints: m.opponentPoints || null,
+                opponentCity: m.opponentCity || null,
+                source: 'rtt'
+            };
+
+            try {
+                await pool.query(
+                    `INSERT INTO matches (user_id, opponent_name, score, result, surface, date, stats)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                    [userId, m.opponent, m.score || '', m.result, 'hard', parsedDate, JSON.stringify(stats)]
+                );
+                existingSet.add(key);
+                added++;
+            } catch (insertErr) {
+                console.error(`RTT sync: skip match ${m.opponent} ${m.date}:`, insertErr.message);
+            }
+        }
+
+        await logSystemEvent('info', `RTT sync: ${added} matches added for user ${userId}`, 'RTT');
+        res.json({ success: true, added, total: rttMatches.length });
+
+    } catch (err) {
+        console.error('RTT sync-matches error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get('/api/matches', async (req, res) => {
     const { userId } = req.query;
     if (!userId) return res.status(400).json({ error: 'userId required' });
 
     try {
-        const result = await pool.query('SELECT * FROM matches WHERE user_id = $1 ORDER BY date DESC LIMIT 10', [userId]);
+        const result = await pool.query('SELECT * FROM matches WHERE user_id = $1 ORDER BY date DESC LIMIT 100', [userId]);
         const matches = result.rows.map(row => ({
             id: row.id.toString(),
             userId: row.user_id,
             opponentName: row.opponent_name,
             score: row.score,
-            date: row.date,
+            date: row.date ? new Date(row.date).toISOString().split('T')[0] : null,
             result: row.result,
             surface: row.surface,
             stats: row.stats
         }));
         res.json(matches);
     } catch (err) {
+        console.error('GET /api/matches error:', err);
         res.status(500).json({ error: 'Db error' });
     }
 });

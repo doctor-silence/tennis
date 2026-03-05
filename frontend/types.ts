@@ -17,6 +17,7 @@ export interface User {
   is_private?: boolean;
   notifications_enabled?: boolean;
   totp_enabled?: boolean;
+  rni?: string;
 }
 
 export interface MatchStats {
