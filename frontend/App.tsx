@@ -38,6 +38,7 @@ import {
 
 const App = () => {
   const [view, setView] = useState<ViewState>('landing');
+  const [isNotFound, setIsNotFound] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(true); // Add loading state
@@ -47,6 +48,15 @@ const App = () => {
     try {
       const storedUser = localStorage.getItem('currentUser');
       const pathname = window.location.pathname;
+
+      // Список допустимых путей SPA
+      const validPaths = ['/', '/crm/', '/crm', '/rtt/', '/rtt', '/news/', '/news', '/privacy/', '/privacy', '/pro/', '/pro', '/shop/', '/shop', '/terms/', '/terms'];
+      const isValid = validPaths.some(p => pathname === p || pathname.startsWith(p + '/'));
+      if (!isValid) {
+        setIsNotFound(true);
+        setLoading(false);
+        return;
+      }
 
       if (storedUser) {
         const user: User = JSON.parse(storedUser);
@@ -125,6 +135,28 @@ const App = () => {
       <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
         <Loader2 className="animate-spin h-10 w-10 text-lime-400" />
         <span className="ml-3 text-lg">Загрузка...</span>
+      </div>
+    );
+  }
+
+  if (isNotFound) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 text-white px-6">
+        <div style={{ fontSize: '120px', lineHeight: 1, fontWeight: 900, fontStyle: 'italic', letterSpacing: '-0.05em', color: '#a3e635' }}>404</div>
+        <h1 style={{ fontSize: '24px', fontWeight: 700, marginTop: '16px', marginBottom: '8px' }}>Страница не найдена</h1>
+        <p style={{ color: '#94a3b8', fontSize: '15px', marginBottom: '32px', textAlign: 'center' }}>
+          Такой страницы не существует. Возможно, она была удалена или вы перешли по неверной ссылке.
+        </p>
+        <button
+          onClick={() => { window.history.replaceState({}, '', '/'); setIsNotFound(false); setView('landing'); }}
+          style={{
+            background: '#a3e635', color: '#0f172a', fontWeight: 700,
+            padding: '12px 32px', borderRadius: '12px', border: 'none',
+            cursor: 'pointer', fontSize: '15px',
+          }}
+        >
+          На главную
+        </button>
       </div>
     );
   }
