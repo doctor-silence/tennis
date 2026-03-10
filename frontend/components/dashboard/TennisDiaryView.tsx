@@ -113,13 +113,23 @@ const TennisDiaryView: React.FC<{ user: User }> = ({ user }) => {
   const [rniSearchResults, setRniSearchResults] = useState<any[]>([]);
   const [rniSearchLoading, setRniSearchLoading] = useState(false);
 
+  const DOSSIERS_KEY = `diary_dossiers_${user.id}`;
+  const ENTRIES_KEY = `diary_entries_${user.id}`;
+  // Версия формата данных — при смене сбрасывает старые mock-данные у всех пользователей
+  const DATA_VERSION = 'v2';
+  const VERSION_KEY = `diary_data_version_${user.id}`;
+
   useEffect(() => {
+    // Если версия не совпадает — значит данные старые (mock), очищаем
+    const savedVersion = localStorage.getItem(VERSION_KEY);
+    if (savedVersion !== DATA_VERSION) {
+      localStorage.removeItem(DOSSIERS_KEY);
+      localStorage.removeItem(ENTRIES_KEY);
+      localStorage.setItem(VERSION_KEY, DATA_VERSION);
+    }
     fetchEntries();
     fetchDossiers();
   }, [user.id]);
-
-  const DOSSIERS_KEY = `diary_dossiers_${user.id}`;
-  const ENTRIES_KEY = `diary_entries_${user.id}`;
 
   const fetchDossiers = () => {
     try {
