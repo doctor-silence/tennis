@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   MessageSquare, LogOut, Bell, 
   User as UserIcon, Swords, Globe, Bot, Menu, X,
-  Search, MapPin, BookOpen, Mail, Users, Trophy, BarChart3, Video
+  Search, MapPin, BookOpen, Mail, Users, Trophy, BarChart3, Video, Book
 } from 'lucide-react';
 import { User, DashboardTab, Conversation, Challenge } from '../types';
 import Sidebar from './dashboard/Sidebar';
@@ -20,6 +20,7 @@ import { TacticsView, VideoAnalysisView, StudentsView } from './dashboard/ToolVi
 import { TournamentsView } from './dashboard/TournamentsView';
 import { MyApplications } from './dashboard/MyApplications';
 import { RttStatsView } from './dashboard/RttStatsView';
+import TennisDiaryView from './dashboard/TennisDiaryView';
 
 interface DashboardProps {
   user: User;
@@ -137,6 +138,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
         community: <CommunityView user={user} onNavigate={handleNavigate} onStartConversation={handleStartConversation} feedVersion={feedVersion} isActive={activeTab === 'community'} />,
         my_applications: <MyApplications user={user} />,
         rtt_stats: <RttStatsView user={user} />,
+        diary: <TennisDiaryView user={user} />,
     };
 
     return (
@@ -165,6 +167,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
     my_applications: 'Мои Заявки',
     notifications: 'Уведомления',
     rtt_stats: 'Статистика РТТ',
+    diary: 'Дневник теннисиста',
   };
 
   const handleMobileTabChange = (tab: DashboardTab) => {
@@ -215,6 +218,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
             { tab: 'community' as DashboardTab, icon: <Globe size={18}/>, label: 'Сообщество' },
             ...(user.role !== 'coach' ? [{ tab: 'my_applications' as DashboardTab, icon: <Mail size={18}/>, label: 'Мои заявки' }] : []),
             { tab: 'tactics' as DashboardTab, icon: <BookOpen size={18}/>, label: 'Тактика' },
+            { tab: 'diary' as DashboardTab, icon: <Book size={18}/>, label: 'Дневник теннисиста' },
             { tab: 'messages' as DashboardTab, icon: <MessageSquare size={18}/>, label: 'Сообщения', badge: totalUnread > 0 ? totalUnread : null },
             { tab: 'ai_coach' as DashboardTab, icon: <Bot size={18}/>, label: 'AI Тренер' },
             ...(user.role === 'coach' ? [
