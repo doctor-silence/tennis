@@ -3,6 +3,7 @@ import { User } from '../../types';
 import { Plus, Calendar, Heart, Target, TrendingUp, ChevronDown, ChevronUp, Users, FileText, X } from 'lucide-react';
 import { api } from '../../services/api';
 import DiaryBanner from './DiaryBanner';
+import Tooltip from '../Tooltip';
 
 interface OpponentDossier {
   id: string;
@@ -63,6 +64,7 @@ const TennisDiaryView: React.FC<{ user: User }> = ({ user }) => {
   const [showDossierForm, setShowDossierForm] = useState(false);
   const [selectedDossier, setSelectedDossier] = useState<OpponentDossier | null>(null);
   const [dossiers, setDossiers] = useState<OpponentDossier[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState<{ type: 'entry' | 'dossier'; id: string; name: string } | null>(null);
   const [formData, setFormData] = useState({
     type: 'training' as DiaryEntry['type'],
     title: '',
@@ -317,6 +319,25 @@ const TennisDiaryView: React.FC<{ user: User }> = ({ user }) => {
     } catch (error) {
       console.error('Failed to add dossier:', error);
     }
+  };
+
+  const handleDeleteEntry = (id: string, title: string) => {
+    setConfirmDelete({ type: 'entry', id, name: title });
+  };
+
+  const handleDeleteDossier = (id: string, name: string) => {
+    setConfirmDelete({ type: 'dossier', id, name });
+  };
+
+  const handleConfirmDelete = () => {
+    if (!confirmDelete) return;
+    if (confirmDelete.type === 'entry') {
+      setEntries(prev => prev.filter(e => e.id !== confirmDelete.id));
+    } else {
+      setDossiers(prev => prev.filter(d => d.id !== confirmDelete.id));
+      if (selectedDossier?.id === confirmDelete.id) setSelectedDossier(null);
+    }
+    setConfirmDelete(null);
   };
 
   const handleAddEntry = async () => {
@@ -973,16 +994,30 @@ const TennisDiaryView: React.FC<{ user: User }> = ({ user }) => {
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {dossiers.map((dossier) => (
-              <div
+              <Tooltip
                 key={dossier.id}
-                onClick={() => setSelectedDossier(dossier)}
-                className="p-4 border border-blue-200 rounded-lg bg-blue-50 cursor-pointer hover:bg-blue-100 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200"
+                text="Пример досье соперника"
+                description="Нажмите, чтобы открыть полное досье с тактикой, статистикой и заметками"
               >
-                <div className="font-bold text-slate-900">{dossier.opponentName}</div>
-                <div className="text-sm text-slate-600">{dossier.opponentLevel}</div>
-                <div className="text-xs text-slate-500 mt-2">Встреч: {dossier.matchesCount}</div>
-                {dossier.opponentRni && <div className="text-xs text-blue-700 mt-1">РНИ: {dossier.opponentRni}</div>}
-              </div>
+                <div className="w-full relative group/card">
+                  <div
+                    onClick={() => setSelectedDossier(dossier)}
+                    className="w-full p-4 border border-blue-200 rounded-lg bg-blue-50 cursor-pointer hover:bg-blue-100 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200"
+                  >
+                    <div className="font-bold text-slate-900 pr-8">{dossier.opponentName}</div>
+                    <div className="text-sm text-slate-600">{dossier.opponentLevel}</div>
+                    <div className="text-xs text-slate-500 mt-2">Встреч: {dossier.matchesCount}</div>
+                    {dossier.opponentRni && <div className="text-xs text-blue-700 mt-1">РНИ: {dossier.opponentRni}</div>}
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDeleteDossier(dossier.id, dossier.opponentName); }}
+                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-white/80 text-slate-400 opacity-0 group-hover/card:opacity-100 hover:bg-red-50 hover:text-red-500 transition-all duration-150"
+                    title="Удалить досье"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </Tooltip>
             ))}
           </div>
         </div>
@@ -992,185 +1027,241 @@ const TennisDiaryView: React.FC<{ user: User }> = ({ user }) => {
       {selectedDossier && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-[2px] z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-slide-up">
-            <div className="sticky top-0 bg-white border-b border-slate-200 p-6 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-slate-900">Досье: {selectedDossier.opponentName}</h2>
-              <button onClick={() => setSelectedDossier(null)} className="p-1 hover:bg-slate-100 rounded-lg">
-                <X size={24} />
+
+            {/* Шапка */}
+            <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-start z-10">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Досье: {selectedDossier.opponentName}</h2>
+                <p className="text-sm text-slate-500 mt-0.5">{selectedDossier.opponentLevel}</p>
+              </div>
+              <button onClick={() => setSelectedDossier(null)} className="p-1.5 hover:bg-slate-100 rounded-lg mt-0.5 flex-shrink-0">
+                <X size={20} />
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-slate-50 rounded-lg p-3 animate-fade-in-up">
-                  <span className="text-sm text-slate-500">Уровень игры</span>
-                  <div className="text-lg font-bold text-slate-900">{selectedDossier.opponentLevel}</div>
+            <div className="p-6 space-y-5">
+
+              {/* Базовая статистика */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-slate-50 rounded-xl p-3 text-center">
+                  <div className="text-xs text-slate-400 mb-1">Встреч</div>
+                  <div className="text-2xl font-black text-slate-900">{selectedDossier.matchesCount}</div>
                 </div>
-                <div className="bg-slate-50 rounded-lg p-3 animate-fade-in-up">
-                  <span className="text-sm text-slate-500">Встреч</span>
-                  <div className="text-lg font-bold text-slate-900">{selectedDossier.matchesCount}</div>
+                <div className="bg-green-50 rounded-xl p-3 text-center">
+                  <div className="text-xs text-slate-400 mb-1">Побед</div>
+                  <div className="text-2xl font-black text-green-600">{selectedDossier.h2hWins ?? 0}</div>
+                </div>
+                <div className="bg-red-50 rounded-xl p-3 text-center">
+                  <div className="text-xs text-slate-400 mb-1">Поражений</div>
+                  <div className="text-2xl font-black text-red-500">{selectedDossier.h2hLosses ?? 0}</div>
                 </div>
               </div>
 
+              {/* РТТ данные */}
               {(selectedDossier.opponentRni || selectedDossier.rttCategory || selectedDossier.rttRank) && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2 animate-fade-in-up">
-                  <h3 className="font-bold text-slate-900">🏅 Данные РТТ</h3>
-                  {selectedDossier.opponentRni && <div className="text-sm text-slate-700"><span className="font-medium">РНИ:</span> {selectedDossier.opponentRni}</div>}
-                  {selectedDossier.rttCategory && <div className="text-sm text-slate-700"><span className="font-medium">Категория:</span> {selectedDossier.rttCategory}</div>}
-                  {selectedDossier.rttRank && <div className="text-sm text-slate-700"><span className="font-medium">Рейтинг:</span> {selectedDossier.rttRank}</div>}
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <h3 className="text-sm font-bold text-blue-800 mb-2">🏅 Данные ФТР</h3>
+                  <div className="flex flex-wrap gap-3">
+                    {selectedDossier.opponentRni && (
+                      <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-semibold">РНИ: {selectedDossier.opponentRni}</span>
+                    )}
+                    {selectedDossier.rttCategory && (
+                      <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-semibold">Категория: {selectedDossier.rttCategory}</span>
+                    )}
+                    {selectedDossier.rttRank && (
+                      <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-semibold">Рейтинг: {selectedDossier.rttRank}</span>
+                    )}
+                  </div>
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {selectedDossier.preferredSurface && (
-                  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 animate-fade-in-up">
-                    <h3 className="font-semibold text-slate-900 mb-1">Покрытие</h3>
-                    <p className="text-sm text-slate-700">{selectedDossier.preferredSurface}</p>
-                  </div>
-                )}
-                {selectedDossier.favoriteServeTarget && (
-                  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 animate-fade-in-up">
-                    <h3 className="font-semibold text-slate-900 mb-1">Подача</h3>
-                    <p className="text-sm text-slate-700">{selectedDossier.favoriteServeTarget}</p>
-                  </div>
-                )}
-              </div>
+              {/* Покрытие и подача */}
+              {(selectedDossier.preferredSurface || selectedDossier.favoriteServeTarget) && (
+                <div className="grid grid-cols-2 gap-3">
+                  {selectedDossier.preferredSurface && (
+                    <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
+                      <div className="text-xs text-indigo-400 font-semibold uppercase tracking-wide mb-1">Покрытие</div>
+                      <div className="text-sm font-bold text-slate-800">{selectedDossier.preferredSurface}</div>
+                    </div>
+                  )}
+                  {selectedDossier.favoriteServeTarget && (
+                    <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
+                      <div className="text-xs text-indigo-400 font-semibold uppercase tracking-wide mb-1">Подача</div>
+                      <div className="text-sm font-bold text-slate-800">{selectedDossier.favoriteServeTarget}</div>
+                    </div>
+                  )}
+                </div>
+              )}
 
-              <div>
-                <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                  📊 Стиль игры
-                </h3>
-                <p className="text-slate-600 bg-slate-50 p-4 rounded-lg">{selectedDossier.playStyle}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-6">
+              {/* Стиль игры */}
+              {selectedDossier.playStyle && (
                 <div>
-                  <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                    ✅ Сильные стороны
-                  </h3>
-                  <ul className="space-y-2">
-                    {selectedDossier.strengths.map((strength, idx) => (
-                      <li key={idx} className="flex gap-2 text-slate-600">
-                        <span className="text-green-500 font-bold">•</span> {strength}
+                  <h3 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-1.5">📊 Стиль игры</h3>
+                  <p className="text-sm text-slate-600 bg-slate-50 border border-slate-100 px-4 py-3 rounded-xl">{selectedDossier.playStyle}</p>
+                </div>
+              )}
+
+              {/* Сильные и слабые стороны */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-1.5">✅ Сильные стороны</h3>
+                  <ul className="space-y-1.5">
+                    {selectedDossier.strengths.map((s, i) => (
+                      <li key={i} className="text-sm text-slate-600 flex gap-2 items-start">
+                        <span className="text-green-500 font-bold mt-0.5 flex-shrink-0">•</span>{s}
                       </li>
                     ))}
                   </ul>
                 </div>
-
                 <div>
-                  <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                    ⚠️ Слабые стороны
-                  </h3>
-                  <ul className="space-y-2">
-                    {selectedDossier.weaknesses.map((weakness, idx) => (
-                      <li key={idx} className="flex gap-2 text-slate-600">
-                        <span className="text-red-500 font-bold">•</span> {weakness}
+                  <h3 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-1.5">⚠️ Слабые стороны</h3>
+                  <ul className="space-y-1.5">
+                    {selectedDossier.weaknesses.map((w, i) => (
+                      <li key={i} className="text-sm text-slate-600 flex gap-2 items-start">
+                        <span className="text-red-400 font-bold mt-0.5 flex-shrink-0">•</span>{w}
                       </li>
                     ))}
                   </ul>
                 </div>
               </div>
 
+              {/* Любимые схемы */}
               {selectedDossier.favoritePatterns?.length > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 animate-fade-in-up">
-                  <h3 className="font-bold text-slate-900 mb-2">🎯 Любимые схемы</h3>
-                  <ul className="space-y-1 text-sm text-slate-700">
-                    {selectedDossier.favoritePatterns.map((item, idx) => (
-                      <li key={idx}>• {item}</li>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <h3 className="text-sm font-bold text-amber-800 mb-2">🎯 Любимые схемы</h3>
+                  <ul className="space-y-1">
+                    {selectedDossier.favoritePatterns.map((item, i) => (
+                      <li key={i} className="text-sm text-slate-700">• {item}</li>
                     ))}
                   </ul>
                 </div>
               )}
 
+              {/* Слабые зоны */}
               {selectedDossier.weakZones?.length > 0 && (
-                <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 animate-fade-in-up">
-                  <h3 className="font-bold text-slate-900 mb-2">📍 Слабые зоны</h3>
-                  <ul className="space-y-1 text-sm text-slate-700">
-                    {selectedDossier.weakZones.map((item, idx) => (
-                      <li key={idx}>• {item}</li>
+                <div className="bg-rose-50 border border-rose-200 rounded-xl p-4">
+                  <h3 className="text-sm font-bold text-rose-800 mb-2">📍 Слабые зоны</h3>
+                  <ul className="space-y-1">
+                    {selectedDossier.weakZones.map((item, i) => (
+                      <li key={i} className="text-sm text-slate-700">• {item}</li>
                     ))}
                   </ul>
                 </div>
               )}
 
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-2 animate-fade-in-up">
-                <h3 className="font-bold text-slate-900">🤝 Личные встречи</h3>
-                <div className="text-sm text-slate-700">Баланс: {selectedDossier.h2hWins ?? 0}–{selectedDossier.h2hLosses ?? 0}</div>
-                {selectedDossier.h2hMatches?.length > 0 && (
-                  <div className="text-sm text-slate-600">
-                    Последняя: {selectedDossier.h2hMatches[0].date} • {selectedDossier.h2hMatches[0].score} • {selectedDossier.h2hMatches[0].surface}
+              {/* История встреч */}
+              {selectedDossier.h2hMatches?.length > 0 && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                  <h3 className="text-sm font-bold text-slate-700 mb-3">🤝 История встреч</h3>
+                  <div className="space-y-2">
+                    {selectedDossier.h2hMatches.map((m, i) => (
+                      <div key={i} className="flex items-center justify-between text-sm bg-white border border-slate-100 rounded-lg px-3 py-2">
+                        <span className="text-slate-500">{m.date}</span>
+                        <span className="font-bold text-slate-900">{m.score}</span>
+                        <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{m.surface}</span>
+                      </div>
+                    ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {selectedDossier.pressureBehavior && (
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 animate-fade-in-up">
-                    <h4 className="font-semibold text-slate-900 mb-1">Под давлением</h4>
-                    <p className="text-sm text-slate-700">{selectedDossier.pressureBehavior}</p>
+              {/* Психология */}
+              {(selectedDossier.pressureBehavior || selectedDossier.clutchBehavior || selectedDossier.breakResponse) && (
+                <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+                  <h3 className="text-sm font-bold text-purple-800 mb-3">🧠 Психология</h3>
+                  <div className="grid grid-cols-1 gap-2">
+                    {selectedDossier.pressureBehavior && (
+                      <div className="bg-white rounded-lg px-3 py-2 border border-purple-100">
+                        <span className="text-xs font-semibold text-purple-500 uppercase tracking-wide">Под давлением</span>
+                        <p className="text-sm text-slate-700 mt-0.5">{selectedDossier.pressureBehavior}</p>
+                      </div>
+                    )}
+                    {selectedDossier.clutchBehavior && (
+                      <div className="bg-white rounded-lg px-3 py-2 border border-purple-100">
+                        <span className="text-xs font-semibold text-purple-500 uppercase tracking-wide">Важные очки</span>
+                        <p className="text-sm text-slate-700 mt-0.5">{selectedDossier.clutchBehavior}</p>
+                      </div>
+                    )}
+                    {selectedDossier.breakResponse && (
+                      <div className="bg-white rounded-lg px-3 py-2 border border-purple-100">
+                        <span className="text-xs font-semibold text-purple-500 uppercase tracking-wide">После брейка</span>
+                        <p className="text-sm text-slate-700 mt-0.5">{selectedDossier.breakResponse}</p>
+                      </div>
+                    )}
                   </div>
-                )}
-                {selectedDossier.clutchBehavior && (
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 animate-fade-in-up">
-                    <h4 className="font-semibold text-slate-900 mb-1">Важные очки</h4>
-                    <p className="text-sm text-slate-700">{selectedDossier.clutchBehavior}</p>
-                  </div>
-                )}
-                {selectedDossier.breakResponse && (
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 animate-fade-in-up">
-                    <h4 className="font-semibold text-slate-900 mb-1">После брейка</h4>
-                    <p className="text-sm text-slate-700">{selectedDossier.breakResponse}</p>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {selectedDossier.endurance !== undefined && (
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 animate-fade-in-up">
-                    <h4 className="font-semibold text-slate-900 mb-2">Выносливость</h4>
-                    <div className="h-2 bg-emerald-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full transition-all duration-700" style={{ width: `${(selectedDossier.endurance / 10) * 100}%` }} />
-                    </div>
+              {/* Физика */}
+              {(selectedDossier.endurance !== undefined || selectedDossier.movementSpeed !== undefined) && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                  <h3 className="text-sm font-bold text-emerald-800 mb-3">💪 Физические данные</h3>
+                  <div className="space-y-3">
+                    {selectedDossier.endurance !== undefined && (
+                      <div>
+                        <div className="flex justify-between text-xs text-slate-600 mb-1">
+                          <span className="font-semibold">Выносливость</span>
+                          <span className="font-bold text-emerald-600">{selectedDossier.endurance}/10</span>
+                        </div>
+                        <div className="h-2 bg-emerald-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(selectedDossier.endurance / 10) * 100}%` }} />
+                        </div>
+                      </div>
+                    )}
+                    {selectedDossier.movementSpeed !== undefined && (
+                      <div>
+                        <div className="flex justify-between text-xs text-slate-600 mb-1">
+                          <span className="font-semibold">Скорость ног</span>
+                          <span className="font-bold text-emerald-600">{selectedDossier.movementSpeed}/10</span>
+                        </div>
+                        <div className="h-2 bg-emerald-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(selectedDossier.movementSpeed / 10) * 100}%` }} />
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-                {selectedDossier.movementSpeed !== undefined && (
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 animate-fade-in-up">
-                    <h4 className="font-semibold text-slate-900 mb-2">Скорость ног</h4>
-                    <div className="h-2 bg-emerald-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full transition-all duration-700" style={{ width: `${(selectedDossier.movementSpeed / 10) * 100}%` }} />
-                    </div>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
 
-              <div>
-                <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                  💡 Рекомендации
-                </h3>
-                <p className="text-slate-600 bg-blue-50 p-4 rounded-lg border border-blue-200">{selectedDossier.recommendations}</p>
-              </div>
+              {/* Рекомендации */}
+              {selectedDossier.recommendations && (
+                <div>
+                  <h3 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-1.5">💡 Рекомендации</h3>
+                  <p className="text-sm text-slate-600 bg-blue-50 border border-blue-100 px-4 py-3 rounded-xl">{selectedDossier.recommendations}</p>
+                </div>
+              )}
 
+              {/* Итоги */}
               {(selectedDossier.whatWorked || selectedDossier.nextAdjustments) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   {selectedDossier.whatWorked && (
-                    <div className="bg-lime-50 border border-lime-200 rounded-lg p-4 animate-fade-in-up">
-                      <h4 className="font-semibold text-slate-900 mb-2">✅ Что сработало</h4>
+                    <div className="bg-lime-50 border border-lime-200 rounded-xl p-4">
+                      <div className="text-xs font-bold text-lime-700 uppercase tracking-wide mb-1.5">✅ Что сработало</div>
                       <p className="text-sm text-slate-700">{selectedDossier.whatWorked}</p>
                     </div>
                   )}
                   {selectedDossier.nextAdjustments && (
-                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 animate-fade-in-up">
-                      <h4 className="font-semibold text-slate-900 mb-2">🔧 Что поменять</h4>
+                    <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+                      <div className="text-xs font-bold text-orange-700 uppercase tracking-wide mb-1.5">🔧 Что поменять</div>
                       <p className="text-sm text-slate-700">{selectedDossier.nextAdjustments}</p>
                     </div>
                   )}
                 </div>
               )}
+
             </div>
 
-            <div className="border-t border-slate-200 p-6 flex gap-3">
+            {/* Кнопки */}
+            <div className="border-t border-slate-200 px-6 py-4 flex gap-3">
+              <button
+                onClick={() => handleDeleteDossier(selectedDossier.id, selectedDossier.opponentName)}
+                className="px-4 py-2.5 rounded-xl font-bold bg-red-50 text-red-500 hover:bg-red-100 transition-colors text-sm flex items-center gap-1.5"
+              >
+                <X size={15} /> Удалить
+              </button>
               <button
                 onClick={() => setSelectedDossier(null)}
-                className="flex-1 bg-slate-200 text-slate-700 py-2 rounded-lg font-bold hover:bg-slate-300 transition-colors"
+                className="flex-1 bg-slate-100 text-slate-700 py-2.5 rounded-xl font-bold hover:bg-slate-200 transition-colors text-sm"
               >
                 Закрыть
               </button>
@@ -1180,7 +1271,7 @@ const TennisDiaryView: React.FC<{ user: User }> = ({ user }) => {
                   setSelectedDossier(null);
                   setShowForm(true);
                 }}
-                className="flex-1 bg-blue-500 text-white py-2 rounded-lg font-bold hover:bg-blue-600 transition-colors"
+                className="flex-1 bg-blue-500 text-white py-2.5 rounded-xl font-bold hover:bg-blue-600 transition-colors text-sm"
               >
                 Добавить запись к матчу
               </button>
@@ -1244,6 +1335,13 @@ const TennisDiaryView: React.FC<{ user: User }> = ({ user }) => {
                         <div className="text-sm font-bold text-lime-600">{entry.rating}/10</div>
                       </div>
                     )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeleteEntry(entry.id, entry.title); }}
+                      className="p-1.5 rounded-lg text-slate-300 hover:bg-red-50 hover:text-red-500 transition-all duration-150"
+                      title="Удалить запись"
+                    >
+                      <X size={15} />
+                    </button>
                     {expandedId === entry.id ? (
                       <ChevronUp size={20} className="text-slate-400" />
                     ) : (
@@ -1306,6 +1404,41 @@ const TennisDiaryView: React.FC<{ user: User }> = ({ user }) => {
               )}
             </div>
           ))}
+        </div>
+      )}
+      {/* Confirm Delete Modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-[2px] z-[60] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-sm w-full shadow-2xl p-6 animate-slide-up">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <X size={18} className="text-red-500" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">Удалить {confirmDelete.type === 'entry' ? 'запись' : 'досье'}?</h3>
+                <p className="text-sm text-slate-500 mt-0.5">«{confirmDelete.name}»</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-500 mb-5">
+              {confirmDelete.type === 'entry'
+                ? 'Запись будет удалена без возможности восстановления.'
+                : 'Досье соперника будет удалено без возможности восстановления.'}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="flex-1 bg-slate-100 text-slate-700 py-2.5 rounded-xl font-bold hover:bg-slate-200 transition-colors text-sm"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="flex-1 bg-red-500 text-white py-2.5 rounded-xl font-bold hover:bg-red-600 transition-colors text-sm"
+              >
+                Удалить
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
