@@ -218,7 +218,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
             { tab: 'community' as DashboardTab, icon: <Globe size={18}/>, label: 'Сообщество' },
             ...(user.role !== 'coach' ? [{ tab: 'my_applications' as DashboardTab, icon: <Mail size={18}/>, label: 'Мои заявки' }] : []),
             { tab: 'tactics' as DashboardTab, icon: <BookOpen size={18}/>, label: 'Тактика' },
-            { tab: 'diary' as DashboardTab, icon: <Book size={18}/>, label: 'Дневник теннисиста' },
+            ...(user.role !== 'coach' ? [{ tab: 'diary' as DashboardTab, icon: <Book size={18}/>, label: 'Дневник теннисиста' }] : []),
             { tab: 'messages' as DashboardTab, icon: <MessageSquare size={18}/>, label: 'Сообщения', badge: totalUnread > 0 ? totalUnread : null },
             { tab: 'ai_coach' as DashboardTab, icon: <Bot size={18}/>, label: 'AI Тренер' },
             ...(user.role === 'coach' ? [

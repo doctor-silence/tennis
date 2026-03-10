@@ -74,7 +74,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogo
             <SidebarItem icon={<Mail size={20} />} label="Мои заявки" active={activeTab === 'my_applications'} onClick={() => setActiveTab('my_applications')} />
           )}
           <SidebarItem icon={<BookOpen size={20} />} label="Тактика" active={activeTab === 'tactics'} onClick={() => setActiveTab('tactics')} />
-          <SidebarItem icon={<Book size={20} />} label="Дневник теннисиста" active={activeTab === 'diary'} onClick={() => setActiveTab('diary')} />
+          {user.role !== 'coach' && (
+            <SidebarItem icon={<Book size={20} />} label="Дневник теннисиста" active={activeTab === 'diary'} onClick={() => setActiveTab('diary')} />
+          )}
           <SidebarItem icon={<MessageSquare size={20} />} label="Сообщения" active={activeTab === 'messages'} onClick={() => setActiveTab('messages')} badge={unreadCount > 0 && unreadCount} />
           <SidebarItem icon={<Bot size={20} />} label="AI Тренер" active={activeTab === 'ai_coach'} onClick={() => setActiveTab('ai_coach')} isSpecial />
           {user.role === 'coach' && (
