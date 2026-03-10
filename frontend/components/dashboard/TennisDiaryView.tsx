@@ -118,68 +118,25 @@ const TennisDiaryView: React.FC<{ user: User }> = ({ user }) => {
     fetchDossiers();
   }, [user.id]);
 
-  const fetchDossiers = async () => {
+  const DOSSIERS_KEY = `diary_dossiers_${user.id}`;
+  const ENTRIES_KEY = `diary_entries_${user.id}`;
+
+  const fetchDossiers = () => {
     try {
-      // Здесь будет реальный API запрос
-      const mockDossiers: OpponentDossier[] = [
-        {
-          id: '1',
-          opponentName: 'Иван Петров',
-          opponentLevel: 'NTRP 4.5',
-          preferredSurface: 'hard',
-          favoriteServeTarget: 'Широко в равную сторону',
-          favoritePatterns: ['Подача + форхенд в открытый корт', 'Давление по линии справа', 'Выход к сетке после короткого мяча'],
-          weakZones: ['Бэкхенд по линии', 'Высокие мячи под бэкхенд', 'Удар с неудобной позиции слева'],
-          h2hWins: 2,
-          h2hLosses: 1,
-          h2hMatches: [{ date: '2026-02-15', score: '6:4 3:6 6:3', surface: 'hard' }],
-          pressureBehavior: 'Важные мячи играет осторожно и уходит в центр корта',
-          clutchBehavior: 'На брейк-пойнтах чаще подаёт в корпус',
-          breakResponse: 'После брейка пытается быстро атаковать на приёме',
-          endurance: 7,
-          movementSpeed: 6,
-          firstServePattern: 'Плоская в T с правой стороны',
-          whatWorked: 'Игра через высокий темп по бэкхенду',
-          nextAdjustments: 'Чаще менять высоту и длину мяча в длинных розыгрышах',
-          strengths: ['Мощная подача', 'Хороший волей', 'Умение читать игру'],
-          weaknesses: ['Слабый бэкхенд', 'Низкая мобильность', 'Проблемы с линией'],
-          playStyle: 'Агрессивный, атакующий с сетки',
-          recommendations: 'Атаковать его бэкхенд, не давать ему выходить в сетку',
-          matchesCount: 5,
-        },
-      ];
-      setDossiers(mockDossiers);
-    } catch (error) {
-      console.error('Failed to fetch dossiers:', error);
+      const raw = localStorage.getItem(DOSSIERS_KEY);
+      setDossiers(raw ? JSON.parse(raw) : []);
+    } catch {
+      setDossiers([]);
     }
   };
 
-  const fetchEntries = async () => {
+  const fetchEntries = () => {
     try {
       setLoading(true);
-      // Здесь будет реальный API запрос
-      const mockEntries: DiaryEntry[] = [
-        {
-          id: '1',
-          date: new Date().toISOString().split('T')[0],
-          type: 'training',
-          title: 'Тренировка с тренером',
-          description: 'Отработка удара справа. Улучшилась техника на 15%.',
-          rating: 8,
-          mood: 'excellent',
-          performance: {
-            serve: 7,
-            forehand: 8,
-            backhand: 7,
-            volley: 6,
-            movement: 8,
-          },
-          createdAt: new Date().toISOString(),
-        },
-      ];
-      setEntries(mockEntries);
-    } catch (error) {
-      console.error('Failed to fetch diary entries:', error);
+      const raw = localStorage.getItem(ENTRIES_KEY);
+      setEntries(raw ? JSON.parse(raw) : []);
+    } catch {
+      setEntries([]);
     } finally {
       setLoading(false);
     }
@@ -286,7 +243,9 @@ const TennisDiaryView: React.FC<{ user: User }> = ({ user }) => {
         matchesCount: 1,
       };
 
-      setDossiers([newDossier, ...dossiers]);
+      const updated = [newDossier, ...dossiers];
+      setDossiers(updated);
+      localStorage.setItem(DOSSIERS_KEY, JSON.stringify(updated));
       setDossierForm({
         opponentName: '',
         opponentRni: '',
@@ -332,9 +291,17 @@ const TennisDiaryView: React.FC<{ user: User }> = ({ user }) => {
   const handleConfirmDelete = () => {
     if (!confirmDelete) return;
     if (confirmDelete.type === 'entry') {
-      setEntries(prev => prev.filter(e => e.id !== confirmDelete.id));
+      setEntries(prev => {
+        const updated = prev.filter(e => e.id !== confirmDelete.id);
+        localStorage.setItem(ENTRIES_KEY, JSON.stringify(updated));
+        return updated;
+      });
     } else {
-      setDossiers(prev => prev.filter(d => d.id !== confirmDelete.id));
+      setDossiers(prev => {
+        const updated = prev.filter(d => d.id !== confirmDelete.id);
+        localStorage.setItem(DOSSIERS_KEY, JSON.stringify(updated));
+        return updated;
+      });
       if (selectedDossier?.id === confirmDelete.id) setSelectedDossier(null);
     }
     setConfirmDelete(null);
@@ -356,7 +323,9 @@ const TennisDiaryView: React.FC<{ user: User }> = ({ user }) => {
         createdAt: new Date().toISOString(),
       };
 
-      setEntries([newEntry, ...entries]);
+      const updatedEntries = [newEntry, ...entries];
+      setEntries(updatedEntries);
+      localStorage.setItem(ENTRIES_KEY, JSON.stringify(updatedEntries));
       setFormData({
         type: 'training',
         title: '',
