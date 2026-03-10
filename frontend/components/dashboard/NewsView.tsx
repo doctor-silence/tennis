@@ -65,7 +65,6 @@ const NewsCard: React.FC<NewsCardProps> = ({ article, featured = false, onClick 
                     <p className="text-slate-300 text-sm line-clamp-2 mb-3">{article.summary}</p>
                     <div className="flex items-center gap-4 text-slate-400 text-xs">
                         <span className="flex items-center gap-1"><Clock size={12} /> {formatDate(article.published_at)}</span>
-                        <span className="flex items-center gap-1"><Eye size={12} /> {article.views?.toLocaleString()}</span>
                         <span className="font-medium text-slate-300">{article.author}</span>
                     </div>
                 </div>
@@ -94,9 +93,8 @@ const NewsCard: React.FC<NewsCardProps> = ({ article, featured = false, onClick 
                     {article.title}
                 </h3>
                 <p className="text-slate-500 text-sm line-clamp-2 mb-3">{article.summary}</p>
-                <div className="flex items-center justify-between text-slate-400 text-xs">
+                <div className="flex items-center text-slate-400 text-xs">
                     <span className="flex items-center gap-1"><Clock size={11} /> {formatDate(article.published_at)}</span>
-                    <span className="flex items-center gap-1"><Eye size={11} /> {article.views?.toLocaleString()}</span>
                 </div>
             </div>
         </div>
@@ -136,9 +134,6 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ article, onBack }) => {
                         </span>
                         <span className="flex items-center gap-1.5">
                             <Clock size={14} /> {formatDate(article.published_at)}
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                            <Eye size={14} /> {article.views?.toLocaleString()} просмотров
                         </span>
                     </div>
                     <p className="text-slate-700 text-lg font-medium mb-4 leading-relaxed">{article.summary}</p>

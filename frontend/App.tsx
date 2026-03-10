@@ -325,7 +325,6 @@ const NewsSection = ({ onRegisterClick, onNavigateToNews }: { onRegisterClick: (
                             <h3 className="text-white text-xl font-black leading-tight mb-2 group-hover:text-lime-300 transition-colors">{featured.title}</h3>
                             <div className="flex items-center gap-3 text-slate-400 text-xs">
                                 <span className="flex items-center gap-1"><Clock size={11} /> {new Date(featured.published_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</span>
-                                <span className="flex items-center gap-1"><Eye size={11} /> {featured.views?.toLocaleString()}</span>
                             </div>
                         </div>
                     </div>
@@ -439,9 +438,7 @@ const NewsPage = ({ onBack, onLogin, onRegister, onNavigate }: { onBack: () => v
                                     <span className="flex items-center gap-1.5">
                                         <Clock size={14} /> {new Date(selected.published_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
                                     </span>
-                                    <span className="flex items-center gap-1.5">
-                                        <Eye size={14} /> {(selected.views ?? 0).toLocaleString()} просмотров
-                                    </span>
+
                                 </div>
                                 <p className="text-slate-700 text-lg font-medium mb-4 leading-relaxed">{selected.summary}</p>
                                 <div>
@@ -517,7 +514,6 @@ const NewsPage = ({ onBack, onLogin, onRegister, onNavigate }: { onBack: () => v
                                             <p className="text-slate-300 text-sm line-clamp-2 mb-3">{featured.summary}</p>
                                             <div className="flex items-center gap-4 text-slate-400 text-xs">
                                                 <span className="flex items-center gap-1"><Clock size={12} /> {new Date(featured.published_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-                                                <span className="flex items-center gap-1"><Eye size={12} /> {(featured.views ?? 0).toLocaleString()}</span>
                                                 <span className="font-medium text-slate-300">{featured.author}</span>
                                             </div>
                                         </div>
@@ -540,7 +536,6 @@ const NewsPage = ({ onBack, onLogin, onRegister, onNavigate }: { onBack: () => v
                                                     <p className="text-slate-500 text-sm line-clamp-2 mb-3">{article.summary}</p>
                                                     <div className="flex items-center justify-between text-slate-400 text-xs">
                                                         <span className="flex items-center gap-1"><Clock size={11} /> {new Date(article.published_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</span>
-                                                        <span className="flex items-center gap-1"><Eye size={11} /> {(article.views ?? 0).toLocaleString()}</span>
                                                     </div>
                                                 </div>
                                             </div>
