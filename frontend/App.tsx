@@ -132,9 +132,8 @@ const App = () => {
 
   if (loading) { // Render loading indicator if loading
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
-        <Loader2 className="animate-spin h-10 w-10 text-lime-400" />
-        <span className="ml-3 text-lg">Загрузка...</span>
+      <div className="min-h-screen flex items-center justify-center bg-slate-100">
+        <Loader2 className="animate-spin h-10 w-10 text-lime-500" />
       </div>
     );
   }
