@@ -829,8 +829,10 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
 
           {/* Row 4 — CRM для тренеров */}
           <div className="mt-5">
-            <div className="bg-slate-50 border border-slate-100 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/60 transition-all duration-500">
-              <div className="absolute -right-10 -bottom-10 text-slate-100 group-hover:text-slate-200 transition-colors duration-500">
+            <div className="bg-slate-950 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/40 transition-all duration-500">
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-900/20 via-slate-950 to-black z-0"></div>
+              <div className="absolute -top-20 -right-20 w-80 h-80 bg-amber-500/10 rounded-full blur-[100px] group-hover:bg-amber-500/20 transition-all duration-700 z-0"></div>
+              <div className="absolute -right-10 -bottom-10 text-white/5 group-hover:text-white/10 transition-colors duration-500 z-0">
                 <Briefcase size={180} />
               </div>
               <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
@@ -838,10 +840,10 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                   <div className="w-11 h-11 bg-amber-500 rounded-2xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform duration-500 shadow-lg shadow-amber-500/30">
                     <Briefcase size={20} />
                   </div>
-                  <h3 className="text-2xl font-bold mb-3 text-slate-900 tracking-tight">CRM для тренеров</h3>
-                  <p className="text-slate-500 text-sm leading-relaxed">Полный инструментарий для профессиональных тренеров: управление учениками, расписание тренировок, статистика прогресса каждого игрока и организация собственных турниров.</p>
+                  <h3 className="text-2xl font-bold mb-3 text-white tracking-tight">CRM для тренеров</h3>
+                  <p className="text-slate-400 text-sm leading-relaxed">Полный инструментарий для профессиональных тренеров: управление учениками, расписание тренировок, статистика прогресса каждого игрока и организация собственных турниров.</p>
                   <div
-                    className="mt-6 inline-flex items-center text-amber-600 font-bold text-sm gap-1 cursor-pointer hover:gap-2 transition-all"
+                    className="mt-6 inline-flex items-center text-amber-400 font-bold text-sm gap-1 cursor-pointer hover:gap-2 transition-all"
                     onClick={() => window.location.href = '/crm/'}
                   >
                     Подробнее <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform"/>
@@ -854,11 +856,68 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                     { label: 'Создание турниров', desc: 'Организуй соревнования' },
                     { label: 'Аналитика', desc: 'Рост каждого игрока' },
                   ].map((item, i) => (
-                    <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 group-hover:border-amber-200 transition-colors">
-                      <div className="font-bold text-sm text-slate-900 mb-1">{item.label}</div>
+                    <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-4 group-hover:border-amber-500/30 transition-colors">
+                      <div className="font-bold text-sm text-white mb-1">{item.label}</div>
                       <div className="text-xs text-slate-400">{item.desc}</div>
                     </div>
                   ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Row 5 — Дневник теннисиста */}
+          <div className="mt-5">
+            <div className="bg-gradient-to-br from-lime-400 to-emerald-500 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-2xl hover:shadow-lime-400/30 transition-all duration-500">
+              <div className="absolute -top-20 -right-20 w-80 h-80 bg-white/10 rounded-full blur-[100px] group-hover:bg-white/20 transition-all duration-700 z-0"></div>
+              <div className="absolute -bottom-16 -left-16 w-64 h-64 bg-emerald-700/20 rounded-full blur-[80px] z-0"></div>
+              <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+                {/* Левая часть — текст */}
+                <div>
+                  <div className="w-11 h-11 bg-slate-900/20 backdrop-blur rounded-2xl flex items-center justify-center text-slate-900 mb-6 group-hover:scale-110 transition-transform duration-500">
+                    <Shield size={20} />
+                  </div>
+                  <span className="text-slate-900/60 font-bold tracking-wider uppercase text-xs">Дневник теннисиста</span>
+                  <h3 className="text-2xl font-bold mt-2 mb-3 text-slate-900 tracking-tight">Веди записи. Анализируй. Расти.</h3>
+                  <p className="text-slate-800/70 text-sm leading-relaxed">Фиксируй тренировки и матчи, отслеживай свои ощущения и прогресс, а досье соперника поможет подготовиться к игре против конкретного игрока.</p>
+                  <div className="mt-8 flex flex-wrap gap-2">
+                    {['Записи тренировок', 'Итоги матчей', 'Оценка настроения', 'Оценка техники'].map((tag) => (
+                      <div key={tag} className="bg-slate-900/10 border border-slate-900/15 px-3 py-1.5 rounded-full text-slate-900 font-medium text-xs">{tag}</div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Правая часть — два блока */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Блок: Дневник */}
+                  <div className="bg-white/25 border border-white/40 rounded-2xl p-6 hover:bg-white/35 transition-all duration-300 backdrop-blur-sm">
+                    <div className="text-2xl mb-3">📔</div>
+                    <div className="font-bold text-slate-900 text-sm mb-2">Личный дневник</div>
+                    <p className="text-slate-800/70 text-xs leading-relaxed">Записи тренировок и матчей с оценкой подачи, форхенда, бэкхенда, движения и настроением дня.</p>
+                    <div className="mt-4 space-y-1.5">
+                      {['Тренировка', 'Матч', 'Цель'].map((t) => (
+                        <div key={t} className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-slate-900/50 flex-shrink-0"></div>
+                          <span className="text-slate-900/70 text-xs">{t}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Блок: Досье */}
+                  <div className="bg-white/25 border border-white/40 rounded-2xl p-6 hover:bg-white/35 transition-all duration-300 backdrop-blur-sm">
+                    <div className="text-2xl mb-3">🎯</div>
+                    <div className="font-bold text-slate-900 text-sm mb-2">Досье соперника</div>
+                    <p className="text-slate-800/70 text-xs leading-relaxed">Храни детальный анализ соперников: стиль игры, слабые зоны, психология, счёт личных встреч.</p>
+                    <div className="mt-4 space-y-1.5">
+                      {['Слабые зоны', 'Личные встречи', 'Тактика против'].map((t) => (
+                        <div key={t} className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-slate-900/50 flex-shrink-0"></div>
+                          <span className="text-slate-900/70 text-xs">{t}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
