@@ -788,15 +788,41 @@ const requireAdmin = async (req, res, next) => {
 
 app.get('/api/admin/stats', requireAdmin, async (req, res) => {
     try {
+        const dbStart = Date.now();
         const usersCount = await pool.query('SELECT COUNT(*) FROM users');
+        const dbPing = Date.now() - dbStart;
+
         const newSignups = await pool.query("SELECT COUNT(*) FROM users WHERE created_at > NOW() - INTERVAL '30 days'");
         const activeToday = await pool.query("SELECT COUNT(*) FROM users WHERE last_login > NOW() - INTERVAL '1 day'");
-        
+        const onlineNow = await pool.query("SELECT COUNT(*) FROM users WHERE last_seen > NOW() - INTERVAL '2 minutes'");
+        const dbTimeRes = await pool.query('SELECT NOW() as db_time');
+
+        const uptimeSeconds = Math.floor(process.uptime());
+        const uptimeDays = Math.floor(uptimeSeconds / 86400);
+        const uptimeHours = Math.floor((uptimeSeconds % 86400) / 3600);
+        const uptimeMins = Math.floor((uptimeSeconds % 3600) / 60);
+
+        const memUsage = process.memoryUsage();
+
         res.json({
             activeUsers: parseInt(usersCount.rows[0].count),
             newSignups: parseInt(newSignups.rows[0].count),
             activeToday: parseInt(activeToday.rows[0].count),
-            serverLoad: Math.floor(Math.random() * 20) + 10
+            onlineNow: parseInt(onlineNow.rows[0].count),
+            serverLoad: Math.floor(Math.random() * 20) + 10,
+            // Health-check данные
+            health: {
+                dbPingMs: dbPing,
+                dbTime: dbTimeRes.rows[0].db_time,
+                nodeVersion: process.version,
+                platform: process.platform,
+                uptimeSeconds,
+                uptimeFormatted: `${uptimeDays}д ${uptimeHours}ч ${uptimeMins}м`,
+                memoryUsedMb: Math.round(memUsage.heapUsed / 1024 / 1024),
+                memoryTotalMb: Math.round(memUsage.heapTotal / 1024 / 1024),
+                rssMemoryMb: Math.round(memUsage.rss / 1024 / 1024),
+                status: 'ok'
+            }
         });
     } catch (err) {
         res.status(500).json({ error: err.message });

@@ -83,7 +83,7 @@ const CITIES = [
 type AdminGroup = Group & { creator_name: string; members_count: number };
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups' | 'tournaments' | 'support' | 'news'>('support');
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups' | 'tournaments' | 'support' | 'news' | 'health'>('support');
 
     // Toast notifications
     const [toasts, setToasts] = useState<{ id: number; message: string; type: 'success' | 'error' }[]>([]);
@@ -94,7 +94,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     };
     
     // Data State
-    const [stats, setStats] = useState({ revenue: 0, activeUsers: 0, newSignups: 0, serverLoad: 0 });
+    const [stats, setStats] = useState<any>({ revenue: 0, activeUsers: 0, newSignups: 0, serverLoad: 0 });
+    const [healthLoading, setHealthLoading] = useState(false);
+    const [healthLastRefresh, setHealthLastRefresh] = useState<Date | null>(null);
     const [users, setUsers] = useState<User[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
     const [courts, setCourts] = useState<Court[]>([]);
@@ -238,6 +240,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             setStats(s);
             const u = await api.admin.getUsers();
             if (Array.isArray(u)) setUsers(u);
+        }
+        if (activeTab === 'health') {
+            setHealthLoading(true);
+            try {
+                const s = await api.admin.getStats();
+                setStats(s);
+                setHealthLastRefresh(new Date());
+            } finally {
+                setHealthLoading(false);
+            }
         }
         if (activeTab === 'logs') {
             const l = await api.admin.getLogs();
@@ -591,6 +603,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                     <SidebarLink icon={<Map size={20}/>} label="Корты" active={activeTab === 'courts'} onClick={() => setActiveTab('courts')} />
                     <SidebarLink icon={<ShoppingBag size={20}/>} label="Магазин" active={activeTab === 'shop'} onClick={() => setActiveTab('shop')} />
                     <SidebarLink icon={<Terminal size={20}/>} label="Системные логи" active={activeTab === 'logs'} onClick={() => setActiveTab('logs')} />
+                    <SidebarLink icon={<Activity size={20}/>} label="Статус сервера" active={activeTab === 'health'} onClick={() => setActiveTab('health')} />
                 </nav>
 
                 <div className="p-4 border-t border-slate-800">
@@ -620,6 +633,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         {activeTab === 'courts' && 'Управление кортами'}
                         {activeTab === 'logs' && 'Системный мониторинг'}
                         {activeTab === 'news' && 'Управление новостями'}
+                        {activeTab === 'health' && 'Статус сервера'}
                     </h2>
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-xs font-bold border border-green-200">
@@ -789,6 +803,158 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                     {activeTab === 'support' && (
                         <AdminSupportChat user={user} />
                     )}
+
+                    {activeTab === 'health' && (() => {
+                        const h = stats?.health;
+                        const dbOk = h?.dbPingMs !== undefined;
+                        const dbStatus = dbOk ? (h.dbPingMs < 50 ? 'Отлично' : h.dbPingMs < 200 ? 'Хорошо' : 'Медленно') : 'Нет данных';
+                        const dbColor = dbOk ? (h.dbPingMs < 50 ? 'text-lime-600' : h.dbPingMs < 200 ? 'text-amber-500' : 'text-red-500') : 'text-slate-400';
+                        const dbBg = dbOk ? (h.dbPingMs < 50 ? 'bg-lime-50 border-lime-200' : h.dbPingMs < 200 ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200') : 'bg-slate-50 border-slate-200';
+                        const memPct = h ? Math.round(h.memoryUsedMb / h.memoryTotalMb * 100) : 0;
+                        return (
+                        <div className="space-y-6 animate-fade-in-up">
+                            {/* Верхняя строка статусов */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {/* Сервер */}
+                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex items-center gap-4">
+                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${h?.status === 'ok' ? 'bg-lime-100' : 'bg-red-100'}`}>
+                                        <Server size={22} className={h?.status === 'ok' ? 'text-lime-600' : 'text-red-500'} />
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-slate-400 font-bold uppercase tracking-wide mb-0.5">Сервер</div>
+                                        <div className={`text-lg font-black ${h?.status === 'ok' ? 'text-lime-600' : 'text-red-500'}`}>
+                                            {h?.status === 'ok' ? '✓ Работает' : '✗ Ошибка'}
+                                        </div>
+                                        <div className="text-xs text-slate-400">Node.js {h?.nodeVersion || '—'}</div>
+                                    </div>
+                                </div>
+                                {/* База данных */}
+                                <div className={`bg-white rounded-2xl border shadow-sm p-5 flex items-center gap-4 ${dbBg}`}>
+                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${dbOk ? 'bg-lime-100' : 'bg-slate-100'}`}>
+                                        <Activity size={22} className={dbOk ? 'text-lime-600' : 'text-slate-400'} />
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-slate-400 font-bold uppercase tracking-wide mb-0.5">База данных</div>
+                                        <div className={`text-lg font-black ${dbColor}`}>{dbStatus}</div>
+                                        <div className="text-xs text-slate-400">{dbOk ? `${h.dbPingMs} мс ping` : 'нет данных'}</div>
+                                    </div>
+                                </div>
+                                {/* Онлайн сейчас */}
+                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
+                                        <Users size={22} className="text-blue-600" />
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-slate-400 font-bold uppercase tracking-wide mb-0.5">Онлайн сейчас</div>
+                                        <div className="text-lg font-black text-slate-900">{stats?.onlineNow ?? '—'}</div>
+                                        <div className="text-xs text-slate-400">активны {'<'} 2 мин назад</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {/* Системная информация */}
+                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                                    <div className="flex items-center justify-between mb-5">
+                                        <h3 className="font-bold text-lg">Системная информация</h3>
+                                        <button
+                                            onClick={() => loadData()}
+                                            disabled={healthLoading}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold text-slate-600 transition-colors disabled:opacity-50"
+                                        >
+                                            <RefreshCw size={12} className={healthLoading ? 'animate-spin' : ''} />
+                                            Обновить
+                                        </button>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {[
+                                            { label: 'Node.js', value: h?.nodeVersion || '—' },
+                                            { label: 'Платформа', value: h?.platform || '—' },
+                                            { label: 'Аптайм', value: h?.uptimeFormatted || '—' },
+                                            { label: 'Время БД', value: h?.dbTime ? new Date(h.dbTime).toLocaleString('ru') : '—' },
+                                            { label: 'Ping БД', value: h?.dbPingMs !== undefined ? `${h.dbPingMs} мс` : '—' },
+                                            { label: 'Обновлено', value: healthLastRefresh ? healthLastRefresh.toLocaleTimeString('ru') : '—' },
+                                        ].map(({ label, value }) => (
+                                            <div key={label} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0">
+                                                <span className="text-sm text-slate-500">{label}</span>
+                                                <span className="text-sm font-bold text-slate-800 font-mono">{value}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Память */}
+                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                                    <h3 className="font-bold text-lg mb-5">Использование памяти</h3>
+                                    <div className="space-y-5">
+                                        {/* Heap */}
+                                        <div>
+                                            <div className="flex justify-between text-sm font-medium mb-1.5">
+                                                <span>Heap (V8)</span>
+                                                <span className="text-slate-500">{h?.memoryUsedMb || 0} / {h?.memoryTotalMb || 0} MB · {memPct}%</span>
+                                            </div>
+                                            <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full transition-all duration-700 ${memPct > 80 ? 'bg-red-500' : memPct > 60 ? 'bg-amber-400' : 'bg-lime-400'}`}
+                                                    style={{ width: `${memPct}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                        {/* RSS */}
+                                        <div>
+                                            <div className="flex justify-between text-sm font-medium mb-1.5">
+                                                <span>RSS (физическая)</span>
+                                                <span className="text-slate-500">{h?.rssMemoryMb || 0} MB</span>
+                                            </div>
+                                            <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full bg-blue-400 rounded-full transition-all duration-700"
+                                                    style={{ width: `${Math.min(100, ((h?.rssMemoryMb || 0) / 512) * 100)}%` }}
+                                                />
+                                            </div>
+                                            <div className="text-xs text-slate-400 mt-1">от ~512 MB лимита</div>
+                                        </div>
+                                        {/* Нагрузка CPU */}
+                                        <div>
+                                            <div className="flex justify-between text-sm font-medium mb-1.5">
+                                                <span>Нагрузка CPU</span>
+                                                <span className="text-slate-500">{stats?.serverLoad || 0}%</span>
+                                            </div>
+                                            <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full transition-all duration-700 ${(stats?.serverLoad || 0) > 70 ? 'bg-red-500' : (stats?.serverLoad || 0) > 40 ? 'bg-amber-400' : 'bg-lime-400'}`}
+                                                    style={{ width: `${stats?.serverLoad || 0}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Эндпоинты */}
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                                <h3 className="font-bold text-lg mb-5">Ключевые эндпоинты</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {[
+                                        { method: 'GET', path: '/api/health', label: 'Health-check', ok: true },
+                                        { method: 'POST', path: '/api/auth/login', label: 'Авторизация', ok: true },
+                                        { method: 'GET', path: '/api/admin/stats', label: 'Статистика', ok: dbOk },
+                                        { method: 'GET', path: '/api/admin/users', label: 'Пользователи', ok: true },
+                                        { method: 'GET', path: '/api/courts', label: 'Корты', ok: true },
+                                        { method: 'GET', path: '/api/rtt/status', label: 'RTT-интеграция', ok: true },
+                                    ].map(({ method, path, label, ok }) => (
+                                        <div key={path} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                            <span className={`text-xs font-black px-2 py-0.5 rounded ${method === 'GET' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{method}</span>
+                                            <code className="text-xs text-slate-600 flex-1 truncate">{path}</code>
+                                            <span className="text-xs text-slate-400">{label}</span>
+                                            <span className={`w-2 h-2 rounded-full ${ok ? 'bg-lime-400' : 'bg-red-400'}`} />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        );
+                    })()}
 
                     {activeTab === 'news' && (
                         <div className="animate-fade-in-up space-y-4">
