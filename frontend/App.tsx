@@ -1645,16 +1645,15 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
                     <div className="space-y-1">
                         <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Возраст</label>
                         <input 
-                            type="number" 
+                            type="text" 
+                            inputMode="numeric"
                             value={age}
                             onChange={(e) => {
-                                const v = e.target.value;
-                                if (v === '' || (parseInt(v) >= 5 && parseInt(v) <= 99)) setAge(v);
+                                const v = e.target.value.replace(/\D/g, '');
+                                if (v === '' || parseInt(v) <= 99) setAge(v);
                             }}
                             className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-lime-400 focus:border-transparent outline-none" 
                             placeholder="25"
-                            min={5}
-                            max={99}
                             required
                         />
                     </div>
@@ -1761,9 +1760,10 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
                                 <div>
                                     <label className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2 block">Очки (Rating)</label>
                                     <input 
-                                        type="number" 
+                                        type="text" 
+                                        inputMode="numeric"
                                         value={rttPoints}
-                                        onChange={(e) => setRttPoints(e.target.value)}
+                                        onChange={(e) => setRttPoints(e.target.value.replace(/\D/g, ''))}
                                         className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white outline-none focus:border-amber-400 placeholder:text-slate-600"
                                         placeholder="1450"
                                         disabled={rniVerified}
@@ -1772,9 +1772,10 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
                                 <div>
                                     <label className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2 block">Позиция РТТ</label>
                                     <input 
-                                        type="number" 
+                                        type="text" 
+                                        inputMode="numeric"
                                         value={rttRank}
-                                        onChange={(e) => setRttRank(e.target.value)}
+                                        onChange={(e) => setRttRank(e.target.value.replace(/\D/g, ''))}
                                         className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white outline-none focus:border-amber-400 placeholder:text-slate-600"
                                         placeholder="№ 123"
                                         disabled={rniVerified}
