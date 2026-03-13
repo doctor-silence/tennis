@@ -11,6 +11,7 @@ const pool = require('./db');
 const rttParser = require('./rttParser');
 const speakeasy = require('speakeasy');
 const QRCode = require('qrcode');
+const v8 = require('v8');
 
 const app = express();
 const server = http.createServer(app);
@@ -803,6 +804,8 @@ app.get('/api/admin/stats', requireAdmin, async (req, res) => {
         const uptimeMins = Math.floor((uptimeSeconds % 3600) / 60);
 
         const memUsage = process.memoryUsage();
+        const v8Stats = v8.getHeapStatistics();
+        const heapSizeLimitMb = Math.round(v8Stats.heap_size_limit / 1024 / 1024);
 
         res.json({
             activeUsers: parseInt(usersCount.rows[0].count),
@@ -820,6 +823,7 @@ app.get('/api/admin/stats', requireAdmin, async (req, res) => {
                 uptimeFormatted: `${uptimeDays}д ${uptimeHours}ч ${uptimeMins}м`,
                 memoryUsedMb: Math.round(memUsage.heapUsed / 1024 / 1024),
                 memoryTotalMb: Math.round(memUsage.heapTotal / 1024 / 1024),
+                heapSizeLimitMb: heapSizeLimitMb,
                 rssMemoryMb: Math.round(memUsage.rss / 1024 / 1024),
                 status: 'ok'
             }

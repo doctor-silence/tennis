@@ -810,7 +810,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         const dbStatus = dbOk ? (h.dbPingMs < 50 ? 'Отлично' : h.dbPingMs < 200 ? 'Хорошо' : 'Медленно') : 'Нет данных';
                         const dbColor = dbOk ? (h.dbPingMs < 50 ? 'text-lime-600' : h.dbPingMs < 200 ? 'text-amber-500' : 'text-red-500') : 'text-slate-400';
                         const dbBg = dbOk ? (h.dbPingMs < 50 ? 'bg-lime-50 border-lime-200' : h.dbPingMs < 200 ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200') : 'bg-slate-50 border-slate-200';
-                        const memPct = h ? Math.round(h.memoryUsedMb / h.memoryTotalMb * 100) : 0;
+                        const memPct = h ? Math.round(h.memoryUsedMb / (h.heapSizeLimitMb || h.memoryTotalMb) * 100) : 0;
                         return (
                         <div className="space-y-6 animate-fade-in-up">
                             {/* Верхняя строка статусов */}
@@ -891,7 +891,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                         <div>
                                             <div className="flex justify-between text-sm font-medium mb-1.5">
                                                 <span>Heap (V8)</span>
-                                                <span className="text-slate-500">{h?.memoryUsedMb || 0} / {h?.memoryTotalMb || 0} MB · {memPct}%</span>
+                                                <span className="text-slate-500">{h?.memoryUsedMb || 0} / {h?.heapSizeLimitMb || h?.memoryTotalMb || 0} MB · {memPct}%</span>
                                             </div>
                                             <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
                                                 <div
@@ -899,6 +899,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                                     style={{ width: `${memPct}%` }}
                                                 />
                                             </div>
+                                            <div className="text-xs text-slate-400 mt-1">от V8 heap limit ({h?.heapSizeLimitMb || '?'} MB)</div>
                                         </div>
                                         {/* RSS */}
                                         <div>
