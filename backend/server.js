@@ -191,6 +191,9 @@ app.post('/api/auth/login', async (req, res) => {
 
         await logSystemEvent('info', `User logged in: ${email}`, 'Auth');
 
+        // Обновляем время последнего входа
+        await pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
+
         const { password: _, totp_secret: __, ...userInfo } = user;
         
         res.json({
@@ -673,6 +676,9 @@ app.post('/api/support/messages', async (req, res) => {
 // Добавляем колонку last_seen если её ещё нет
 pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP`).catch(() => {});
 
+// Добавляем колонку last_login если её ещё нет
+pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP`).catch(() => {});
+
 // Добавляем колонку avatar в groups если её ещё нет
 pool.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS avatar TEXT`).catch(() => {});
 
@@ -784,12 +790,12 @@ app.get('/api/admin/stats', requireAdmin, async (req, res) => {
     try {
         const usersCount = await pool.query('SELECT COUNT(*) FROM users');
         const newSignups = await pool.query("SELECT COUNT(*) FROM users WHERE created_at > NOW() - INTERVAL '30 days'");
-        const revenue = 1450000;
+        const activeToday = await pool.query("SELECT COUNT(*) FROM users WHERE last_login > NOW() - INTERVAL '1 day'");
         
         res.json({
-            revenue: revenue,
             activeUsers: parseInt(usersCount.rows[0].count),
             newSignups: parseInt(newSignups.rows[0].count),
+            activeToday: parseInt(activeToday.rows[0].count),
             serverLoad: Math.floor(Math.random() * 20) + 10
         });
     } catch (err) {

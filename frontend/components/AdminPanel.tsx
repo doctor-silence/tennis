@@ -236,6 +236,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
         if (activeTab === 'overview') {
             const s = await api.admin.getStats();
             setStats(s);
+            const u = await api.admin.getUsers();
+            if (Array.isArray(u)) setUsers(u);
         }
         if (activeTab === 'logs') {
             const l = await api.admin.getLogs();
@@ -627,20 +629,67 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                 </header>
 
                 <div className="p-8">
-                    {activeTab === 'overview' && (
+                    {activeTab === 'overview' && (() => {
+                        const totalUsers = users.length;
+                        const amateurs = users.filter(u => u.role === 'amateur').length;
+                        const coaches = users.filter(u => u.role === 'coach').length;
+                        const rttPros = users.filter(u => u.role === 'rtt_pro').length;
+                        const admins = users.filter(u => u.role === 'admin').length;
+                        const pct = (n: number) => totalUsers ? Math.round(n / totalUsers * 100) : 0;
+                        return (
                         <div className="space-y-8 animate-fade-in-up">
                             {/* Stats Cards */}
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                <StatCard title="Общая выручка" value={`${((stats?.revenue || 0) / 1000).toFixed(0)}k ₽`} change="+12.5%" icon={<DollarSign className="text-lime-600"/>} color="lime"/>
-                                <StatCard title="Активные пользователи" value={(stats?.activeUsers || 0).toLocaleString()} change="+5.2%" icon={<Users className="text-blue-600"/>} color="blue"/>
-                                <StatCard title="Новые регистрации" value={(stats?.newSignups || 0).toString()} change="+18%" icon={<TrendingUp className="text-purple-600"/>} color="purple"/>
-                                <StatCard title="Нагрузка сервера" value={`${stats?.serverLoad || 0}%`} change="-2%" icon={<Server className="text-amber-600"/>} color="amber"/>
+                                <StatCard title="Всего пользователей" value={totalUsers.toLocaleString()} change="" icon={<Users className="text-blue-600"/>} color="blue"/>
+                                <StatCard title="Любители" value={amateurs.toLocaleString()} change="" icon={<Users className="text-lime-600"/>} color="lime"/>
+                                <StatCard title="Тренеры" value={coaches.toLocaleString()} change="" icon={<Users className="text-purple-600"/>} color="purple"/>
+                                <StatCard title="Нагрузка сервера" value={`${stats?.serverLoad || 0}%`} change="" icon={<Server className="text-amber-600"/>} color="amber"/>
                             </div>
 
-                            {/* Charts Area (Mocked with CSS) */}
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><h3 className="font-bold text-lg mb-6">Динамика продаж</h3><div className="h-64 flex items-end justify-between gap-2">{[40, 65, 45, 80, 55, 90, 70, 85, 60, 75, 95, 100].map((h, i) => (<div key={i} className="w-full bg-slate-100 rounded-t-lg relative group overflow-hidden"><div className="absolute bottom-0 w-full bg-slate-900 group-hover:bg-lime-500 transition-colors duration-300" style={{ height: `${h}%` }}></div></div>))}</div><div className="flex justify-between mt-4 text-xs text-slate-400 font-bold uppercase"><span>Янв</span><span>Май</span><span>Дек</span></div></div>
-                                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><h3 className="font-bold text-lg mb-6">Распределение подписок</h3><div className="space-y-4"><div className="space-y-2"><div className="flex justify-between text-sm font-medium"><span>Amateur (Free)</span><span className="text-slate-500">65%</span></div><div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-slate-300 w-[65%]"></div></div></div><div className="space-y-2"><div className="flex justify-between text-sm font-medium"><span>PRO Player</span><span className="text-slate-500">25%</span></div><div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-lime-400 w-[25%]"></div></div></div><div className="space-y-2"><div className="flex justify-between text-sm font-medium"><span>Coach PRO</span><span className="text-slate-500">10%</span></div><div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-slate-900 w-[10%]"></div></div></div></div></div>
+                                {/* Распределение по ролям */}
+                                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                    <h3 className="font-bold text-lg mb-2">Распределение по ролям</h3>
+                                    <p className="text-sm text-slate-400 mb-6">Реальные данные · {totalUsers} пользователей</p>
+                                    <div className="space-y-4">
+                                        {[
+                                            { label: 'Любитель', count: amateurs, color: 'bg-lime-400' },
+                                            { label: 'Тренер', count: coaches, color: 'bg-purple-500' },
+                                            { label: 'Профи РТТ', count: rttPros, color: 'bg-blue-500' },
+                                            { label: 'Администратор', count: admins, color: 'bg-slate-800' },
+                                        ].map(({ label, count, color }) => (
+                                            <div key={label} className="space-y-1.5">
+                                                <div className="flex justify-between text-sm font-medium">
+                                                    <span>{label}</span>
+                                                    <span className="text-slate-500">{count} чел. · {pct(count)}%</span>
+                                                </div>
+                                                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                                    <div className={`h-full ${color} rounded-full transition-all duration-700`} style={{ width: `${pct(count)}%` }}></div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Сводка */}
+                                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                    <h3 className="font-bold text-lg mb-2">Сводка платформы</h3>
+                                    <p className="text-sm text-slate-400 mb-6">Всё бесплатно · Бета-версия</p>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {[
+                                            { label: 'Новые регистрации', value: (stats?.newSignups || 0).toString(), sub: 'за последние 30 дн.' },
+                                            { label: 'Активных сегодня', value: ((stats as any)?.activeToday ?? '—').toString(), sub: 'вошли за последние 24ч' },
+                                            { label: 'Монетизация', value: '—', sub: 'платных тарифов нет' },
+                                            { label: 'Статус', value: '✓ Бета', sub: 'открытый доступ' },
+                                        ].map(({ label, value, sub }) => (
+                                            <div key={label} className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                                <div className="text-2xl font-black text-slate-900 mb-1">{value}</div>
+                                                <div className="text-xs font-bold text-slate-700 mb-0.5">{label}</div>
+                                                <div className="text-xs text-slate-400">{sub}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
 
                             {/* 2FA Security */}
@@ -721,7 +770,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                 )}
                             </div>
                         </div>
-                    )}
+                        );
+                    })()}
 
                     {activeTab === 'tournaments' && (
                         <AdminTournamentsView 
@@ -1767,7 +1817,7 @@ const SidebarLink = ({ icon, label, active, onClick }: any) => (
     </button>
 );
 
-const StatCard = ({ title, value, change, icon, color }: { title: string, value: string, change: string, icon: React.ReactNode, color: 'lime' | 'blue' | 'purple' | 'amber' }) => {
+const StatCard = ({ title, value, change, icon, color }: { title: string, value: string, change?: string, icon: React.ReactNode, color: 'lime' | 'blue' | 'purple' | 'amber' }) => {
     // Tailwind needs full class names to parse them. We cannot use dynamic string interpolation like `bg-${color}-50`.
     const bgColors = {
         lime: 'bg-lime-50',
@@ -1792,7 +1842,7 @@ const StatCard = ({ title, value, change, icon, color }: { title: string, value:
                 <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">{title}</div>
                 <div className="flex items-end gap-2">
                     <div className="text-2xl font-bold text-slate-900">{value}</div>
-                    <div className={`text-xs font-bold mb-1 ${change.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>{change}</div>
+                    {change && <div className={`text-xs font-bold mb-1 ${change.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>{change}</div>}
                 </div>
             </div>
         </div>
