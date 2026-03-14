@@ -568,6 +568,44 @@ const NewsPage = ({ onBack, onLogin, onRegister, onNavigate }: { onBack: () => v
     );
 };
 
+// --- Requisites Modal ---
+const RequisitesModal = ({ onClose }: { onClose: () => void }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+    <div
+      className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 animate-fade-in-up"
+      onClick={e => e.stopPropagation()}
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 transition-colors text-slate-500"
+      >
+        <X size={16} />
+      </button>
+      <div className="mb-6">
+        <span className="inline-block bg-lime-100 text-lime-700 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full mb-3">Реквизиты</span>
+        <h2 className="text-xl font-bold text-slate-900">Сведения об организации</h2>
+      </div>
+      <dl className="space-y-4 text-sm">
+        <div>
+          <dt className="text-slate-400 text-xs uppercase tracking-wider font-bold mb-1">Наименование</dt>
+          <dd className="text-slate-900 font-semibold">ИП Крыжановский Владимир Владимирович</dd>
+        </div>
+        <div className="h-px bg-slate-100" />
+        <div>
+          <dt className="text-slate-400 text-xs uppercase tracking-wider font-bold mb-1">ИНН</dt>
+          <dd className="text-slate-900 font-mono font-semibold">540225545098</dd>
+        </div>
+        <div className="h-px bg-slate-100" />
+        <div>
+          <dt className="text-slate-400 text-xs uppercase tracking-wider font-bold mb-1">ОГРНИП</dt>
+          <dd className="text-slate-900 font-mono font-semibold">324547600197503</dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+);
+
 // --- FAQ Section ---
 const FAQ_ITEMS = [
   {
@@ -654,8 +692,10 @@ const FaqSection = () => {
 };
 
 const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginClick: () => void, onRegisterClick: () => void, onNavigate: (v: ViewState) => void }) => {
+  const [reqOpen, setReqOpen] = useState(false);
   return (
     <>
+      {reqOpen && <RequisitesModal onClose={() => setReqOpen(false)} />}
       <PublicHeader onLogin={onLoginClick} onRegister={onRegisterClick} onNavigate={onNavigate} />
 
       {/* Hero Section */}
@@ -1029,19 +1069,90 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
           </div>
        </section>
 
-       <footer className="bg-slate-50 py-12 border-t border-slate-200">
-         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-6">
-           <div className="flex items-center">
-              <img src="/assets/logo.svg" alt="НаКорте" className="h-20 w-auto" style={{ filter: 'invert(1)' }} />
-           </div>
-           <div className="text-slate-500 text-sm font-medium">
-             &copy; 2026 НаКорте. Все права защищены.
-           </div>
-           <div className="flex flex-wrap justify-center gap-4 text-slate-400 text-sm">
-             <a href="/privacy/" className="hover:text-slate-900 transition-colors">Политика конфиденциальности</a>
-             <a href="/terms/" className="hover:text-slate-900 transition-colors">Условия обслуживания</a>
-           </div>
+       <footer className="bg-slate-950 text-slate-400">
+         {/* Main footer grid */}
+         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-10">
+           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8">
 
+             {/* Brand column */}
+             <div className="lg:col-span-2">
+               <a href="/" aria-label="НаКорте — теннисная платформа">
+                 <img src="/assets/logo.svg" alt="НаКорте — платформа для теннисистов" className="h-14 w-auto mb-4" />
+               </a>
+               <p className="text-sm leading-relaxed text-slate-400 max-w-xs">
+                 Платформа для теннисистов России: поиск партнёров по уровню NTRP и РТТ, бронирование кортов, AI-тренер, турниры и CRM для тренеров.
+               </p>
+               <div className="mt-6 flex flex-wrap gap-2">
+                 {['Теннис Россия', 'NTRP рейтинг', 'РТТ игроки', 'Теннисный клуб'].map(tag => (
+                   <span key={tag} className="text-xs px-3 py-1 rounded-full bg-white/5 border border-white/10 text-slate-500">{tag}</span>
+                 ))}
+               </div>
+             </div>
+
+             {/* Платформа */}
+             <div>
+               <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Платформа</h3>
+               <ul className="space-y-2.5 text-sm">
+                 <li><a href="/?auth=register" className="hover:text-lime-400 transition-colors">Регистрация теннисиста</a></li>
+                 <li><a href="/?auth=login" className="hover:text-lime-400 transition-colors">Войти в аккаунт</a></li>
+                 <li><a href="/rtt/" className="hover:text-lime-400 transition-colors">Статус РТТ Про</a></li>
+                 <li><a href="/pro/" className="hover:text-lime-400 transition-colors">PRO-подписка</a></li>
+                 <li><a href="/shop/" className="hover:text-lime-400 transition-colors">Магазин товаров</a></li>
+                 <li><a href="/news/" className="hover:text-lime-400 transition-colors">Новости тенниса</a></li>
+               </ul>
+             </div>
+
+             {/* Возможности */}
+             <div>
+               <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Возможности</h3>
+               <ul className="space-y-2.5 text-sm">
+                 <li><a href="/?auth=register#search" className="hover:text-lime-400 transition-colors">Поиск партнёра по теннису</a></li>
+                 <li><a href="/?auth=register#courts" className="hover:text-lime-400 transition-colors">Бронирование теннисных кортов</a></li>
+                 <li><a href="/?auth=register#ai" className="hover:text-lime-400 transition-colors">AI-тренер по теннису</a></li>
+                 <li><a href="/?auth=register#tournaments" className="hover:text-lime-400 transition-colors">Любительские турниры</a></li>
+                 <li><a href="/?auth=register#diary" className="hover:text-lime-400 transition-colors">Дневник теннисиста</a></li>
+                 <li><a href="/crm/" className="hover:text-lime-400 transition-colors">CRM для тренеров</a></li>
+               </ul>
+             </div>
+
+             {/* Информация */}
+             <div>
+               <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Информация</h3>
+               <ul className="space-y-2.5 text-sm">
+                 <li><a href="/privacy/" className="hover:text-lime-400 transition-colors">Политика конфиденциальности</a></li>
+                 <li><a href="/terms/" className="hover:text-lime-400 transition-colors">Условия обслуживания</a></li>
+                 <li><button onClick={() => setReqOpen(true)} className="hover:text-lime-400 transition-colors text-left">Реквизиты</button></li>
+               </ul>
+               <div className="mt-6">
+                 <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Поддержка</h3>
+                 <p className="text-sm leading-relaxed mb-3">Есть вопросы? Напишите нам через чат поддержки прямо в приложении.</p>
+                 <p className="text-xs text-slate-500 leading-relaxed">По вопросам сотрудничества, партнёрства и рекламы пишите на&nbsp;<a href="mailto:info@onthecourt.ru" className="text-slate-400 hover:text-lime-400 transition-colors underline underline-offset-2">info@onthecourt.ru</a></p>
+               </div>
+             </div>
+
+           </div>
+         </div>
+
+         {/* SEO text block */}
+         <div className="border-t border-white/5">
+           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+             <p className="text-xs text-slate-600 leading-relaxed">
+               <strong className="text-slate-500">НаКорте</strong> — российская платформа для любителей и профессионалов тенниса.
+               Найди <a href="/?auth=register" className="hover:text-slate-400 underline underline-offset-2">партнёра для игры в теннис</a> по уровню NTRP или рейтингу РТТ в своём городе.
+               Бронируй <a href="/?auth=register" className="hover:text-slate-400 underline underline-offset-2">теннисные корты</a> онлайн, тренируйся с <a href="/?auth=register" className="hover:text-slate-400 underline underline-offset-2">AI-тренером по теннису</a>,
+               участвуй в <a href="/?auth=register" className="hover:text-slate-400 underline underline-offset-2">любительских теннисных турнирах</a> и веди <a href="/?auth=register" className="hover:text-slate-400 underline underline-offset-2">дневник теннисиста</a>.
+               Для профессиональных тренеров доступна <a href="/crm/" className="hover:text-slate-400 underline underline-offset-2">CRM-система для ведения учеников</a>.
+               Верификация игроков <a href="/rtt/" className="hover:text-slate-400 underline underline-offset-2">Российского Теннисного Тура (РТТ)</a>.
+             </p>
+           </div>
+         </div>
+
+         {/* Bottom bar */}
+         <div className="border-t border-white/5">
+           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-600">
+             <span>&copy; 2026 НаКорте. Все права защищены.</span>
+             <span>Теннис в России — играй умнее</span>
+           </div>
          </div>
        </footer>
     </>
