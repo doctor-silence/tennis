@@ -425,8 +425,8 @@ const NewsPage = ({ onBack, onLogin, onRegister, onNavigate }: { onBack: () => v
                             <ChevronLeft size={20} /> Назад к новостям
                         </button>
                         <div className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
-                            <div className="h-[420px] lg:h-[520px] overflow-hidden">
-                                <img src={selected.image} alt={selected.title} className="w-full h-full object-cover" />
+                            <div className="h-[520px] lg:h-[620px] overflow-hidden">
+                                <img src={selected.image} alt={selected.title} className="w-full h-full object-cover object-top" />
                             </div>
                             <div className="p-6 lg:p-8">
                                 <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border mb-4 ${CATEGORY_COLORS_PAGE[selected.category] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
@@ -505,8 +505,8 @@ const NewsPage = ({ onBack, onLogin, onRegister, onNavigate }: { onBack: () => v
                             <div className="space-y-6">
                                 {/* Featured */}
                                 {featured && (
-                                    <div className="relative rounded-2xl overflow-hidden cursor-pointer group h-[420px] lg:h-[520px]" onClick={() => setSelected(featured)}>
-                                        <img src={featured.image} alt={featured.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 pointer-events-none" />
+                                    <div className="relative rounded-2xl overflow-hidden cursor-pointer group h-[520px] lg:h-[620px]" onClick={() => setSelected(featured)}>
+                                        <img src={featured.image} alt={featured.title} className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105 pointer-events-none" />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
                                         <div className="absolute bottom-0 left-0 right-0 p-6 pointer-events-none">
                                             <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border mb-3 ${CATEGORY_COLORS_PAGE[featured.category] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
