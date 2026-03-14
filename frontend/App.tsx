@@ -32,6 +32,7 @@ import {
   Clock,
   Eye,
   ChevronLeft,
+  ChevronDown,
   MessageSquare,
   Calendar
 } from 'lucide-react';
@@ -567,6 +568,91 @@ const NewsPage = ({ onBack, onLogin, onRegister, onNavigate }: { onBack: () => v
     );
 };
 
+// --- FAQ Section ---
+const FAQ_ITEMS = [
+  {
+    question: 'Что такое НаКорте и для кого это приложение?',
+    answer: 'НаКорте — это платформа для теннисистов любого уровня: от новичков до профессиональных игроков РТТ. Здесь можно найти партнёра для игры, забронировать корт, отслеживать статистику, тренироваться с AI-ассистентом и участвовать в любительских турнирах.',
+  },
+  {
+    question: 'Сколько стоит использование платформы?',
+    answer: 'Сейчас НаКорте находится на стадии бета-тестирования и полностью бесплатен. Все функции открыты без ограничений. В будущем мы планируем ввести PRO-подписку с расширенными возможностями, но базовый доступ останется бесплатным.',
+  },
+  {
+    question: 'Как найти партнёра для игры?',
+    answer: 'После регистрации перейдите в раздел «Поиск партнёра». Алгоритм подберёт игроков по вашему уровню (NTRP или очкам РТТ), городу и предпочтительному времени. Вы можете также фильтровать по возрасту, цели встречи (спарринг, тренировка, турнир) и стилю игры.',
+  },
+  {
+    question: 'Что такое статус РТТ Про и как его получить?',
+    answer: 'Статус РТТ Про — это верификация для действующих спортсменов Российского Теннисного Тура. При регистрации укажите свой РНИ (регистрационный номер игрока), и система автоматически подтянет ваш рейтинг и историю матчей из базы ФТР. Статус открывает галочку верификации, расширенную статистику и приоритетный поиск.',
+  },
+  {
+    question: 'Как работает AI-тренер?',
+    answer: 'AI-тренер анализирует данные ваших матчей и тренировок из дневника, выявляет слабые места и составляет персональный план тренировок. Вы можете задавать вопросы в чате — AI ответит с учётом вашего текущего уровня и целей.',
+  },
+  {
+    question: 'Я тренер. Какие возможности есть для меня?',
+    answer: 'Тренеры получают доступ к CRM-системе: ведение базы учеников, управление расписанием тренировок, отслеживание прогресса каждого игрока и организация собственных турниров. Зарегистрируйтесь и выберите тип аккаунта «Тренер».',
+  },
+  {
+    question: 'Могу ли я создать свой турнир?',
+    answer: 'Да. Любой пользователь может создать любительский турнир, пригласить участников и управлять сеткой прямо в приложении. Тренеры дополнительно могут организовывать закрытые турниры для своих учеников.',
+  },
+  {
+    question: 'Как удалить аккаунт или свои данные?',
+    answer: 'Вы можете запросить удаление аккаунта через чат поддержки внутри приложения. Мы удалим все ваши персональные данные в течение 7 рабочих дней в соответствии с нашей Политикой конфиденциальности.',
+  },
+];
+
+const FaqSection = () => {
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  return (
+    <section className="py-24 bg-slate-50">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-14">
+          <span className="text-lime-600 font-bold tracking-wider uppercase text-xs">Ответы на вопросы</span>
+          <h2 className="text-4xl font-bold text-slate-900 mt-2 tracking-tight">Часто задаваемые<br/>вопросы</h2>
+        </div>
+
+        <div className="space-y-3">
+          {FAQ_ITEMS.map((item, i) => (
+            <div
+              key={i}
+              className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+            >
+              <button
+                className="w-full flex items-center justify-between gap-4 px-6 py-5 text-left"
+                onClick={() => setOpenIndex(openIndex === i ? null : i)}
+              >
+                <span className="font-bold text-slate-900 text-base leading-snug">{item.question}</span>
+                <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${openIndex === i ? 'bg-lime-400 text-slate-900 rotate-180' : 'bg-slate-100 text-slate-500'}`}>
+                  <ChevronDown size={16} />
+                </span>
+              </button>
+              <div
+                className={`overflow-hidden transition-all duration-300 ease-in-out ${openIndex === i ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}
+              >
+                <p className="px-6 pb-5 text-slate-600 leading-relaxed text-sm">{item.answer}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-12 text-center">
+          <p className="text-slate-500 text-sm mb-4">Не нашли ответ на свой вопрос?</p>
+          <a
+            href="#support"
+            className="inline-flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-xl font-semibold text-sm hover:bg-slate-700 transition-colors"
+          >
+            <MessageSquare size={16} /> Написать в поддержку
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginClick: () => void, onRegisterClick: () => void, onNavigate: (v: ViewState) => void }) => {
   return (
     <>
@@ -924,6 +1010,9 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
       {/* News Section */}
       <NewsSection onRegisterClick={onRegisterClick} onNavigateToNews={() => onNavigate('news')} />
 
+       {/* FAQ Section */}
+       <FaqSection />
+
        {/* CTA Section */}
        <section className="py-24 bg-white relative overflow-hidden">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
@@ -939,7 +1028,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
             </div>
           </div>
        </section>
-       
+
        <footer className="bg-slate-50 py-12 border-t border-slate-200">
          <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-6">
            <div className="flex items-center">
