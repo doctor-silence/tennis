@@ -505,7 +505,7 @@ const NewsPage = ({ onBack, onLogin, onRegister, onNavigate }: { onBack: () => v
                             <div className="space-y-6">
                                 {/* Featured */}
                                 {featured && (
-                                    <div className="relative rounded-2xl overflow-hidden cursor-pointer group h-[520px] lg:h-[620px]" onClick={() => setSelected(featured)}>
+                                    <div className="relative rounded-2xl overflow-hidden cursor-pointer group h-[520px] lg:h-[620px]" onClick={() => { setSelected(featured); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
                                         <img src={featured.image} alt={featured.title} className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105 pointer-events-none" />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
                                         <div className="absolute bottom-0 left-0 right-0 p-6 pointer-events-none">
@@ -526,7 +526,7 @@ const NewsPage = ({ onBack, onLogin, onRegister, onNavigate }: { onBack: () => v
                                 {rest.length > 0 && (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                         {rest.map(article => (
-                                            <div key={article.id} className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onClick={() => setSelected(article)}>
+                                            <div key={article.id} className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onClick={() => { setSelected(article); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
                                                 <div className="h-44 overflow-hidden pointer-events-none">
                                                     <img src={article.image} alt={article.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                                                 </div>
