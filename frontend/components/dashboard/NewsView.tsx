@@ -45,7 +45,7 @@ const NewsCard: React.FC<NewsCardProps> = ({ article, featured = false, onClick 
     if (featured) {
         return (
             <div
-                className="relative rounded-2xl overflow-hidden cursor-pointer group h-80 lg:h-96"
+                className="relative rounded-2xl overflow-hidden cursor-pointer group h-[420px] lg:h-[520px]"
                 onClick={onClick}
             >
                 <img
@@ -117,7 +117,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ article, onBack }) => {
             </button>
 
             <div className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
-                <div className="h-64 lg:h-80 overflow-hidden">
+                <div className="h-[420px] lg:h-[520px] overflow-hidden">
                     <img src={article.image} alt={article.title} className="w-full h-full object-cover" />
                 </div>
                 <div className="p-6 lg:p-8">

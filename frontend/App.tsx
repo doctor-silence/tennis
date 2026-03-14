@@ -425,7 +425,7 @@ const NewsPage = ({ onBack, onLogin, onRegister, onNavigate }: { onBack: () => v
                             <ChevronLeft size={20} /> Назад к новостям
                         </button>
                         <div className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
-                            <div className="h-64 lg:h-80 overflow-hidden">
+                            <div className="h-[420px] lg:h-[520px] overflow-hidden">
                                 <img src={selected.image} alt={selected.title} className="w-full h-full object-cover" />
                             </div>
                             <div className="p-6 lg:p-8">
@@ -505,7 +505,7 @@ const NewsPage = ({ onBack, onLogin, onRegister, onNavigate }: { onBack: () => v
                             <div className="space-y-6">
                                 {/* Featured */}
                                 {featured && (
-                                    <div className="relative rounded-2xl overflow-hidden cursor-pointer group h-80 lg:h-96" onClick={() => setSelected(featured)}>
+                                    <div className="relative rounded-2xl overflow-hidden cursor-pointer group h-[420px] lg:h-[520px]" onClick={() => setSelected(featured)}>
                                         <img src={featured.image} alt={featured.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 pointer-events-none" />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
                                         <div className="absolute bottom-0 left-0 right-0 p-6 pointer-events-none">
