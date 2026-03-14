@@ -6,6 +6,7 @@ import Shop from './components/Shop';
 import AdminPanel from './components/AdminPanel';
 import SupportChatWidget from './components/SupportChatWidget'; // Import the new component
 import TrainerCRMPage from './components/TrainerCRMPage';
+import Tooltip from './components/Tooltip';
 import { api } from './services/api';
 import { 
   ArrowRight, 
@@ -840,7 +841,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                   { icon: <BarChart3 size={18}/>, title: 'Полная статистика ФТР', desc: 'Рейтинг, очки классификации, история матчей — всё подгружается автоматически из базы данных ФТР.' },
                   { icon: <Trophy size={18}/>, title: 'Турнирный профиль', desc: 'Выступления в категориях, динамика рейтинга по сезонам, личные встречи с соперниками.' },
                   { icon: <Eye size={18}/>, title: 'Видимость в сообществе', desc: 'PRO-профили выделяются в поиске, их видят тренеры, организаторы турниров и партнёры.' },
-                  { icon: <Medal size={18}/>, title: 'Ладдер рейтинг', desc: 'Участвуй во внутреннем ладдере платформы — дополнительные рейтинговые очки за активность.' },
+                  { icon: <Medal size={18}/>, title: <Tooltip text="Ладдер" description="Рейтинговая система в онлайн-играх, представляющая собой таблицу лидеров, где игроки ранжируются по уровню мастерства, количеству побед или очков"><span className="border-b border-dashed border-lime-400/60 cursor-help">Ладдер</span></Tooltip>, desc: 'Участвуй во внутреннем ладдере платформы — дополнительные рейтинговые очки за активность.' },
                 ].map((item, i) => (
                   <div key={i} className="flex gap-4">
                     <div className="w-10 h-10 rounded-xl bg-lime-400/10 border border-lime-400/20 text-lime-400 flex items-center justify-center flex-shrink-0">{item.icon}</div>
