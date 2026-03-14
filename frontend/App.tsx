@@ -767,35 +767,174 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
         </div>
       </section>
 
-      {/* How It Works Section */}
-      <section className="py-10 sm:py-20 bg-white border-b border-slate-100">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-           <div className="mb-6 sm:mb-12">
-             <span className="text-lime-600 font-bold tracking-wider uppercase text-xs">Простой старт</span>
-             <h2 className="text-3xl font-bold text-slate-900 mt-2">Как это работает</h2>
-           </div>
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-12 relative">
-              {/* Connector Line */}
-              <div className="hidden md:block absolute top-12 left-0 w-full h-0.5 bg-slate-100 z-0"></div>
-              
-              {[
-                { icon: <UserIcon size={28}/>, title: "Создай профиль", desc: "Укажи свой уровень игры (NTRP) и город." },
-                { icon: <Search size={28}/>, title: "Найди партнера", desc: "Выбери соперника по уровню и удобному времени." },
-                { icon: <Trophy size={28}/>, title: "Играй и побеждай", desc: "Бронируй корт в приложении и фиксируй счет." }
-              ].map((step, i) => (
-                 <div key={i} className="relative z-10 bg-white p-4 sm:p-6 group flex md:flex-col items-center md:items-center gap-4 md:gap-0 text-left md:text-center">
-                    <div className="w-16 h-16 sm:w-24 sm:h-24 bg-slate-50 rounded-full flex items-center justify-center flex-shrink-0 border-4 border-white shadow-lg group-hover:scale-110 transition-transform duration-300">
-                       <div className="text-slate-900 group-hover:text-lime-600 transition-colors">{step.icon}</div>
+      {/* For Whom Section */}
+      <section className="py-20 sm:py-32 bg-white border-b border-slate-100 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+          {/* Header */}
+          <div className="text-center mb-16 sm:mb-24">
+            <span className="text-lime-600 font-bold tracking-wider uppercase text-xs">Платформа для всех</span>
+            <h2 className="text-4xl sm:text-5xl font-bold text-slate-900 mt-3 mb-4 tracking-tight">Кому подходит НаКорте?</h2>
+            <p className="text-slate-400 max-w-2xl mx-auto text-base sm:text-lg font-light">Мы создали единую экосистему для каждого, кто любит теннис — независимо от уровня и амбиций.</p>
+          </div>
+
+          {/* Block 1 — Beginners & Amateurs */}
+          <div className="mb-8 rounded-[2rem] overflow-hidden bg-gradient-to-br from-slate-50 to-white border border-slate-200 shadow-sm">
+            <div className="grid grid-cols-1 lg:grid-cols-2">
+              {/* Left — label + title + desc */}
+              <div className="p-10 lg:p-14 flex flex-col justify-center">
+                <div className="inline-flex items-center gap-2 bg-lime-100 text-lime-700 text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full mb-6 w-fit">
+                  <UserIcon size={13} /> Начинающие и любители
+                </div>
+                <h3 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight mb-4 leading-tight">Начни играть<br/>без лишних сложностей</h3>
+                <p className="text-slate-500 text-base leading-relaxed mb-8">Не важно, только ли ты взял ракетку или играешь пару лет — НаКорте поможет найти компанию своего уровня, не бояться уйти с корта с разгромным счётом и расти в удовольствие.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    { icon: <Search size={16}/>, text: 'Поиск партнёра по уровню NTRP' },
+                    { icon: <Map size={16}/>, text: 'Корты рядом с домом' },
+                    { icon: <Activity size={16}/>, text: 'Личная статистика и прогресс' },
+                    { icon: <Zap size={16}/>, text: 'AI-тренер с советами' },
+                    { icon: <Shield size={16}/>, text: 'Дневник тренировок и матчей' },
+                    { icon: <Users size={16}/>, text: 'Комьюнити и группы по интересам' },
+                    { icon: <Calendar size={16}/>, text: 'Любительские турниры' },
+                    { icon: <MessageSquare size={16}/>, text: 'Чат с партнёрами' },
+                  ].map((f, i) => (
+                    <div key={i} className="flex items-center gap-2.5 bg-white border border-slate-100 rounded-xl px-4 py-2.5 text-sm text-slate-700 font-medium shadow-sm">
+                      <span className="text-lime-500 flex-shrink-0">{f.icon}</span>{f.text}
                     </div>
+                  ))}
+                </div>
+                <button onClick={onRegisterClick} className="mt-8 inline-flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-lime-500 hover:text-slate-900 transition-all w-fit">
+                  Создать профиль <ArrowRight size={16} />
+                </button>
+              </div>
+              {/* Right — highlights */}
+              <div className="bg-slate-900 p-10 lg:p-14 flex flex-col justify-center gap-6">
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Почему НаКорте лучше групповых чатов</p>
+                {[
+                  { title: 'Умный подбор', desc: 'Алгоритм учитывает уровень, возраст, город и удобное время — не нужно листать сотни анкет.' },
+                  { title: 'Без завышенных ожиданий', desc: 'Играешь против равных. Никакого дискомфорта от огромной разницы в уровне.' },
+                  { title: 'Расти вместе с платформой', desc: 'Фиксируй победы, отслеживай рейтинг NTRP и наблюдай, как улучшаются твои показатели.' },
+                  { title: 'AI-ассистент в кармане', desc: 'Задай вопрос тренеру в любое время — получи разбор ошибок и план улучшений.' },
+                ].map((item, i) => (
+                  <div key={i} className="flex gap-4">
+                    <div className="w-8 h-8 rounded-full bg-lime-400 text-slate-900 flex items-center justify-center font-black text-sm flex-shrink-0 mt-0.5">{i + 1}</div>
                     <div>
-                      <h3 className="font-bold text-lg sm:text-xl mb-1 sm:mb-2 md:mt-4">{step.title}</h3>
-                      <p className="text-slate-500 text-sm leading-relaxed">{step.desc}</p>
+                      <p className="text-white font-bold text-sm mb-1">{item.title}</p>
+                      <p className="text-slate-400 text-sm leading-relaxed">{item.desc}</p>
                     </div>
-                 </div>
-              ))}
-           </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Block 2 — RTT Pros */}
+          <div className="mb-8 rounded-[2rem] overflow-hidden bg-slate-950 border border-white/5 shadow-xl">
+            <div className="grid grid-cols-1 lg:grid-cols-2">
+              {/* Left — dark highlights */}
+              <div className="p-10 lg:p-14 flex flex-col justify-center gap-6 order-2 lg:order-1">
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Эксклюзивно для РТТ</p>
+                {[
+                  { icon: <ShieldCheck size={18}/>, title: 'Верификация РНИ', desc: 'Официальная галочка подтверждённого спортсмена. Твой статус виден всему сообществу.' },
+                  { icon: <BarChart3 size={18}/>, title: 'Полная статистика ФТР', desc: 'Рейтинг, очки классификации, история матчей — всё подгружается автоматически из базы данных ФТР.' },
+                  { icon: <Trophy size={18}/>, title: 'Турнирный профиль', desc: 'Выступления в категориях, динамика рейтинга по сезонам, личные встречи с соперниками.' },
+                  { icon: <Eye size={18}/>, title: 'Видимость в сообществе', desc: 'PRO-профили выделяются в поиске, их видят тренеры, организаторы турниров и партнёры.' },
+                  { icon: <Medal size={18}/>, title: 'Ладдер рейтинг', desc: 'Участвуй во внутреннем ладдере платформы — дополнительные рейтинговые очки за активность.' },
+                ].map((item, i) => (
+                  <div key={i} className="flex gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-lime-400/10 border border-lime-400/20 text-lime-400 flex items-center justify-center flex-shrink-0">{item.icon}</div>
+                    <div>
+                      <p className="text-white font-bold text-sm mb-1">{item.title}</p>
+                      <p className="text-slate-400 text-sm leading-relaxed">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Right — label + title */}
+              <div className="p-10 lg:p-14 flex flex-col justify-center order-1 lg:order-2 relative overflow-hidden">
+                <div className="absolute -top-20 -right-20 w-72 h-72 bg-lime-400/10 rounded-full blur-[80px]"></div>
+                <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-emerald-600/10 rounded-full blur-[80px]"></div>
+                <div className="relative z-10">
+                  <div className="inline-flex items-center gap-2 bg-lime-400/10 border border-lime-400/20 text-lime-400 text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full mb-6 w-fit">
+                    <ShieldCheck size={13} /> Профессионалы РТТ
+                  </div>
+                  <h3 className="text-3xl sm:text-4xl font-bold text-white tracking-tight mb-4 leading-tight">Твой официальный<br/>цифровой профиль<br/>игрока РТТ</h3>
+                  <p className="text-slate-400 text-base leading-relaxed mb-8">Привяжи свой РНИ — и платформа автоматически станет твоим персональным цифровым профилем с полной статистикой из базы ФТР. Покажи результаты, найди спарринг-партнёров своего уровня и следи за ладдером.</p>
+                  <div className="flex flex-wrap gap-3">
+                    <a href="/rtt/" className="inline-flex items-center gap-2 bg-lime-400 text-slate-900 px-6 py-3 rounded-xl font-bold text-sm hover:bg-lime-300 transition-all">
+                      Подробнее о РТТ <ArrowRight size={16} />
+                    </a>
+                    <button onClick={onRegisterClick} className="inline-flex items-center gap-2 border border-white/20 text-white px-6 py-3 rounded-xl font-bold text-sm hover:border-lime-400 hover:text-lime-400 transition-all">
+                      Зарегистрироваться
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Block 3 — Coaches */}
+          <div className="rounded-[2rem] overflow-hidden bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 shadow-sm">
+            <div className="grid grid-cols-1 lg:grid-cols-2">
+              {/* Left — label + title */}
+              <div className="p-10 lg:p-14 flex flex-col justify-center">
+                <div className="inline-flex items-center gap-2 bg-amber-100 text-amber-700 text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full mb-6 w-fit">
+                  <Briefcase size={13} /> Тренеры
+                </div>
+                <h3 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight mb-4 leading-tight">Весь бизнес тренера<br/>в одном месте</h3>
+                <p className="text-slate-600 text-base leading-relaxed mb-8">Забудь о таблицах и переписках в чатах. НаКорте даёт тренерам профессиональную CRM-систему для управления учениками, расписанием и турнирами — всё под рукой в удобном интерфейсе.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    { icon: <Users size={16}/>, text: 'База учеников с профилями' },
+                    { icon: <Calendar size={16}/>, text: 'Расписание тренировок' },
+                    { icon: <Activity size={16}/>, text: 'Прогресс каждого игрока' },
+                    { icon: <Trophy size={16}/>, text: 'Организация турниров' },
+                    { icon: <Video size={16}/>, text: 'Видео-анализ техники' },
+                    { icon: <BarChart3 size={16}/>, text: 'Аналитика и отчёты' },
+                    { icon: <Zap size={16}/>, text: 'AI-помощник для планирования' },
+                    { icon: <Search size={16}/>, text: 'Поиск учеников в своём городе' },
+                  ].map((f, i) => (
+                    <div key={i} className="flex items-center gap-2.5 bg-white border border-amber-100 rounded-xl px-4 py-2.5 text-sm text-slate-700 font-medium shadow-sm">
+                      <span className="text-amber-500 flex-shrink-0">{f.icon}</span>{f.text}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-8 flex flex-wrap gap-3">
+                  <a href="/crm/" className="inline-flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-amber-500 transition-all">
+                    Подробнее о CRM <ArrowRight size={16} />
+                  </a>
+                  <button onClick={onRegisterClick} className="inline-flex items-center gap-2 border border-slate-300 text-slate-700 px-6 py-3 rounded-xl font-bold text-sm hover:border-amber-400 hover:text-amber-600 transition-all">
+                    Аккаунт тренера
+                  </button>
+                </div>
+              </div>
+              {/* Right — advantages */}
+              <div className="p-10 lg:p-14 flex flex-col justify-center gap-5">
+                <p className="text-amber-700 text-xs font-bold uppercase tracking-wider mb-2">Преимущества для тренеров</p>
+                {[
+                  { title: 'Один инструмент вместо десяти', desc: 'Расписание, прогресс, чаты с учениками, турниры — всё в одном приложении. Никаких Google Таблиц и Telegram-чатов.' },
+                  { title: 'Объективная аналитика прогресса', desc: 'Наглядные графики роста каждого ученика по матчам, рейтингу NTRP и показателям техники.' },
+                  { title: 'Организация турниров за минуты', desc: 'Создавай закрытые турниры для своих групп, управляй сеткой и публикуй результаты прямо в приложении.' },
+                  { title: 'Поиск новых учеников', desc: 'Твой тренерский профиль виден в сообществе. Игроки в твоём городе сами находят тебя по специализации и отзывам.' },
+                ].map((item, i) => (
+                  <div key={i} className="flex gap-4 bg-white/70 border border-amber-100 rounded-2xl p-4">
+                    <div className="w-8 h-8 rounded-full bg-amber-400 text-slate-900 flex items-center justify-center font-black text-sm flex-shrink-0 mt-0.5">{i + 1}</div>
+                    <div>
+                      <p className="text-slate-900 font-bold text-sm mb-1">{item.title}</p>
+                      <p className="text-slate-500 text-sm leading-relaxed">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
         </div>
       </section>
+
+      {/* News Section */}
+      <NewsSection onRegisterClick={onRegisterClick} onNavigateToNews={() => onNavigate('news')} />
 
       {/* Bento Grid Features */}
       <section className="py-12 sm:py-32 bg-white overflow-hidden">
@@ -1046,9 +1185,6 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
 
         </div>
       </section>
-
-      {/* News Section */}
-      <NewsSection onRegisterClick={onRegisterClick} onNavigateToNews={() => onNavigate('news')} />
 
        {/* FAQ Section */}
        <FaqSection />
