@@ -1,3 +1,31 @@
 /* Custom styles */
 body { font-family: 'Plus Jakarta Sans', sans-serif; }
 * { box-sizing: border-box; }
+
+@keyframes diaryFloat {
+	0%, 100% { transform: translateY(0px); }
+	50% { transform: translateY(-10px); }
+}
+
+@keyframes diaryGlow {
+	0%, 100% { box-shadow: 0 0 0 rgba(163, 230, 53, 0); }
+	50% { box-shadow: 0 0 32px rgba(163, 230, 53, 0.18); }
+}
+
+@keyframes diaryShimmer {
+	0% { background-position: -200% 0; }
+	100% { background-position: 200% 0; }
+}
+
+.animate-diary-float {
+	animation: diaryFloat 6s ease-in-out infinite;
+}
+
+.animate-diary-glow {
+	animation: diaryGlow 4.5s ease-in-out infinite;
+}
+
+.animate-diary-shimmer {
+	background-size: 200% 100%;
+	animation: diaryShimmer 6s linear infinite;
+}

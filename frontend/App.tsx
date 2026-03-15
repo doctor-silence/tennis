@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   User as UserIcon,
   Search,
+  MapPin,
   X,
   ListOrdered,
   Medal,
@@ -35,7 +36,12 @@ import {
   ChevronLeft,
   ChevronDown,
   MessageSquare,
-  Calendar
+  Calendar,
+  Heart,
+  Target,
+  TrendingUp,
+  FileText,
+  Plus
 } from 'lucide-react';
 
 const App = () => {
@@ -52,7 +58,7 @@ const App = () => {
       const pathname = window.location.pathname;
 
       // Список допустимых путей SPA
-      const validPaths = ['/', '/crm/', '/crm', '/rtt/', '/rtt', '/news/', '/news', '/privacy/', '/privacy', '/pro/', '/pro', '/shop/', '/shop', '/terms/', '/terms'];
+      const validPaths = ['/', '/crm/', '/crm', '/rtt/', '/rtt', '/news/', '/news', '/privacy/', '/privacy', '/pro/', '/pro', '/shop/', '/shop', '/terms/', '/terms', '/find-partner/', '/find-partner', '/find-courts/', '/find-courts', '/ai-coach/', '/ai-coach', '/amateur-tournaments/', '/amateur-tournaments', '/community/', '/community', '/3d-tactics/', '/3d-tactics', '/tennis-diary/', '/tennis-diary'];
       const isValid = validPaths.some(p => pathname === p || pathname.startsWith(p + '/'));
       if (!isValid) {
         setIsNotFound(true);
@@ -69,8 +75,22 @@ const App = () => {
           setView('dashboard');
         }
       } else {
-        // Если открыт /crm/ — показываем форму входа
-        if (pathname.startsWith('/crm')) {
+        // Если открыт /find-partner — SEO-страница
+        if (pathname.startsWith('/find-partner')) {
+          setView('find-partner');
+        } else if (pathname.startsWith('/find-courts')) {
+          setView('find-courts');
+        } else if (pathname.startsWith('/ai-coach')) {
+          setView('ai-coach-info');
+        } else if (pathname.startsWith('/amateur-tournaments')) {
+          setView('amateur-tournaments');
+        } else if (pathname.startsWith('/community')) {
+          setView('community-info');
+        } else if (pathname.startsWith('/3d-tactics')) {
+          setView('tactics-3d-info');
+        } else if (pathname.startsWith('/tennis-diary')) {
+          setView('tennis-diary-info');
+        } else if (pathname.startsWith('/crm')) {
           setAuthInitialMode('login');
           setView('auth');
         } else {
@@ -222,6 +242,34 @@ const App = () => {
 
       {view === 'terms' && (
           <LegalPage type="terms" onBack={() => handleNavigate('landing')} />
+      )}
+
+      {view === 'find-partner' && (
+          <FindPartnerSeoPage onBack={() => handleNavigate('landing')} onRegister={() => handleAuthNavigate('register')} />
+      )}
+
+      {view === 'find-courts' && (
+          <FindCourtsSeoPage onBack={() => handleNavigate('landing')} onRegister={() => handleAuthNavigate('register')} />
+      )}
+
+      {view === 'ai-coach-info' && (
+          <AiCoachInfoPage onBack={() => handleNavigate('landing')} onRegister={() => handleAuthNavigate('register')} />
+      )}
+
+      {view === 'amateur-tournaments' && (
+          <AmateurTournamentsPage onBack={() => handleNavigate('landing')} onRegister={() => handleAuthNavigate('register')} />
+      )}
+
+      {view === 'community-info' && (
+          <CommunityInfoPage onBack={() => handleNavigate('landing')} onRegister={() => handleAuthNavigate('register')} />
+      )}
+
+      {view === 'tactics-3d-info' && (
+          <Tactics3DInfoPage onBack={() => handleNavigate('landing')} onRegister={() => handleAuthNavigate('register')} />
+      )}
+
+      {view === 'tennis-diary-info' && (
+          <TennisDiaryInfoPage onBack={() => handleNavigate('landing')} onRegister={() => handleAuthNavigate('register')} />
       )}
     </div>
   );
@@ -1243,12 +1291,14 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
              <div>
                <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Возможности</h3>
                <ul className="space-y-2.5 text-sm">
-                 <li><a href="/?auth=register#search" className="hover:text-lime-400 transition-colors">Поиск партнёра по теннису</a></li>
-                 <li><a href="/?auth=register#courts" className="hover:text-lime-400 transition-colors">Бронирование теннисных кортов</a></li>
-                 <li><a href="/?auth=register#ai" className="hover:text-lime-400 transition-colors">AI-тренер по теннису</a></li>
-                 <li><a href="/?auth=register#tournaments" className="hover:text-lime-400 transition-colors">Любительские турниры</a></li>
-                 <li><a href="/?auth=register#diary" className="hover:text-lime-400 transition-colors">Дневник теннисиста</a></li>
-                 <li><a href="/crm/" className="hover:text-lime-400 transition-colors">CRM для тренеров</a></li>
+                 <li><button onClick={() => onNavigate('find-partner')} className="hover:text-lime-400 transition-colors text-left">Поиск партнёра по теннису</button></li>
+                 <li><button onClick={() => onNavigate('find-courts')} className="hover:text-lime-400 transition-colors text-left">Бронирование теннисных кортов</button></li>
+                 <li><button onClick={() => onNavigate('ai-coach-info')} className="hover:text-lime-400 transition-colors text-left">AI-тренер по теннису</button></li>
+                 <li><button onClick={() => onNavigate('amateur-tournaments')} className="hover:text-lime-400 transition-colors text-left">Любительские турниры</button></li>
+                 <li><button onClick={() => onNavigate('community-info')} className="hover:text-lime-400 transition-colors text-left">Сообщество</button></li>
+                 <li><button onClick={() => onNavigate('tactics-3d-info')} className="hover:text-lime-400 transition-colors text-left">3D тактика</button></li>
+                 <li><button onClick={() => onNavigate('tennis-diary-info')} className="hover:text-lime-400 transition-colors text-left">Дневник теннисиста</button></li>
+                 <li><button onClick={() => onNavigate('crm-info')} className="hover:text-lime-400 transition-colors text-left">CRM для тренеров</button></li>
                </ul>
              </div>
 
@@ -2324,5 +2374,1743 @@ const LegalPage = ({ type, onBack }: { type: 'privacy' | 'terms', onBack: () => 
     </div>
   );
 };
+
+function FindPartnerSeoPage({ onBack, onRegister }: { onBack: () => void, onRegister: () => void }) {
+  const benefits = [
+    {
+      title: 'Подбор по уровню игры',
+      description: 'Фильтруйте игроков по NTRP, РТТ-статусу, городу и активности, чтобы быстрее находить подходящего партнёра для тренировки или матча.',
+      icon: <BarChart3 className="text-lime-400" size={22} />,
+    },
+    {
+      title: 'Игроки рядом с вами',
+      description: 'Сервис показывает теннисистов из вашего города и помогает быстро договориться о совместной игре на удобном корте.',
+      icon: <Map className="text-lime-400" size={22} />,
+    },
+    {
+      title: 'Быстрый старт общения',
+      description: 'После регистрации можно написать игроку, обсудить формат встречи, уровень нагрузки и выбрать подходящее время.',
+      icon: <MessageSquare className="text-lime-400" size={22} />,
+    },
+  ];
+
+  const steps = [
+    'Создайте профиль и укажите город, уровень и формат игры.',
+    'Выберите фильтры поиска: уровень, имя игрока и город.',
+    'Откройте карточки теннисистов и найдите подходящего партнёра.',
+    'Напишите игроку и договоритесь о матче или совместной тренировке.',
+  ];
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-white font-sans">
+      <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/90 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-2 text-slate-300 hover:text-white transition-colors font-medium text-sm"
+          >
+            <ChevronLeft size={18} /> На главную
+          </button>
+          <img src="/assets/logo.svg" alt="НаКорте" className="h-10 sm:h-12 w-auto" />
+          <Button onClick={onRegister} size="sm" className="text-xs sm:text-sm px-3 sm:px-4">
+            Регистрация
+          </Button>
+        </div>
+      </header>
+
+      <section className="relative overflow-hidden border-b border-white/5">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(163,230,53,0.18),transparent_28%),radial-gradient(circle_at_left,rgba(34,197,94,0.14),transparent_22%)]" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-20 md:pt-24 md:pb-24 grid lg:grid-cols-[1.2fr_0.8fr] gap-10 items-center">
+          <div>
+            <span className="inline-flex items-center gap-2 text-lime-400 font-black uppercase tracking-[0.2em] text-xs mb-4">
+              <Search size={14} /> Сервис подбора партнёров
+            </span>
+            <h1 className="text-4xl md:text-6xl font-black italic uppercase tracking-tight leading-none mb-5">
+              Поиск партнёра
+              <span className="block text-lime-400">по теннису</span>
+            </h1>
+            <p className="text-slate-300 text-base md:text-lg leading-relaxed max-w-2xl mb-8">
+              «НаКорте» помогает быстро находить теннисистов вашего уровня в своём городе, договариваться о спаррингах,
+              тренировках и любительских матчах. Функция подходит новичкам, любителям и игрокам с рейтингом РТТ.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Button size="lg" onClick={onRegister} className="shadow-xl shadow-lime-400/20">
+                Найти партнёра
+              </Button>
+              <button
+                onClick={onBack}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-white/15 text-slate-200 hover:bg-white/5 transition-colors"
+              >
+                Вернуться <ArrowRight size={16} />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm">
+              <div className="flex items-center justify-between mb-5">
+                <span className="text-sm font-semibold text-slate-300">Что даёт поиск</span>
+                <Users className="text-lime-400" size={20} />
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5" size={18} />
+                  <p className="text-sm text-slate-300">Подбор соперников и партнёров по уровню, географии и целям игры.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5" size={18} />
+                  <p className="text-sm text-slate-300">Быстрый выход на диалог и согласование времени матча.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5" size={18} />
+                  <p className="text-sm text-slate-300">Удобный старт для регулярных тренировок и новых знакомств в теннисном комьюнити.</p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-3xl border border-lime-400/20 bg-lime-400/5 p-6">
+              <p className="text-xs uppercase tracking-[0.2em] text-lime-400 font-black mb-2">Для кого</p>
+              <p className="text-slate-200 leading-relaxed">
+                Для игроков, которые хотят найти спарринг-партнёра, собрать компанию на корт, подготовиться к турниру
+                или просто играть чаще без долгих поисков в чатах и мессенджерах.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20">
+        <div className="grid md:grid-cols-3 gap-6 mb-16">
+          {benefits.map((benefit) => (
+            <article key={benefit.title} className="rounded-3xl border border-white/10 bg-white/5 p-7">
+              <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-white/10 flex items-center justify-center mb-5">
+                {benefit.icon}
+              </div>
+              <h2 className="text-xl font-bold mb-3">{benefit.title}</h2>
+              <p className="text-slate-400 leading-relaxed">{benefit.description}</p>
+            </article>
+          ))}
+        </div>
+
+        <div className="grid lg:grid-cols-[0.95fr_1.05fr] gap-8 items-stretch">
+          <div className="rounded-[32px] border border-white/10 bg-white/5 p-8 md:p-10 h-full">
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Как это работает</p>
+            <h2 className="text-3xl font-black tracking-tight mb-6">Найдите игрока за несколько шагов</h2>
+            <div className="space-y-4">
+              {steps.map((step, index) => (
+                <div key={step} className="flex items-start gap-4">
+                  <div className="w-9 h-9 rounded-full bg-lime-400 text-slate-950 flex items-center justify-center font-black flex-shrink-0">
+                    {index + 1}
+                  </div>
+                  <p className="text-slate-300 leading-relaxed pt-1">{step}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[32px] border border-white/10 bg-slate-900/70 p-8 md:p-10 h-full">
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Возможности сервиса</p>
+            <h2 className="text-3xl font-black tracking-tight mb-6">Что умеет сервис поиска партнёра</h2>
+            <div className="space-y-5 text-slate-300 leading-relaxed">
+              <p>
+                Функция поиска партнёра по теннису на платформе «НаКорте» создана для тех, кто хочет быстро подобрать
+                игрока по уровню, рейтингу, городу и формату матча. Вместо бесконечных переписок в чатах вы получаете
+                структурированный каталог теннисистов и понятные фильтры.
+              </p>
+              <p>
+                Пользователь может найти партнёра для одиночной игры, совместной тренировки, спарринга перед турниром
+                или регулярных встреч на корте. Это особенно удобно в больших городах, где важно быстро отсечь игроков,
+                которые не подходят по уровню или графику.
+              </p>
+              <p>
+                После регистрации доступно общение с игроками, а также другие возможности платформы: бронирование кортов,
+                участие в турнирах, ведение дневника и использование AI-инструментов для тренировочного процесса.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 grid lg:grid-cols-[1fr_auto] gap-8 items-center">
+          <div>
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Готовы начать?</p>
+            <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-3">Откройте поиск партнёра и найдите матч уже сегодня</h2>
+            <p className="text-slate-400 max-w-2xl leading-relaxed">
+              Зарегистрируйтесь на «НаКорте», заполните профиль и начните искать игроков для тренировок, спаррингов и любительских встреч.
+            </p>
+          </div>
+          <Button size="lg" onClick={onRegister} className="shadow-xl shadow-lime-400/20">
+            Зарегистрироваться
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function FindCourtsSeoPage({ onBack, onRegister }: { onBack: () => void, onRegister: () => void }) {
+  const courts = [
+    {
+      name: 'Спартак (Ширяевка)',
+      address: 'Майский просек, 7, Москва',
+      price: '2200 ₽',
+      rating: '4.7',
+      surface: 'Грунт, трава',
+      color: 'bg-orange-500',
+      image: 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=1200&auto=format&fit=crop',
+    },
+    {
+      name: 'Теннисный клуб "Чайка"',
+      address: 'Ленинградское шоссе, 45Б, стр. 2, Москва',
+      price: '3200 ₽',
+      rating: '4.6',
+      surface: 'Хард',
+      color: 'bg-blue-500',
+      image: 'https://images.unsplash.com/photo-1578269174936-2709b6aeb913?q=80&w=1200&auto=format&fit=crop',
+    },
+  ];
+
+  const advantages = [
+    'Поиск теннисных кортов по названию клуба, адресу, городу и типу покрытия.',
+    'Сравнение площадок по цене за час, рейтингу, покрытию и расположению.',
+    'Быстрый переход к бронированию без звонков и долгих переписок.',
+  ];
+
+  const steps = [
+    'Введите название клуба, район или адрес в строке поиска.',
+    'Отфильтруйте площадки по городу и типу покрытия.',
+    'Сравните карточки кортов по цене, рейтингу и доступности.',
+    'Откройте нужную площадку и перейдите к бронированию.',
+  ];
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-white font-sans">
+      <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/90 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-2 text-slate-300 hover:text-white transition-colors font-medium text-sm"
+          >
+            <ChevronLeft size={18} /> На главную
+          </button>
+          <img src="/assets/logo.svg" alt="НаКорте" className="h-10 sm:h-12 w-auto" />
+          <Button onClick={onRegister} size="sm" className="text-xs sm:text-sm px-3 sm:px-4">
+            Регистрация
+          </Button>
+        </div>
+      </header>
+
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(163,230,53,0.14),transparent_30%),radial-gradient(circle_at_left,rgba(59,130,246,0.12),transparent_22%)]" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-10 md:pt-24 md:pb-12 grid lg:grid-cols-[1.05fr_0.95fr] gap-10 items-start">
+          <div>
+            <span className="inline-flex items-center gap-2 text-lime-400 font-black uppercase tracking-[0.2em] text-xs mb-4">
+              <Map size={14} /> Поиск и бронирование кортов
+            </span>
+            <h1 className="text-4xl md:text-6xl font-black italic uppercase tracking-tight leading-none mb-5">
+              Бронирование
+              <span className="block text-lime-400">теннисных кортов</span>
+            </h1>
+            <p className="text-slate-300 text-base md:text-lg leading-relaxed max-w-2xl mb-8">
+              НаКорте помогает искать теннисные корты по городу, адресу, клубу и покрытию. Пользователь видит карточки площадок,
+              сравнивает цены и рейтинг, а затем быстро переходит к бронированию удобного корта.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Button size="lg" onClick={onRegister} className="shadow-xl shadow-lime-400/20">
+                Найти корт
+              </Button>
+              <button
+                onClick={onBack}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-white/15 text-slate-200 hover:bg-white/5 transition-colors"
+              >
+                Вернуться <ArrowRight size={16} />
+              </button>
+            </div>
+
+            <div className="mt-8 rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-sm max-w-xl">
+              <div className="grid grid-cols-3 gap-3 mb-6">
+                <div className="rounded-2xl bg-slate-900/70 border border-white/10 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Города</div>
+                  <div className="text-2xl font-black text-white">20+</div>
+                </div>
+                <div className="rounded-2xl bg-slate-900/70 border border-white/10 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Рейтинг</div>
+                  <div className="text-2xl font-black text-white">4.6+</div>
+                </div>
+                <div className="rounded-2xl bg-slate-900/70 border border-white/10 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Фильтры</div>
+                  <div className="text-2xl font-black text-white">3</div>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-sm text-slate-300">
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>Поиск кортов по адресу, клубу, городу и покрытию в одном интерфейсе.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>Карточки площадок с фото, рейтингом, ценой за час и быстрым бронированием.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>Удобный сценарий для поиска корта рядом с домом, работой или в нужном районе.</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 backdrop-blur-sm">
+            <div className="flex items-center justify-between gap-3 rounded-2xl bg-white p-2 mb-4 overflow-hidden">
+              <div className="flex-1 flex items-center gap-3 px-3 py-3 text-slate-400 text-sm min-w-0">
+                <Search size={18} className="shrink-0" />
+                <span className="truncate">Название клуба или адрес...</span>
+              </div>
+              <div className="hidden sm:flex items-center gap-2 shrink-0">
+                <div className="px-4 py-3 rounded-xl bg-slate-50 text-slate-700 text-sm font-bold">Все города</div>
+                <div className="px-4 py-3 rounded-xl bg-slate-50 text-slate-700 text-sm font-bold">Все покрытия</div>
+              </div>
+            </div>
+            <div className="space-y-4">
+              {courts.map((court) => (
+                <article key={court.name} className="rounded-[28px] bg-white text-slate-900 p-2 shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="relative h-52 rounded-[22px] overflow-hidden">
+                    <img src={court.image} alt={court.name} className="w-full h-full object-cover" />
+                    <div className={`absolute top-4 left-4 ${court.color} text-white text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg tracking-wider`}>
+                      {court.surface}
+                    </div>
+                    <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm text-slate-900 text-xs font-bold px-3 py-1.5 rounded-lg shadow-md flex items-center gap-1">
+                      <Star size={12} className="fill-amber-400 text-amber-400" /> {court.rating}
+                    </div>
+                  </div>
+                  <div className="p-5">
+                    <h3 className="font-bold text-2xl mb-2 leading-tight">{court.name}</h3>
+                    <p className="text-slate-500 font-medium flex items-center gap-2 mb-5 line-clamp-1">
+                      <MapPin size={18} className="shrink-0 text-slate-400" /> {court.address}
+                    </p>
+                    <div className="flex items-end justify-between pt-4 border-t border-slate-100 gap-4">
+                      <div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">Цена</div>
+                        <div className="flex items-baseline gap-1">
+                          <span className="font-bold text-2xl text-slate-900">{court.price}</span>
+                          <span className="text-xs font-medium text-slate-400">/ час</span>
+                        </div>
+                      </div>
+                      <button className="bg-slate-900 text-white font-bold text-sm tracking-wider uppercase px-6 py-3 rounded-xl hover:bg-lime-500 hover:text-slate-900 transition-all shadow-lg shadow-slate-900/10">
+                        Забронировать
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-16 md:pt-10 md:pb-20">
+        <div className="grid md:grid-cols-3 gap-6 mb-16">
+          {advantages.map((advantage) => (
+            <article key={advantage} className="rounded-3xl border border-white/10 bg-white/5 p-7">
+              <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-white/10 flex items-center justify-center mb-5">
+                <Calendar className="text-lime-400" size={22} />
+              </div>
+              <p className="text-slate-300 leading-relaxed">{advantage}</p>
+            </article>
+          ))}
+        </div>
+
+        <div className="grid xl:grid-cols-2 gap-8 items-stretch">
+          <div className="rounded-[32px] border border-white/10 bg-white/5 p-8 md:p-10 h-full">
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Как это работает</p>
+            <h2 className="text-3xl font-black tracking-tight mb-6">Найдите и забронируйте корт за пару минут</h2>
+            <div className="space-y-4">
+              {steps.map((step, index) => (
+                <div key={step} className="flex items-start gap-4">
+                  <div className="w-9 h-9 rounded-full bg-lime-400 text-slate-950 flex items-center justify-center font-black flex-shrink-0">
+                    {index + 1}
+                  </div>
+                  <p className="text-slate-300 leading-relaxed pt-1">{step}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[32px] border border-white/10 bg-slate-900/70 p-8 md:p-10 h-full">
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Возможности сервиса</p>
+            <h2 className="text-3xl font-black tracking-tight mb-6">Что умеет поиск теннисных кортов</h2>
+            <div className="space-y-5 text-slate-300 leading-relaxed">
+              <p>
+                Функция поиска теннисных кортов на платформе «НаКорте» помогает быстро подобрать площадку по местоположению,
+                стоимости, рейтингу клуба и типу покрытия. Пользователь сразу видит ключевую информацию в карточке: фото,
+                адрес, цену за час и формат покрытия.
+              </p>
+              <p>
+                Такой сценарий особенно удобен, когда нужно срочно найти свободный корт рядом с домом, работой или в новом районе.
+                Вместо поиска по сайтам клубов пользователь получает единый каталог площадок с удобными фильтрами и наглядным сравнением.
+              </p>
+              <p>
+                Здесь показано, как выглядит интерфейс поиска кортов в приложении: строка поиска, фильтры по городам и покрытиям,
+                а также реальные примеры карточек площадок по мотивам интерфейса из приложения.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 grid lg:grid-cols-[1fr_auto] gap-8 items-center">
+          <div>
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Готовы начать?</p>
+            <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-3">Выберите удобный корт и бронируйте игру онлайн</h2>
+            <p className="text-slate-400 max-w-2xl leading-relaxed">
+              Зарегистрируйтесь на «НаКорте» и получите доступ к поиску теннисных клубов, фильтрации по покрытию и быстрому бронированию площадок.
+            </p>
+          </div>
+          <Button size="lg" onClick={onRegister} className="shadow-xl shadow-lime-400/20">
+            Перейти к поиску кортов
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function AiCoachInfoPage({ onBack, onRegister }: { onBack: () => void, onRegister: () => void }) {
+  const benefits = [
+    'AI-тренер отвечает на вопросы по тактике, технике, подготовке к матчу и игровым ситуациям.',
+    'В личном кабинете доступны готовые тренировки, которые можно выполнять по шагам и отмечать как завершённые.',
+    'За выполнение тренировок начисляются XP-очки, которые отражают вашу активность и прогресс в профиле.',
+  ];
+
+  const steps = [
+    'Откройте AI-тренера в личном кабинете и задайте вопрос по игре или тренировкам.',
+    'Получите персональные рекомендации по тактике, технике и подготовке к следующему матчу.',
+    'Выберите готовую тренировку, выполните задания по шагам и отметьте её как завершённую.',
+    'Получите XP-очки в профиле за активность и отслеживайте свой прогресс в личном кабинете.',
+  ];
+
+  const trainingCards = [
+    {
+      title: 'Тренировка: Точность подачи',
+      goal: 'Увеличить процент попадания первой подачи в квадрат.',
+      inventory: 'Корзина мячей (30–50 шт), конусы или мишени.',
+      items: [
+        'Разминка (5 мин) — имитация движения подачи без мяча.',
+        'Подача по зонам (15 мин) — 10 подач в каждую цель.',
+        'Игра на счёт (10 мин) — вторая подача без двойных ошибок.',
+      ],
+    },
+    {
+      title: 'Тренировка: Игра у сетки',
+      goal: 'Уверенно завершать розыгрыши у сетки.',
+      inventory: 'Корзина мячей, партнёр или стенка.',
+      items: [
+        'Разминка (5 мин) — короткие удары с лёта с партнёром.',
+        'Реакция и техника (15 мин) — игра с лёта по разным сторонам.',
+        'Смэш (10 мин) — отработка удара над головой по свечам.',
+      ],
+    },
+  ];
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-white font-sans">
+      <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/90 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-2 text-slate-300 hover:text-white transition-colors font-medium text-sm"
+          >
+            <ChevronLeft size={18} /> На главную
+          </button>
+          <img src="/assets/logo.svg" alt="НаКорте" className="h-10 sm:h-12 w-auto" />
+          <Button onClick={onRegister} size="sm" className="text-xs sm:text-sm px-3 sm:px-4">
+            Регистрация
+          </Button>
+        </div>
+      </header>
+
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(163,230,53,0.14),transparent_30%),radial-gradient(circle_at_left,rgba(59,130,246,0.12),transparent_22%)]" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12 md:pt-24 md:pb-14 grid lg:grid-cols-[0.95fr_1.05fr] gap-10 items-stretch">
+          <div className="flex flex-col h-full">
+            <span className="inline-flex items-center gap-2 text-lime-400 font-black uppercase tracking-[0.2em] text-xs mb-4">
+              <Zap size={14} /> AI-тренер в личном кабинете
+            </span>
+            <h1 className="text-4xl md:text-6xl font-black italic uppercase tracking-tight leading-none mb-5">
+              AI-тренер
+              <span className="block text-lime-400">по теннису</span>
+            </h1>
+            <p className="text-slate-300 text-base md:text-lg leading-relaxed max-w-2xl mb-8">
+              НаКорте даёт доступ к AI-тренеру, который помогает разбирать игровые ситуации, подсказывает тактические решения
+              и предлагает готовые тренировки. Все рекомендации доступны прямо в личном кабинете, без переключения между сервисами.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Button size="lg" onClick={onRegister} className="shadow-xl shadow-lime-400/20">
+                Открыть AI-тренера
+              </Button>
+              <button
+                onClick={onBack}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-white/15 text-slate-200 hover:bg-white/5 transition-colors"
+              >
+                Вернуться <ArrowRight size={16} />
+              </button>
+            </div>
+
+            <div className="mt-8 rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-sm max-w-xl">
+              <div className="grid grid-cols-3 gap-3 mb-6">
+                <div className="rounded-2xl bg-slate-900/70 border border-white/10 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Советы</div>
+                  <div className="text-2xl font-black text-white">24/7</div>
+                </div>
+                <div className="rounded-2xl bg-slate-900/70 border border-white/10 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Тренировки</div>
+                  <div className="text-2xl font-black text-white">Пошагово</div>
+                </div>
+                <div className="rounded-2xl bg-slate-900/70 border border-white/10 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Награда</div>
+                  <div className="text-2xl font-black text-white">XP</div>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-sm text-slate-300">
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>Спроси о тактике на приёме, подаче, игре у сетки или подготовке к сопернику.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>Получай готовые тренировочные сценарии и отмечай выполненные задания прямо в кабинете.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>За выполненные тренировки система начисляет XP-очки, которые видны в профиле пользователя.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4 mt-auto pt-6">
+              {benefits.map((benefit, index) => (
+                <article key={benefit} className={`rounded-3xl border border-white/10 bg-white/5 p-6 ${index === 2 ? 'md:col-span-2' : ''}`}>
+                  <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-white/10 flex items-center justify-center mb-5">
+                    <Zap className="text-lime-400" size={22} />
+                  </div>
+                  <p className="text-slate-300 leading-relaxed">{benefit}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col h-full gap-5">
+            <div className="rounded-[32px] border border-white/10 bg-white p-4 shadow-sm overflow-hidden">
+              <div className="flex justify-end mb-4">
+                <div className="bg-slate-900 text-white px-5 py-3 rounded-[20px] text-sm max-w-[70%]">
+                  Как тактически обыграть соперника на приёме?
+                </div>
+              </div>
+              <div className="rounded-[24px] border border-lime-200 bg-lime-100/80 text-slate-700 p-6 leading-relaxed text-sm">
+                <p className="mb-4">Ключевые тактические приёмы на приёме подачи:</p>
+                <div className="space-y-4">
+                  <div>
+                    <p className="font-bold text-slate-800 mb-1">1. Позиция</p>
+                    <p>Адаптируй дистанцию в зависимости от силы подачи соперника и дай себе больше времени на замах.</p>
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-800 mb-1">2. Чтение подачи</p>
+                    <p>Следи за движением ракетки и корпуса, чтобы предугадывать направление, вращение и силу.</p>
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-800 mb-1">3. Атака второй подачи</p>
+                    <p>На слабой второй подаче смещайся вперёд и занимай более агрессивную позицию.</p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 flex gap-3 items-center">
+                <input
+                  readOnly
+                  value="Спроси совет у тренера..."
+                  className="flex-1 bg-white border-2 border-lime-300 rounded-2xl px-5 py-4 text-slate-400 outline-none"
+                />
+                <div className="w-14 h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg shadow-slate-900/20">
+                  <ArrowRight size={20} />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4 max-w-[760px] mt-auto">
+              {trainingCards.map((card) => (
+                <article key={card.title} className="rounded-[28px] bg-white text-slate-900 shadow-sm overflow-hidden border border-slate-200 self-start">
+                  <div className="p-6">
+                    <div className="flex items-start justify-between gap-3 mb-6">
+                      <h3 className="text-[22px] font-black leading-tight">{card.title}</h3>
+                      <X className="text-slate-400 shrink-0" size={24} />
+                    </div>
+
+                    <div className="rounded-[22px] bg-slate-50 p-5 mb-6 border border-slate-100">
+                      <p className="text-slate-700 leading-relaxed mb-3"><strong>Цель:</strong> {card.goal}</p>
+                      <p className="text-slate-700 leading-relaxed"><strong>Инвентарь:</strong> {card.inventory}</p>
+                    </div>
+
+                    <div className="space-y-4 mb-6">
+                      {card.items.map((item, index) => (
+                        <div key={item} className="flex gap-3">
+                          <div className="w-9 h-9 rounded-full bg-lime-300 text-slate-900 font-black flex items-center justify-center shrink-0 mt-1 text-sm">
+                            {index + 1}
+                          </div>
+                          <p className="text-slate-700 leading-relaxed font-medium text-[15px]">{item}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button className="w-full bg-slate-900 text-white font-bold text-lg py-4 rounded-2xl shadow-lg shadow-slate-900/20">
+                      Я выполнил тренировку
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-16 md:pt-10 md:pb-20">
+        <div className="grid lg:grid-cols-[0.95fr_1.05fr] gap-8 items-stretch">
+          <div className="rounded-[32px] border border-white/10 bg-white/5 p-8 md:p-10 h-full">
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Как это работает</p>
+            <h2 className="text-3xl font-black tracking-tight mb-6">AI-тренер подсказывает и ведёт по тренировкам</h2>
+            <div className="space-y-4">
+              {steps.map((step, index) => (
+                <div key={step} className="flex items-start gap-4">
+                  <div className="w-9 h-9 rounded-full bg-lime-400 text-slate-950 flex items-center justify-center font-black flex-shrink-0">
+                    {index + 1}
+                  </div>
+                  <p className="text-slate-300 leading-relaxed pt-1">{step}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[32px] border border-white/10 bg-slate-900/70 p-8 md:p-10 h-full">
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Возможности сервиса</p>
+            <h2 className="text-3xl font-black tracking-tight mb-6">Что умеет AI-тренер по теннису</h2>
+            <div className="space-y-5 text-slate-300 leading-relaxed">
+              <p>
+                AI-тренер на платформе «НаКорте» помогает игроку получать быстрые ответы на вопросы по тактике и технике.
+                Можно разобрать сложный розыгрыш, понять, как действовать против определённого типа соперника, или получить
+                рекомендации перед ближайшей тренировкой.
+              </p>
+              <p>
+                В личном кабинете AI-тренер дополняется готовыми тренировками: вы видите цель занятия, необходимый инвентарь,
+                последовательность шагов и можете отмечать выполнение. Это превращает рекомендации в понятный тренировочный план.
+              </p>
+              <p>
+                За выполнение тренировок пользователь получает XP-очки. Они отображаются в профиле и помогают отслеживать активность,
+                регулярность занятий и общий прогресс внутри платформы.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 grid lg:grid-cols-[1fr_auto] gap-8 items-center">
+          <div>
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Готовы начать?</p>
+            <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-3">Откройте AI-тренера и тренируйтесь с персональными подсказками</h2>
+            <p className="text-slate-400 max-w-2xl leading-relaxed">
+              Зарегистрируйтесь на «НаКорте», используйте AI-тренера в личном кабинете, выполняйте упражнения и зарабатывайте XP-очки за прогресс.
+            </p>
+          </div>
+          <Button size="lg" onClick={onRegister} className="shadow-xl shadow-lime-400/20">
+            Перейти к AI-тренеру
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function CommunityInfoPage({ onBack, onRegister }: { onBack: () => void, onRegister: () => void }) {
+  const categories = ['Все события', 'Группы', 'Результаты матчей', 'Поиск игры', 'Барахолка'];
+
+  const advantages = [
+    'В одном разделе собраны новости клуба, посты игроков, результаты матчей, группы, турниры и барахолка.',
+    'Пользователь может публиковать события, комментировать результаты, искать игру и видеть лучших игроков сезона.',
+    'Сообщество превращает приложение в живую теннисную экосистему, где удобно общаться, следить за активностью и находить нужные сервисы.',
+  ];
+
+  const steps = [
+    'Откройте вкладку сообщества и выберите нужный фильтр: все события, группы, результаты матчей, поиск игры или барахолка.',
+    'Просматривайте ленту публикаций, карточки турниров, итоговые результаты матчей и рейтинг топ-игроков.',
+    'Создавайте собственные публикации, делитесь событиями клуба, обсуждайте матчи и откликайтесь на предложения других игроков.',
+    'Используйте группы и барахолку для общения внутри теннисного сообщества, поиска нужных вещей и новых знакомств.',
+  ];
+
+  const communitySections = [
+    {
+      title: 'Лента событий',
+      description: 'Публикации игроков и администрации, обсуждения, комментарии и быстрый переход к главным новостям клуба.',
+      icon: MessageSquare,
+    },
+    {
+      title: 'Турниры и результаты',
+      description: 'Анонсы ближайших турниров, результаты матчей, победители и ключевые события сезона в одной вкладке.',
+      icon: Trophy,
+    },
+    {
+      title: 'Группы и поиск игры',
+      description: 'Общение по интересам, локальные клубные группы и публикации для поиска соперника или компании на матч.',
+      icon: Users,
+    },
+    {
+      title: 'Барахолка',
+      description: 'Объявления о продаже экипировки, аксессуаров и инвентаря внутри знакомого теннисного комьюнити.',
+      icon: Briefcase,
+    },
+  ];
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-white font-sans">
+      <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/90 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-2 text-slate-300 hover:text-white transition-colors font-medium text-sm"
+          >
+            <ChevronLeft size={18} /> На главную
+          </button>
+          <img src="/assets/logo.svg" alt="НаКорте" className="h-10 sm:h-12 w-auto" />
+          <Button onClick={onRegister} size="sm" className="text-xs sm:text-sm px-3 sm:px-4">
+            Регистрация
+          </Button>
+        </div>
+      </header>
+
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(163,230,53,0.14),transparent_30%),radial-gradient(circle_at_left,rgba(59,130,246,0.12),transparent_24%)]" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12 md:pt-24 md:pb-14 grid lg:grid-cols-[0.9fr_1.1fr] gap-10 items-stretch">
+          <div className="flex flex-col h-full">
+            <span className="inline-flex items-center gap-2 text-lime-400 font-black uppercase tracking-[0.2em] text-xs mb-4">
+              <Users size={14} /> Сообщество теннисистов
+            </span>
+            <h1 className="text-4xl md:text-6xl font-black italic uppercase tracking-tight leading-none mb-5">
+              Теннисное
+              <span className="block text-lime-400">сообщество</span>
+            </h1>
+            <p className="text-slate-300 text-base md:text-lg leading-relaxed max-w-2xl mb-8">
+              НаКорте объединяет игроков, тренеров и любителей тенниса в одной ленте событий. Здесь можно следить за турнирами,
+              смотреть результаты матчей, вступать в группы, публиковать новости, искать игру и пользоваться барахолкой без перехода в другие сервисы.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Button size="lg" onClick={onRegister} className="shadow-xl shadow-lime-400/20">
+                Открыть сообщество
+              </Button>
+              <button
+                onClick={onBack}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-white/15 text-slate-200 hover:bg-white/5 transition-colors"
+              >
+                Вернуться <ArrowRight size={16} />
+              </button>
+            </div>
+
+            <div className="mt-8 rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-sm max-w-xl">
+              <div className="grid grid-cols-3 gap-3 mb-6">
+                <div className="rounded-2xl bg-slate-900/70 border border-white/10 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Разделы</div>
+                  <div className="text-2xl font-black text-white">5</div>
+                </div>
+                <div className="rounded-2xl bg-slate-900/70 border border-white/10 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Посты</div>
+                  <div className="text-2xl font-black text-white">Лента</div>
+                </div>
+                <div className="rounded-2xl bg-slate-900/70 border border-white/10 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Игроки</div>
+                  <div className="text-2xl font-black text-white">Топ</div>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-sm text-slate-300">
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>Фильтры по событиям помогают быстро перейти от новостей к матчам, группам, поиску игры и объявлениям.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>В ленте видны публикации администрации и игроков, а также результаты турниров с победителями и счётом.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>Карточки турниров, группы и топ-игроки делают сообщество полезным не только для чтения, но и для действий.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-5 h-full">
+            <div className="rounded-[30px] border border-white/10 bg-white/5 p-6 backdrop-blur-sm">
+              <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-4">Разделы сообщества</p>
+              <div className="flex flex-wrap gap-2 mb-6">
+                {categories.map((category, index) => (
+                  <div
+                    key={category}
+                    className={`rounded-full px-4 py-2.5 text-sm font-bold border ${index === 0 ? 'bg-lime-400 text-slate-950 border-lime-400' : 'bg-slate-900/60 text-slate-300 border-white/10'}`}
+                  >
+                    {category}
+                  </div>
+                ))}
+              </div>
+              <p className="text-slate-300 leading-relaxed">
+                Сообщество построено как единое пространство для общения и всех околотеннисных активностей. Пользователь выбирает нужный раздел
+                и сразу попадает к релевантному контенту: новостям, обсуждениям, группам, результатам матчей, поиску игры или объявлениям.
+              </p>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4 mt-auto">
+              {communitySections.map((section) => {
+                const Icon = section.icon;
+
+                return (
+                  <article key={section.title} className="rounded-[28px] border border-white/10 bg-slate-900/70 p-6 h-full">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-950 border border-white/10 flex items-center justify-center mb-5">
+                      <Icon className="text-lime-400" size={22} />
+                    </div>
+                    <h3 className="text-2xl font-black text-white mb-3 leading-tight">{section.title}</h3>
+                    <p className="text-slate-300 leading-relaxed">{section.description}</p>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-16 md:pt-10 md:pb-20">
+        <div className="grid md:grid-cols-3 gap-6 mb-16">
+          {advantages.map((advantage) => (
+            <article key={advantage} className="rounded-3xl border border-white/10 bg-white/5 p-7">
+              <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-white/10 flex items-center justify-center mb-5">
+                <Users className="text-lime-400" size={22} />
+              </div>
+              <p className="text-slate-300 leading-relaxed">{advantage}</p>
+            </article>
+          ))}
+        </div>
+
+        <div className="grid lg:grid-cols-[0.95fr_1.05fr] gap-8 items-stretch">
+          <div className="rounded-[32px] border border-white/10 bg-white/5 p-8 md:p-10 h-full">
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Как это работает</p>
+            <h2 className="text-3xl font-black tracking-tight mb-6">Все теннисные активности в одной ленте</h2>
+            <div className="space-y-4">
+              {steps.map((step, index) => (
+                <div key={step} className="flex items-start gap-4">
+                  <div className="w-9 h-9 rounded-full bg-lime-400 text-slate-950 flex items-center justify-center font-black flex-shrink-0">
+                    {index + 1}
+                  </div>
+                  <p className="text-slate-300 leading-relaxed pt-1">{step}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[32px] border border-white/10 bg-slate-900/70 p-8 md:p-10 h-full">
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Возможности сервиса</p>
+            <h2 className="text-3xl font-black tracking-tight mb-6">Что умеет раздел сообщества</h2>
+            <div className="space-y-5 text-slate-300 leading-relaxed">
+              <p>
+                Сообщество на платформе «НаКорте» — это единая лента, в которой объединены все важные события теннисной жизни.
+                Пользователь видит анонсы турниров, публикации администрации, результаты сыгранных матчей, посты игроков и тематические группы.
+              </p>
+              <p>
+                Раздел помогает не только читать новости, но и взаимодействовать: публиковать сообщения, обсуждать результаты, следить за топом игроков,
+                переходить к поиску игры и находить полезные объявления в барахолке. Это делает приложение живым и удерживает всю коммуникацию внутри одной платформы.
+              </p>
+              <p>
+                По структуре сообщество разделено на понятные категории: все события, группы, результаты матчей, поиск игры и барахолка.
+                Благодаря этому игрок быстро переключается между контентом и использует приложение как полноценную социальную среду для тенниса.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 grid lg:grid-cols-[1fr_auto] gap-8 items-center">
+          <div>
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Готовы начать?</p>
+            <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-3">Публикуйте события, следите за матчами и общайтесь внутри клуба</h2>
+            <p className="text-slate-400 max-w-2xl leading-relaxed">
+              Зарегистрируйтесь на «НаКорте» и получите доступ к ленте сообщества, группам, турнирным публикациям, поиску игры и барахолке.
+            </p>
+          </div>
+          <Button size="lg" onClick={onRegister} className="shadow-xl shadow-lime-400/20">
+            Перейти в сообщество
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function TennisDiaryInfoPage({ onBack, onRegister }: { onBack: () => void, onRegister: () => void }) {
+  const diaryBenefits = [
+    'Записывайте тренировки, матчи, цели и общий прогресс в одном личном пространстве без таблиц и сторонних заметок.',
+    'Фиксируйте настроение, оценку элементов игры, сильные и слабые стороны, чтобы видеть реальные изменения от недели к неделе.',
+    'Собирайте досье на соперников: покрытия, любимые паттерны, слабые зоны, поведение под давлением и рекомендации к следующему матчу.',
+  ];
+
+  const diarySteps = [
+    'Создайте запись после тренировки или матча, выберите тип события и кратко опишите, что получилось, а что стоит улучшить.',
+    'Оцените подачу, форхенд, бэкхенд, игру с лёта и передвижение, чтобы сформировать объективную картину текущей формы.',
+    'Добавьте настроение, наблюдения по сопернику и личные выводы — это превращает обычную заметку в рабочий инструмент анализа.',
+    'Возвращайтесь к прошлым записям перед тренировкой или турниром, чтобы видеть динамику и готовить более точный план действий.',
+  ];
+
+  const sections = [
+    {
+      title: 'Записи после матчей и тренировок',
+      text: 'Дневник помогает сохранять не только счёт или краткую заметку, но и контекст: над чем работали, какие решения сработали и какие ошибки повторялись.',
+      icon: FileText,
+    },
+    {
+      title: 'Оценка элементов игры',
+      text: 'Система оценок по подаче, форхенду, бэкхенду, игре у сетки и передвижению превращает ощущения игрока в понятную аналитику прогресса.',
+      icon: TrendingUp,
+    },
+    {
+      title: 'Досье на соперников',
+      text: 'Отдельный блок позволяет вести заметки по соперникам: стиль игры, любимые паттерны, слабые зоны, поведение в важных розыгрышах и рекомендации на следующий матч.',
+      icon: Target,
+    },
+    {
+      title: 'Мотивация и осознанность',
+      text: 'Записи по настроению, целям и ощущениям помогают игроку лучше понимать своё состояние и сохранять дисциплину между матчами и тренировками.',
+      icon: Heart,
+    },
+  ];
+
+  const diaryMetrics = [
+    { label: 'Типы записей', value: '4+' },
+    { label: 'Оценка игры', value: '5 зон' },
+    { label: 'Досье', value: 'По соперникам' },
+  ];
+
+  const quickNotes = [
+    'Что сработало в розыгрышах',
+    'Где терялась уверенность',
+    'Что взять в следующую тренировку',
+  ];
+
+  return (
+    <div className="min-h-screen bg-[#130f0b] text-white font-sans">
+      <header className="sticky top-0 z-20 border-b border-white/10 bg-[#130f0b]/90 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-2 text-slate-300 hover:text-white transition-colors font-medium text-sm"
+          >
+            <ChevronLeft size={18} /> На главную
+          </button>
+          <img src="/assets/logo.svg" alt="НаКорте" className="h-10 sm:h-12 w-auto" />
+          <Button onClick={onRegister} size="sm" className="text-xs sm:text-sm px-3 sm:px-4">
+            Регистрация
+          </Button>
+        </div>
+      </header>
+
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.12),transparent_28%),radial-gradient(circle_at_left,rgba(163,230,53,0.12),transparent_20%)]" />
+        <div className="absolute top-20 left-[8%] w-32 h-32 rounded-full bg-amber-300/10 blur-3xl animate-diary-float" />
+        <div className="absolute bottom-10 right-[10%] w-40 h-40 rounded-full bg-lime-300/10 blur-3xl animate-diary-float" style={{ animationDelay: '1.5s' }} />
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12 md:pt-24 md:pb-16 flex flex-col gap-5 md:gap-6">
+          <div className="grid lg:grid-cols-[0.92fr_1.08fr] gap-10 items-stretch">
+            <div className="flex flex-col h-full">
+            <span className="inline-flex items-center gap-2 text-lime-400 font-black uppercase tracking-[0.2em] text-xs mb-4">
+              <FileText size={14} /> Личный дневник игрока
+            </span>
+            <h1 className="text-4xl md:text-6xl font-black italic uppercase tracking-tight leading-none mb-5">
+              Дневник
+              <span className="block text-lime-400">теннисиста</span>
+            </h1>
+            <p className="text-slate-300 text-base md:text-lg leading-relaxed max-w-2xl mb-8">
+              Дневник теннисиста на платформе «НаКорте» помогает не просто сохранять записи, а системно анализировать игру. Здесь можно фиксировать
+              тренировки, матчи, настроение, уровень выполнения элементов, заметки по соперникам и личные выводы, чтобы каждый следующий выход на корт был осознаннее.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Button size="lg" onClick={onRegister} className="shadow-xl shadow-lime-400/20 animate-diary-glow">
+                Открыть дневник
+              </Button>
+              <button
+                onClick={onBack}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-white/15 text-slate-200 hover:bg-white/5 transition-colors"
+              >
+                Вернуться <ArrowRight size={16} />
+              </button>
+            </div>
+
+            <div className="mt-8 rounded-[30px] border border-amber-200/10 bg-white/5 p-6 backdrop-blur-sm max-w-xl">
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                {diaryMetrics.map((metric, index) => (
+                  <div key={metric.label} className={`min-w-0 rounded-2xl bg-slate-950/50 border border-white/10 p-4 ${index === 2 ? 'col-span-2' : ''}`}>
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">{metric.label}</div>
+                    <div
+                      className={`font-black text-white ${
+                        metric.value === 'По соперникам'
+                          ? 'leading-none'
+                          : `leading-tight ${metric.value.length > 8 ? 'text-lg sm:text-xl md:text-2xl' : 'text-2xl'}`
+                      }`}
+                    >
+                      {metric.value === 'По соперникам' ? (
+                        <div className="max-w-full text-[clamp(1.35rem,3vw,2.5rem)] tracking-tight">
+                          <span className="block">По</span>
+                          <span className="block whitespace-nowrap">соперникам</span>
+                        </div>
+                      ) : (
+                        metric.value
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-3 text-sm text-slate-300">
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>Каждая запись помогает закрепить выводы сразу после игры, пока ощущения ещё свежие и точные.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>История записей показывает, как меняется техника, уверенность и качество решений на дистанции.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>Досье на соперников делает подготовку к матчам предметной и помогает не терять важные наблюдения.</p>
+                </div>
+              </div>
+            </div>
+            </div>
+
+            <div className="relative flex flex-col h-full">
+              <div className="absolute inset-x-6 top-6 h-20 bg-gradient-to-r from-amber-300/10 via-lime-300/10 to-transparent blur-3xl pointer-events-none" />
+
+              <div className="relative rounded-[34px] border border-white/10 bg-[linear-gradient(180deg,rgba(43,30,20,0.95),rgba(24,18,13,0.98))] p-6 md:p-8 shadow-[0_24px_100px_rgba(0,0,0,0.38)] overflow-hidden animate-diary-float h-full">
+                <div className="absolute inset-0 opacity-40 bg-[linear-gradient(135deg,rgba(255,255,255,0.08),transparent_40%,rgba(163,230,53,0.06))] animate-diary-shimmer" />
+                <div className="relative flex items-start justify-between gap-4 mb-6">
+                  <div>
+                    <p className="text-amber-200/70 text-[11px] font-black uppercase tracking-[0.25em] mb-2">Новый визуал страницы</p>
+                    <h2 className="text-3xl font-black tracking-tight">Личный журнал игрока</h2>
+                  </div>
+                  <div className="w-14 h-14 rounded-2xl bg-lime-400/15 border border-lime-300/20 flex items-center justify-center">
+                    <FileText className="text-lime-300" size={24} />
+                  </div>
+                </div>
+
+                <div className="grid 2xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-4 items-start">
+                  <div className="min-w-0 rounded-[26px] bg-[#f6f1e8] text-slate-900 p-5 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-black mb-1">Запись дня</div>
+                        <div className="text-xl sm:text-2xl font-black leading-tight">Матч против агрессивного соперника</div>
+                      </div>
+                      <div className="w-11 h-11 rounded-2xl bg-lime-100 text-lime-700 flex items-center justify-center">
+                        <Calendar size={20} />
+                      </div>
+                    </div>
+                    <div className="space-y-3 text-sm leading-relaxed text-slate-700">
+                      <p>Сегодня лучше работала подача в тело и перевод по диагонали под форхенд соперника.</p>
+                      <p>На важных мячах не хватало глубины с бэкхенда, из-за чего приходилось защищаться.</p>
+                      <p>На следующей тренировке сделать акцент на первом ударе после подачи и на игре под давлением.</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 min-w-0">
+                    <div className="grid grid-cols-1 gap-4">
+                      <div className="min-w-0 rounded-[24px] border border-white/10 bg-slate-950/45 p-4 sm:p-5">
+                        <div className="flex items-center gap-2 text-slate-400 text-xs font-black uppercase tracking-[0.15em] mb-3">
+                          <TrendingUp size={14} className="text-lime-400" /> Прогресс
+                        </div>
+                        <div className="space-y-2.5 text-[15px] sm:text-base">
+                          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4"><span className="text-slate-400 min-w-0">Подача</span><span className="font-black text-white shrink-0">8/10</span></div>
+                          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4"><span className="text-slate-400 min-w-0">Форхенд</span><span className="font-black text-white shrink-0">7/10</span></div>
+                          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4"><span className="text-slate-400 min-w-0">Передвижение</span><span className="font-black text-white shrink-0">6/10</span></div>
+                        </div>
+                      </div>
+                      <div className="min-w-0 rounded-[24px] border border-white/10 bg-slate-950/45 p-4 sm:p-5">
+                        <div className="flex items-center gap-2 text-slate-400 text-xs font-black uppercase tracking-[0.15em] mb-3">
+                          <Heart size={14} className="text-pink-400" /> Состояние
+                        </div>
+                        <div className="text-[28px] sm:text-[32px] font-black text-white mb-3 leading-none">Хорошее</div>
+                        <p className="text-[15px] sm:text-base text-slate-400 leading-relaxed max-w-none">Спокойный настрой до матча и уверенность в длинных розыгрышах.</p>
+                      </div>
+                    </div>
+
+                    <div className="min-w-0 rounded-[24px] border border-white/10 bg-slate-950/45 p-5">
+                      <div className="flex items-center justify-between gap-3 mb-4">
+                        <div className="min-w-0">
+                          <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-1">Досье на соперника</div>
+                          <div className="text-lg sm:text-xl font-black text-white leading-tight">Алексей Смирнов</div>
+                        </div>
+                        <div className="w-11 h-11 rounded-2xl bg-amber-400/10 text-amber-300 flex items-center justify-center">
+                          <Target size={20} />
+                        </div>
+                      </div>
+                      <div className="grid 2xl:grid-cols-2 gap-3 text-sm">
+                        <div className="rounded-2xl bg-white/5 p-4 border border-white/10">
+                          <div className="text-slate-500 text-[10px] uppercase tracking-[0.15em] font-black mb-2">Сильные стороны</div>
+                          <p className="text-slate-300 leading-relaxed">Плотный форхенд, активный приём второй подачи, быстрый вход в корт.</p>
+                        </div>
+                        <div className="rounded-2xl bg-white/5 p-4 border border-white/10">
+                          <div className="text-slate-500 text-[10px] uppercase tracking-[0.15em] font-black mb-2">Слабые зоны</div>
+                          <p className="text-slate-300 leading-relaxed">Низкий мяч под бэкхенд, нестабильность в длинных розыгрышах, ошибки под давлением.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid xl:grid-cols-[0.92fr_1.08fr] gap-4 items-start">
+            <div className="rounded-[26px] border border-amber-200/10 bg-white/5 p-5 backdrop-blur-sm h-full">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-amber-200/70 font-black mb-1">Быстрый шаблон записи</div>
+                  <div className="text-xl font-black text-white">Что зафиксировать сразу после матча</div>
+                </div>
+                <div className="w-11 h-11 rounded-2xl bg-lime-400/10 text-lime-300 flex items-center justify-center shrink-0">
+                  <Check size={20} />
+                </div>
+              </div>
+              <div className="grid sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3 gap-3">
+                {quickNotes.map((note, index) => (
+                  <div key={note} className="rounded-2xl border border-white/10 bg-slate-950/45 px-4 py-4">
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Пункт {index + 1}</div>
+                    <p className="text-slate-300 leading-relaxed">{note}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid xl:grid-cols-2 gap-4">
+              {sections.map((section, index) => {
+                const Icon = section.icon;
+
+                return (
+                  <article
+                    key={section.title}
+                    className={`rounded-[28px] border border-white/10 p-6 backdrop-blur-sm transition-transform duration-300 hover:-translate-y-1 ${index % 2 === 0 ? 'bg-[#201812]/85' : 'bg-[#17130f]/85'}`}
+                  >
+                    <div className="w-12 h-12 rounded-2xl bg-slate-950/70 border border-white/10 flex items-center justify-center mb-5">
+                      <Icon className="text-lime-400" size={22} />
+                    </div>
+                    <h3 className="text-2xl font-black text-white mb-3 leading-tight">{section.title}</h3>
+                    <p className="text-slate-300 leading-relaxed">{section.text}</p>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-16 md:pt-10 md:pb-20">
+        <div className="grid md:grid-cols-3 gap-6 mb-16">
+          {diaryBenefits.map((benefit) => (
+            <article key={benefit} className="rounded-3xl border border-white/10 bg-white/5 p-7 backdrop-blur-sm">
+              <div className="w-12 h-12 rounded-2xl bg-slate-950 border border-white/10 flex items-center justify-center mb-5">
+                <FileText className="text-lime-400" size={22} />
+              </div>
+              <p className="text-slate-300 leading-relaxed">{benefit}</p>
+            </article>
+          ))}
+        </div>
+
+        <div className="grid lg:grid-cols-[0.95fr_1.05fr] gap-8 items-stretch">
+          <div className="rounded-[32px] border border-white/10 bg-white/5 p-8 md:p-10 h-full backdrop-blur-sm">
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Как это работает</p>
+            <h2 className="text-3xl font-black tracking-tight mb-6">Системный подход к развитию игрока</h2>
+            <div className="space-y-4">
+              {diarySteps.map((step, index) => (
+                <div key={step} className="flex items-start gap-4">
+                  <div className="w-9 h-9 rounded-full bg-lime-400 text-slate-950 flex items-center justify-center font-black flex-shrink-0">
+                    {index + 1}
+                  </div>
+                  <p className="text-slate-300 leading-relaxed pt-1">{step}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[32px] border border-amber-200/10 bg-slate-900/70 p-8 md:p-10 h-full">
+            <p className="text-amber-300 text-xs font-black uppercase tracking-[0.2em] mb-3">Возможности сервиса</p>
+            <h2 className="text-3xl font-black tracking-tight mb-6">Что даёт дневник теннисиста в реальной игре</h2>
+            <div className="space-y-5 text-slate-300 leading-relaxed">
+              <p>
+                Дневник теннисиста на платформе «НаКорте» нужен тем, кто хочет прогрессировать не хаотично, а осмысленно. Он помогает сохранять опыт
+                после каждой тренировки или матча, чтобы не терять важные наблюдения и постепенно превращать их в игровые решения.
+              </p>
+              <p>
+                Для пользователя это удобный личный журнал: здесь можно быстро записать ощущения, оценить качество ударов, отметить эмоциональное состояние,
+                зафиксировать цели и сделать выводы на следующую сессию. Такой подход особенно полезен, когда игрок занимается регулярно и хочет видеть реальную динамику.
+              </p>
+              <p>
+                Отдельная ценность дневника — блок досье на соперников. Он помогает помнить стиль игры конкретного человека, его сильные и слабые стороны,
+                покрытие, паттерны подачи и поведение в напряжённых моментах. Перед следующим матчем игрок получает уже не интуитивную, а подготовленную стратегию.
+              </p>
+              <p>
+                Эта страница оформлена иначе, чем другие разделы: визуал ближе к личному спортивному журналу с тёплыми акцентами, карточками заметок и мягкими анимациями.
+                Такой стиль поддерживает идею вдумчивой работы над собой и делает инструмент более живым и эмоциональным.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 grid lg:grid-cols-[1fr_auto] gap-8 items-center">
+          <div>
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Готовы начать?</p>
+            <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-3">Сохраняйте матчи, тренировки и мысли в одном личном дневнике</h2>
+            <p className="text-slate-400 max-w-2xl leading-relaxed">
+              Зарегистрируйтесь на «НаКорте», фиксируйте игровой прогресс, собирайте досье на соперников и превращайте каждую запись в понятный шаг к более сильной игре.
+            </p>
+          </div>
+          <Button size="lg" onClick={onRegister} className="shadow-xl shadow-lime-400/20 animate-diary-glow">
+            Перейти к дневнику
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function Tactics3DInfoPage({ onBack, onRegister }: { onBack: () => void, onRegister: () => void }) {
+  const capabilities = [
+    'Интерактивный 3D-корт помогает рисовать тактические схемы прямо поверх игровой зоны и видеть розыгрыш целиком.',
+    'Пользователь меняет цвет траекторий, задаёт низкую или высокую дугу мяча и быстро очищает схему для новой комбинации.',
+    'Сервис подходит для разбора подач, возвратов, выходов к сетке, игры по диагонали и сценариев против конкретного соперника.',
+  ];
+
+  const steps = [
+    'Откройте 3D-тактику в личном кабинете и выберите участок корта, который хотите разобрать.',
+    'Нарисуйте траектории ударов на интерактивном корте, меняя цвет и тип дуги для разных сценариев.',
+    'Соберите комбинацию из подачи, первого удара, перехода к сетке или защитного розыгрыша.',
+    'Сохраните идею для разбора с тренером или очистите схему и быстро постройте новый вариант тактики.',
+  ];
+
+  const examples = [
+    {
+      title: 'Подача + первый удар',
+      description: 'Разберите, куда подавать, как открывать корт следующим ударом и где завершать атаку.',
+      accent: 'from-lime-400/20 to-emerald-400/5',
+    },
+    {
+      title: 'Розыгрыш против левши',
+      description: 'Постройте сценарий под конкретного соперника и посмотрите, как менять направления и высоту мяча.',
+      accent: 'from-sky-400/20 to-indigo-400/5',
+    },
+    {
+      title: 'Выход к сетке',
+      description: 'Смоделируйте короткий мяч, подход, позицию у сетки и завершающий удар по свободной зоне.',
+      accent: 'from-amber-400/20 to-orange-400/5',
+    },
+  ];
+
+  return (
+    <div className="min-h-screen bg-[#06111a] text-white font-sans">
+      <header className="sticky top-0 z-20 border-b border-white/10 bg-[#06111a]/90 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-2 text-slate-300 hover:text-white transition-colors font-medium text-sm"
+          >
+            <ChevronLeft size={18} /> На главную
+          </button>
+          <img src="/assets/logo.svg" alt="НаКорте" className="h-10 sm:h-12 w-auto" />
+          <Button onClick={onRegister} size="sm" className="text-xs sm:text-sm px-3 sm:px-4">
+            Регистрация
+          </Button>
+        </div>
+      </header>
+
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,197,94,0.16),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(56,189,248,0.16),transparent_24%)]" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12 md:pt-24 md:pb-16 grid lg:grid-cols-[0.92fr_1.08fr] gap-10 items-stretch">
+          <div className="flex flex-col h-full">
+            <span className="inline-flex items-center gap-2 text-lime-400 font-black uppercase tracking-[0.2em] text-xs mb-4">
+              <Activity size={14} /> 3D разбор тактики
+            </span>
+            <h1 className="text-4xl md:text-6xl font-black italic uppercase tracking-tight leading-none mb-5">
+              3D
+              <span className="block text-lime-400">тактика</span>
+            </h1>
+            <p className="text-slate-300 text-base md:text-lg leading-relaxed max-w-2xl mb-8">
+              НаКорте даёт интерактивный 3D-корт для визуального разбора розыгрышей. Игрок или тренер может рисовать траектории,
+              моделировать комбинации и быстро объяснять, как строить атаку, защищаться и занимать правильные позиции на корте.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Button size="lg" onClick={onRegister} className="shadow-xl shadow-lime-400/20">
+                Открыть 3D тактику
+              </Button>
+              <button
+                onClick={onBack}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-white/15 text-slate-200 hover:bg-white/5 transition-colors"
+              >
+                Вернуться <ArrowRight size={16} />
+              </button>
+            </div>
+
+            <div className="mt-8 rounded-[30px] border border-cyan-400/15 bg-white/5 p-6 backdrop-blur-sm max-w-xl">
+              <div className="grid grid-cols-3 gap-3 mb-6">
+                <div className="rounded-2xl bg-slate-950/60 border border-white/10 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Режим</div>
+                  <div className="text-2xl font-black text-white">3D</div>
+                </div>
+                <div className="rounded-2xl bg-slate-950/60 border border-white/10 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Траектории</div>
+                  <div className="text-2xl font-black text-white">Цвет + дуга</div>
+                </div>
+                <div className="rounded-2xl bg-slate-950/60 border border-white/10 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Сценарии</div>
+                  <div className="text-2xl font-black text-white">Матч</div>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-sm text-slate-300">
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>Разбирайте тактику не словами, а визуально — прямо на корте в перспективе.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>Показывайте направления мяча, смену ритма и высоту удара для каждого участка розыгрыша.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>Используйте инструмент для самостоятельного анализа и для работы с тренером.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[34px] border border-cyan-300/10 bg-[linear-gradient(180deg,rgba(8,21,32,0.95),rgba(5,12,20,0.98))] p-6 md:p-8 shadow-[0_24px_120px_rgba(0,0,0,0.35)] overflow-hidden">
+            <div className="flex items-center justify-between gap-4 mb-6">
+              <div>
+                <p className="text-cyan-300 text-[11px] font-black uppercase tracking-[0.25em] mb-2">Новый визуал</p>
+                <h2 className="text-3xl font-black tracking-tight">Тактический конструктор</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-lime-400" />
+                <div className="w-3 h-3 rounded-full bg-cyan-400" />
+                <div className="w-3 h-3 rounded-full bg-white" />
+              </div>
+            </div>
+
+            <div className="relative rounded-[28px] border border-cyan-300/10 bg-[#0b1c28] p-5 md:p-6 overflow-hidden">
+              <div className="absolute inset-0 opacity-30 bg-[linear-gradient(0deg,transparent_24%,rgba(148,163,184,0.22)_25%,transparent_26%,transparent_49%,rgba(148,163,184,0.18)_50%,transparent_51%,transparent_74%,rgba(148,163,184,0.22)_75%,transparent_76%),linear-gradient(90deg,transparent_24%,rgba(148,163,184,0.18)_25%,transparent_26%,transparent_49%,rgba(148,163,184,0.12)_50%,transparent_51%,transparent_74%,rgba(148,163,184,0.18)_75%,transparent_76%)] bg-[length:72px_72px]" />
+              <div className="relative aspect-[1.15/1] rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_center,rgba(58,130,80,0.95),rgba(39,90,61,0.98))] overflow-hidden">
+                <div className="absolute inset-[8%] border-2 border-white/80 rounded-[18px]" />
+                <div className="absolute left-1/2 top-[8%] bottom-[8%] w-px bg-white/70 -translate-x-1/2" />
+                <div className="absolute left-[18%] right-[18%] top-1/2 h-px bg-white/80 -translate-y-1/2" />
+                <div className="absolute left-1/2 top-[8%] bottom-[8%] w-[3px] bg-white/80 -translate-x-1/2 opacity-80" />
+
+                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <path d="M18 78 C 28 62, 38 57, 50 50" stroke="#22d3ee" strokeWidth="2.6" fill="none" strokeDasharray="6 4" strokeLinecap="round" />
+                  <path d="M50 50 C 63 44, 74 34, 82 22" stroke="#a3e635" strokeWidth="2.8" fill="none" strokeDasharray="7 5" strokeLinecap="round" />
+                  <path d="M20 20 C 34 28, 42 36, 50 50" stroke="#ffffff" strokeWidth="2.2" fill="none" strokeDasharray="5 5" strokeLinecap="round" opacity="0.95" />
+                </svg>
+
+                <div className="absolute left-[16%] top-[74%] w-4 h-4 rounded-full bg-cyan-400 shadow-[0_0_18px_rgba(34,211,238,0.8)]" />
+                <div className="absolute left-[48%] top-[48%] w-4 h-4 rounded-full bg-white shadow-[0_0_18px_rgba(255,255,255,0.7)]" />
+                <div className="absolute right-[14%] top-[18%] w-4 h-4 rounded-full bg-lime-400 shadow-[0_0_18px_rgba(163,230,53,0.8)]" />
+
+                <div className="absolute right-4 bottom-4 rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 backdrop-blur-sm">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-1">Комбинация</div>
+                  <div className="text-sm font-bold text-white">Подача → открытие корта → выход к сетке</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-4 mt-5">
+              {examples.map((example) => (
+                <article key={example.title} className={`rounded-[24px] border border-white/10 bg-gradient-to-br ${example.accent} p-5`}>
+                  <div className="w-11 h-11 rounded-2xl bg-slate-950/70 border border-white/10 flex items-center justify-center mb-4">
+                    <Map className="text-lime-400" size={20} />
+                  </div>
+                  <h3 className="text-lg font-black text-white mb-2 leading-tight">{example.title}</h3>
+                  <p className="text-slate-300 text-sm leading-relaxed">{example.description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-16 md:pt-10 md:pb-20">
+        <div className="grid md:grid-cols-3 gap-6 mb-16">
+          {capabilities.map((capability) => (
+            <article key={capability} className="rounded-3xl border border-white/10 bg-white/5 p-7 backdrop-blur-sm">
+              <div className="w-12 h-12 rounded-2xl bg-slate-950 border border-white/10 flex items-center justify-center mb-5">
+                <Activity className="text-lime-400" size={22} />
+              </div>
+              <p className="text-slate-300 leading-relaxed">{capability}</p>
+            </article>
+          ))}
+        </div>
+
+        <div className="grid lg:grid-cols-[0.95fr_1.05fr] gap-8 items-stretch">
+          <div className="rounded-[32px] border border-white/10 bg-white/5 p-8 md:p-10 h-full backdrop-blur-sm">
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Как это работает</p>
+            <h2 className="text-3xl font-black tracking-tight mb-6">От идеи до тактической схемы за несколько действий</h2>
+            <div className="space-y-4">
+              {steps.map((step, index) => (
+                <div key={step} className="flex items-start gap-4">
+                  <div className="w-9 h-9 rounded-full bg-lime-400 text-slate-950 flex items-center justify-center font-black flex-shrink-0">
+                    {index + 1}
+                  </div>
+                  <p className="text-slate-300 leading-relaxed pt-1">{step}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[32px] border border-cyan-300/10 bg-slate-900/70 p-8 md:p-10 h-full">
+            <p className="text-cyan-300 text-xs font-black uppercase tracking-[0.2em] mb-3">Возможности сервиса</p>
+            <h2 className="text-3xl font-black tracking-tight mb-6">Что даёт 3D-тактика игроку и тренеру</h2>
+            <div className="space-y-5 text-slate-300 leading-relaxed">
+              <p>
+                3D-тактика на платформе «НаКорте» позволяет разбирать розыгрыши в пространстве, а не только в теории. Вместо абстрактных объяснений
+                пользователь видит корт, направления мяча и порядок действий, что делает анализ быстрее и нагляднее.
+              </p>
+              <p>
+                Инструмент особенно полезен для подготовки к матчу, разбора ошибок после игры и постановки задач на тренировку. Можно показать,
+                как открывать корт, куда направлять мяч после подачи, в какой момент идти к сетке и как перестраиваться в обороне.
+              </p>
+              <p>
+                Визуал страницы построен в стилистике цифрового тактического экрана: с неоновыми траекториями, схемой корта и акцентом
+                на интерактивный разбор игровых ситуаций. Это помогает сразу передать ощущение анализа розыгрыша прямо внутри сервиса.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 grid lg:grid-cols-[1fr_auto] gap-8 items-center">
+          <div>
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Готовы начать?</p>
+            <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-3">Разбирайте розыгрыши и собирайте игровые схемы на 3D-корте</h2>
+            <p className="text-slate-400 max-w-2xl leading-relaxed">
+              Зарегистрируйтесь на «НаКорте» и получите доступ к интерактивной 3D-тактике для анализа матчей, подготовки к соперникам и совместной работы с тренером.
+            </p>
+          </div>
+          <Button size="lg" onClick={onRegister} className="shadow-xl shadow-lime-400/20">
+            Перейти к 3D тактике
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function AmateurTournamentsPage({ onBack, onRegister }: { onBack: () => void, onRegister: () => void }) {
+  const advantages = [
+    'Бросайте вызовы игрокам рядом с вами по уровню и двигайтесь вверх по турнирной лестнице клуба.',
+    'Получайте очки за победы, активность и сыгранные матчи, чтобы расти в любительском рейтинге.',
+    'Используйте отдельные режимы для клубного ладдера, спаррингов и отслеживания рейтинга РТТ.',
+  ];
+
+  const steps = [
+    'Откройте раздел турниров и выберите формат: клубный рейтинг, спарринг или рейтинг РТТ.',
+    'Найдите игрока в таблице, посмотрите его позицию и отправьте вызов на матч в пару касаний.',
+    'Сыграйте матч, подтвердите результат и получите очки для продвижения по турнирной лестнице.',
+    'Следите за своим местом в любительском рейтинге и отдельно сравнивайте себя с игроками по данным РТТ.',
+  ];
+
+  const rankingRows = [
+    { place: 1, name: 'Роман Новиков', points: '1 480', trend: '+2', accent: 'text-amber-500' },
+    { place: 2, name: 'Александр К.', points: '1 420', trend: '+1', accent: 'text-slate-900' },
+    { place: 3, name: 'Игорь Петров', points: '1 390', trend: '—', accent: 'text-slate-900' },
+    { place: 8, name: 'Вы', points: '1 180', trend: '+3', accent: 'text-lime-500' },
+  ];
+
+  const challengeActions = [
+    'Рейтинговый матч — влияет на место в лестнице и клубные очки.',
+    'Спарринг — быстрый вызов для игровой практики без давления турнирной сетки.',
+    'Матч с игроком РТТ — помогает ориентироваться на официальный рейтинг и уровень соперника.',
+  ];
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-white font-sans">
+      <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/90 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-2 text-slate-300 hover:text-white transition-colors font-medium text-sm"
+          >
+            <ChevronLeft size={18} /> На главную
+          </button>
+          <img src="/assets/logo.svg" alt="НаКорте" className="h-10 sm:h-12 w-auto" />
+          <Button onClick={onRegister} size="sm" className="text-xs sm:text-sm px-3 sm:px-4">
+            Регистрация
+          </Button>
+        </div>
+      </header>
+
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.18),transparent_30%),radial-gradient(circle_at_left,rgba(163,230,53,0.12),transparent_24%)]" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12 md:pt-24 md:pb-14 grid lg:grid-cols-[0.95fr_1.05fr] gap-10 items-stretch">
+          <div className="flex flex-col h-full">
+            <span className="inline-flex items-center gap-2 text-lime-400 font-black uppercase tracking-[0.2em] text-xs mb-4">
+              <Trophy size={14} /> Любительские турниры и ладдер
+            </span>
+            <h1 className="text-4xl md:text-6xl font-black italic uppercase tracking-tight leading-none mb-5">
+              Любительские
+              <span className="block text-lime-400">турниры</span>
+            </h1>
+            <p className="text-slate-300 text-base md:text-lg leading-relaxed max-w-2xl mb-8">
+              НаКорте объединяет клубную турнирную лестницу, спарринги и отслеживание рейтингов в одном разделе.
+              Игрок может бросать вызовы соперникам, зарабатывать очки, подниматься по ладдеру и отдельно смотреть,
+              как соотносится его прогресс с любительским и РТТ-рейтингом.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Button size="lg" onClick={onRegister} className="shadow-xl shadow-lime-400/20">
+                Открыть турниры
+              </Button>
+              <button
+                onClick={onBack}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-white/15 text-slate-200 hover:bg-white/5 transition-colors"
+              >
+                Вернуться <ArrowRight size={16} />
+              </button>
+            </div>
+
+            <div className="mt-8 rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-sm max-w-xl">
+              <div className="grid grid-cols-3 gap-3 mb-6">
+                <div className="rounded-2xl bg-slate-900/70 border border-white/10 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Форматы</div>
+                  <div className="text-2xl font-black text-white">3</div>
+                </div>
+                <div className="rounded-2xl bg-slate-900/70 border border-white/10 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Очки</div>
+                  <div className="text-2xl font-black text-white">ELO</div>
+                </div>
+                <div className="rounded-2xl bg-slate-900/70 border border-white/10 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Вызовы</div>
+                  <div className="text-2xl font-black text-white">24/7</div>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-sm text-slate-300">
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>Вызов сопернику из таблицы рейтинга или через отдельный сценарий спарринга.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>Рост в турнирной лестнице за счёт побед и активности в клубных матчах.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>Параллельный просмотр любительского рейтинга и данных РТТ для более точной оценки уровня.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col h-full gap-5">
+            <div className="rounded-[34px] border border-amber-500/20 bg-[#0b0c0f] p-7 overflow-hidden relative shadow-[0_20px_80px_rgba(0,0,0,0.35)]">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(250,204,21,0.18),transparent_24%),radial-gradient(circle_at_85%_20%,rgba(251,146,60,0.14),transparent_22%)]" />
+              <div className="relative flex items-center justify-between gap-4 mb-8">
+                <div>
+                  <div className="inline-flex items-center gap-2 mb-3 bg-amber-500/15 px-4 py-1.5 rounded-full border border-amber-500/20 w-fit text-amber-100 text-[10px] font-black uppercase tracking-[0.25em]">
+                    <div className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Diamond Season
+                  </div>
+                  <h2 className="text-4xl sm:text-5xl font-black italic uppercase tracking-tighter leading-none text-white">
+                    Road to <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-100 via-amber-400 to-amber-200">#1</span>
+                  </h2>
+                  <p className="text-amber-200/40 text-[10px] font-bold uppercase tracking-[0.35em] mt-2">Турнирная лестница клуба</p>
+                </div>
+                <div className="hidden md:flex items-center gap-4 rounded-[26px] border border-white/10 bg-white/5 px-5 py-4">
+                  <div className="text-right">
+                    <div className="text-[9px] font-black uppercase tracking-[0.25em] text-amber-500/70 mb-1">Лидер сезона</div>
+                    <div className="text-xl font-black italic text-amber-300">Александр К.</div>
+                  </div>
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-200 via-amber-500 to-orange-500 flex items-center justify-center">
+                    <Crown size={28} className="text-slate-950" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:grid sm:grid-cols-[1fr_auto] sm:gap-4 items-start sm:items-center">
+                <div className="grid w-full grid-cols-3 gap-2 pb-1">
+                  <div className="min-w-0 px-2.5 py-3 rounded-2xl bg-lime-400 text-slate-950 text-[12px] sm:text-sm font-black text-center leading-tight">
+                    Клубный рейтинг
+                  </div>
+                  <div className="min-w-0 px-2.5 py-3 rounded-2xl bg-white/5 border border-white/10 text-slate-300 text-[12px] sm:text-sm font-bold text-center leading-tight">
+                    Вызовы
+                  </div>
+                  <div className="min-w-0 px-2.5 py-3 rounded-2xl bg-white/5 border border-white/10 text-slate-300 text-[12px] sm:text-sm font-bold text-center leading-tight">
+                    Рейтинг РТТ
+                  </div>
+                </div>
+                <div className="pl-1 sm:pl-0 text-[11px] sm:text-xs text-slate-500 font-bold uppercase tracking-[0.2em] whitespace-nowrap">
+                  Обновлено сегодня
+                </div>
+              </div>
+            </div>
+
+            <div className="grid xl:grid-cols-[1.1fr_0.9fr] gap-5 mt-auto">
+              <div className="rounded-[30px] border border-white/10 bg-white p-4 text-slate-900 shadow-sm overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-3 border-b border-slate-100 mb-2">
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Турнирная таблица</div>
+                    <h3 className="text-xl font-black mt-1">Лидерборд сезона</h3>
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-500">
+                    <Medal size={14} className="text-amber-500" /> Club ELO
+                  </div>
+                </div>
+                <div className="space-y-2 p-2">
+                  {rankingRows.map((row) => (
+                    <div key={row.name} className="grid grid-cols-[56px_1fr_auto_auto] gap-3 items-center rounded-2xl border border-slate-100 px-4 py-3">
+                      <div className={`text-lg font-black ${row.place <= 3 ? 'text-amber-500' : 'text-slate-400'}`}>#{row.place}</div>
+                      <div>
+                        <div className={`font-bold ${row.accent}`}>{row.name}</div>
+                        <div className="text-xs text-slate-400">Любительский рейтинг клуба</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-black">Очки</div>
+                        <div className="font-black text-slate-900">{row.points}</div>
+                      </div>
+                      <div className={`text-sm font-black ${row.trend.startsWith('+') ? 'text-lime-500' : 'text-slate-400'}`}>{row.trend}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-[30px] border border-white/10 bg-slate-900/80 p-5">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.22em] text-lime-400">Матчмейкинг</div>
+                    <h3 className="text-2xl font-black mt-1">Бросить вызов</h3>
+                  </div>
+                  <div className="w-12 h-12 rounded-2xl bg-lime-400 text-slate-950 flex items-center justify-center">
+                    <MessageSquare size={20} />
+                  </div>
+                </div>
+
+                <div className="rounded-[24px] border border-white/10 bg-white/5 p-4 mb-4">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div>
+                      <div className="font-bold text-white">Сергей Иванов</div>
+                      <div className="text-xs text-slate-400">Позиция #5 • RTT 3.5</div>
+                    </div>
+                    <div className="px-3 py-2 rounded-xl bg-amber-500/15 text-amber-300 text-xs font-bold">Подходит по уровню</div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60 px-3 py-3">
+                      <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-1">Формат</div>
+                      <div className="max-w-full text-[15px] sm:text-base font-bold text-white leading-tight">
+                        <span className="block">Рейтинговый</span>
+                        <span className="block">матч</span>
+                      </div>
+                    </div>
+                    <div className="min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60 px-3 py-3">
+                      <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-1">Когда</div>
+                      <div className="max-w-full text-[14px] sm:text-base font-bold text-white leading-tight">
+                        <span className="block whitespace-nowrap">Сегодня,</span>
+                        <span className="block whitespace-nowrap">19:30</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 mb-5">
+                  {challengeActions.map((action) => (
+                    <div key={action} className="flex items-start gap-3 text-sm text-slate-300">
+                      <Check className="text-lime-400 mt-0.5 shrink-0" size={17} />
+                      <p>{action}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <button className="w-full bg-lime-400 text-slate-950 font-black py-4 rounded-2xl shadow-lg shadow-lime-400/20">
+                  Отправить вызов
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-16 md:pt-10 md:pb-20">
+        <div className="grid md:grid-cols-3 gap-6 mb-16">
+          {advantages.map((advantage) => (
+            <article key={advantage} className="rounded-3xl border border-white/10 bg-white/5 p-7">
+              <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-white/10 flex items-center justify-center mb-5">
+                <Trophy className="text-lime-400" size={22} />
+              </div>
+              <p className="text-slate-300 leading-relaxed">{advantage}</p>
+            </article>
+          ))}
+        </div>
+
+        <div className="grid lg:grid-cols-[0.95fr_1.05fr] gap-8 items-stretch">
+          <div className="rounded-[32px] border border-white/10 bg-white/5 p-8 md:p-10 h-full">
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Как это работает</p>
+            <h2 className="text-3xl font-black tracking-tight mb-6">От вызова до роста в рейтинге</h2>
+            <div className="space-y-4">
+              {steps.map((step, index) => (
+                <div key={step} className="flex items-start gap-4">
+                  <div className="w-9 h-9 rounded-full bg-lime-400 text-slate-950 flex items-center justify-center font-black flex-shrink-0">
+                    {index + 1}
+                  </div>
+                  <p className="text-slate-300 leading-relaxed pt-1">{step}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[32px] border border-white/10 bg-slate-900/70 p-8 md:p-10 h-full">
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Возможности сервиса</p>
+            <h2 className="text-3xl font-black tracking-tight mb-6">Что дают любительские турниры на НаКорте</h2>
+            <div className="space-y-5 text-slate-300 leading-relaxed">
+              <p>
+                Раздел любительских турниров позволяет игроку не просто искать соперников, а участвовать в постоянной соревновательной
+                системе. Вы видите турнирную лестницу клуба, текущее место, прирост очков и можете выбирать, с кем сыграть следующий матч.
+              </p>
+              <p>
+                Через вызовы удобно договариваться как о рейтинговых матчах, так и о спаррингах. Это помогает регулярно получать игровую
+                практику, не теряя мотивацию и не выходя из приложения. После каждого подтверждённого результата система пересчитывает позиции.
+              </p>
+              <p>
+                Для игроков, которые ориентируются и на официальный теннисный контур, рядом доступен рейтинг РТТ. Так пользователь видит
+                сразу два измерения прогресса: внутренний любительский рейтинг для активной игры в клубе и данные РТТ для сравнения с официальным уровнем.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 grid lg:grid-cols-[1fr_auto] gap-8 items-center">
+          <div>
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Готовы начать?</p>
+            <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-3">Принимайте вызовы, играйте матчи и поднимайтесь в рейтинге</h2>
+            <p className="text-slate-400 max-w-2xl leading-relaxed">
+              Зарегистрируйтесь на «НаКорте», участвуйте в любительских турнирах, зовите игроков на спарринг и следите за своим местом в клубном и РТТ-рейтинге.
+            </p>
+          </div>
+          <Button size="lg" onClick={onRegister} className="shadow-xl shadow-lime-400/20">
+            Перейти к турнирам
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
 
 export default App;
