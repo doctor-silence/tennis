@@ -742,6 +742,56 @@ const FaqSection = () => {
 
 const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginClick: () => void, onRegisterClick: () => void, onNavigate: (v: ViewState) => void }) => {
   const [reqOpen, setReqOpen] = useState(false);
+  const [featureReveal, setFeatureReveal] = useState<Record<string, boolean>>({});
+  const featureRevealNodes = React.useRef<Record<string, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    const nodes = Object.entries(featureRevealNodes.current).filter(([, node]) => node);
+    if (!nodes.length) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+
+          const id = (entry.target as HTMLElement).dataset.revealId;
+          if (id) {
+            setFeatureReveal((prev) => (prev[id] ? prev : { ...prev, [id]: true }));
+          }
+
+          observer.unobserve(entry.target);
+        });
+      },
+      {
+        threshold: 0.18,
+        rootMargin: '0px 0px -10% 0px',
+      }
+    );
+
+    nodes.forEach(([, node]) => {
+      if (node) observer.observe(node);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  const bindFeatureReveal = (id: string) => (node: HTMLDivElement | null) => {
+    featureRevealNodes.current[id] = node;
+  };
+
+  const getFeatureRevealStyle = (id: string, direction: 'left' | 'right' | 'up') => {
+    const isVisible = !!featureReveal[id];
+    const offsetX = direction === 'left' ? -42 : direction === 'right' ? 42 : 0;
+    const offsetY = direction === 'up' ? 34 : 0;
+
+    return {
+      opacity: isVisible ? 1 : 0,
+      transform: isVisible ? 'translate3d(0,0,0)' : `translate3d(${offsetX}px, ${offsetY}px, 0)`,
+      transition: 'opacity 1400ms ease, transform 1800ms cubic-bezier(0.22, 1, 0.36, 1)',
+      willChange: 'opacity, transform',
+    } as React.CSSProperties;
+  };
+
   return (
     <>
       {reqOpen && <RequisitesModal onClose={() => setReqOpen(false)} />}
@@ -994,11 +1044,8 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
             <p className="text-slate-400 max-w-xl mx-auto text-base sm:text-lg font-light">Мы убрали лишнее, оставив только то, что нужно для прогресса.</p>
           </div>
 
-          {/* Row 1 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-             {/* Feature 1: Large Left */}
-             <div className="md:col-span-2 bg-slate-950 rounded-[2rem] p-10 relative overflow-hidden group cursor-default"
-               style={{minHeight: '320px'}}>
+             <div ref={bindFeatureReveal('feature-partners')} data-reveal-id="feature-partners" style={{ ...getFeatureRevealStyle('feature-partners', 'left'), minHeight: '320px' }} className="md:col-span-2 bg-slate-950 rounded-[2rem] p-10 relative overflow-hidden group cursor-default" >
                 <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-slate-900 via-slate-950 to-black z-0"></div>
                 <div className="absolute -top-20 -right-20 w-72 h-72 bg-lime-400/10 rounded-full blur-[80px] group-hover:bg-lime-400/20 transition-all duration-700 z-0"></div>
                 <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-500/10 rounded-full blur-[60px] z-0"></div>
@@ -1018,9 +1065,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                 </div>
              </div>
 
-             {/* Feature 2: PRO */}
-             <div className="rounded-[2rem] p-10 relative overflow-hidden group cursor-pointer bg-gradient-to-br from-lime-400 to-emerald-500 hover:shadow-2xl hover:shadow-lime-400/30 transition-all duration-500 hover:-translate-y-1"
-               style={{minHeight: '320px'}} onClick={() => window.location.href = '/rtt/'}>
+             <div ref={bindFeatureReveal('feature-rtt')} data-reveal-id="feature-rtt" style={{ ...getFeatureRevealStyle('feature-rtt', 'right'), minHeight: '320px' }} className="rounded-[2rem] p-10 relative overflow-hidden group cursor-pointer bg-gradient-to-br from-lime-400 to-emerald-500 hover:shadow-2xl hover:shadow-lime-400/30 transition-all duration-500 hover:-translate-y-1" onClick={() => window.location.href = '/rtt/'}>
                 <div className="absolute -right-8 -bottom-8 opacity-20 group-hover:opacity-40 group-hover:scale-110 transition-all duration-700">
                   <Trophy size={180} />
                 </div>
@@ -1039,12 +1084,8 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
              </div>
           </div>
 
-          {/* Row 2 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-5">
-
-             {/* Корты */}
-             <div className="bg-slate-50 border border-slate-100 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/60 transition-all duration-500"
-               style={{minHeight: '260px'}}>
+             <div ref={bindFeatureReveal('feature-courts')} data-reveal-id="feature-courts" style={{ ...getFeatureRevealStyle('feature-courts', 'left'), minHeight: '260px' }} className="bg-slate-50 border border-slate-100 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/60 transition-all duration-500">
                 <div className="absolute -right-6 -bottom-6 text-slate-100 group-hover:text-slate-200 transition-colors duration-500">
                   <Map size={120} />
                 </div>
@@ -1057,9 +1098,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                 </div>
              </div>
 
-             {/* Статистика */}
-             <div className="bg-slate-950 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/40 transition-all duration-500"
-               style={{minHeight: '260px'}}>
+             <div ref={bindFeatureReveal('feature-stats')} data-reveal-id="feature-stats" style={{ ...getFeatureRevealStyle('feature-stats', 'up'), minHeight: '260px' }} className="bg-slate-950 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/40 transition-all duration-500">
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-transparent z-0"></div>
                 <div className="absolute -right-6 -bottom-6 text-blue-500/10 group-hover:text-blue-500/20 transition-colors duration-500">
                   <Activity size={120} />
@@ -1073,8 +1112,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                 </div>
              </div>
 
-             {/* Комьюнити + Турниры */}
-             <div className="flex flex-col gap-5">
+             <div ref={bindFeatureReveal('feature-community')} data-reveal-id="feature-community" style={getFeatureRevealStyle('feature-community', 'right')} className="flex flex-col gap-5">
                <div className="bg-slate-50 border border-slate-100 rounded-[2rem] p-8 relative overflow-hidden group hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/60 transition-all duration-500 flex-1">
                  <div className="w-11 h-11 bg-purple-500 rounded-2xl flex items-center justify-center text-white mb-4 group-hover:scale-110 transition-transform duration-500 shadow-lg shadow-purple-500/30">
                    <MessageSquare size={20} />
@@ -1090,15 +1128,10 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                  <p className="text-slate-500 text-sm leading-relaxed">Участвуй или создавай любительские соревнования в пару кликов.</p>
                </div>
              </div>
-
           </div>
 
-          {/* Row 3 — AI, 3D, CRM */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-5">
-
-            {/* AI Тренер */}
-            <div className="md:col-span-2 bg-slate-950 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/40 transition-all duration-500"
-              style={{minHeight: '260px'}}>
+            <div ref={bindFeatureReveal('feature-ai')} data-reveal-id="feature-ai" style={{ ...getFeatureRevealStyle('feature-ai', 'left'), minHeight: '260px' }} className="md:col-span-2 bg-slate-950 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/40 transition-all duration-500">
               <div className="absolute inset-0 bg-gradient-to-br from-violet-900/30 via-slate-950 to-black z-0"></div>
               <div className="absolute -top-16 -right-16 w-64 h-64 bg-violet-500/10 rounded-full blur-[80px] group-hover:bg-violet-500/20 transition-all duration-700 z-0"></div>
               <div className="relative z-10 flex flex-col h-full justify-between">
@@ -1117,9 +1150,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
               </div>
             </div>
 
-            {/* 3D Тактический симулятор */}
-            <div className="bg-gradient-to-br from-cyan-500 to-blue-600 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-2xl hover:shadow-cyan-400/30 transition-all duration-500"
-              style={{minHeight: '260px'}}>
+            <div ref={bindFeatureReveal('feature-3d')} data-reveal-id="feature-3d" style={{ ...getFeatureRevealStyle('feature-3d', 'right'), minHeight: '260px' }} className="bg-gradient-to-br from-cyan-500 to-blue-600 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-2xl hover:shadow-cyan-400/30 transition-all duration-500">
               <div className="absolute -right-8 -bottom-8 opacity-20 group-hover:opacity-40 group-hover:scale-110 transition-all duration-700">
                 <BarChart3 size={160} />
               </div>
@@ -1133,12 +1164,10 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                 </div>
               </div>
             </div>
-
           </div>
 
-          {/* Row 4 — CRM для тренеров */}
           <div className="mt-5">
-            <div className="bg-slate-950 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/40 transition-all duration-500">
+            <div ref={bindFeatureReveal('feature-crm')} data-reveal-id="feature-crm" style={getFeatureRevealStyle('feature-crm', 'left')} className="bg-slate-950 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/40 transition-all duration-500">
               <div className="absolute inset-0 bg-gradient-to-br from-amber-900/20 via-slate-950 to-black z-0"></div>
               <div className="absolute -top-20 -right-20 w-80 h-80 bg-amber-500/10 rounded-full blur-[100px] group-hover:bg-amber-500/20 transition-all duration-700 z-0"></div>
               <div className="absolute -right-10 -bottom-10 text-white/5 group-hover:text-white/10 transition-colors duration-500 z-0">
@@ -1151,10 +1180,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                   </div>
                   <h3 className="text-2xl font-bold mb-3 text-white tracking-tight">CRM для тренеров</h3>
                   <p className="text-slate-400 text-sm leading-relaxed">Полный инструментарий для профессиональных тренеров: управление учениками, расписание тренировок, статистика прогресса каждого игрока и организация собственных турниров.</p>
-                  <div
-                    className="mt-6 inline-flex items-center text-amber-400 font-bold text-sm gap-1 cursor-pointer hover:gap-2 transition-all"
-                    onClick={() => window.location.href = '/crm/'}
-                  >
+                  <div className="mt-6 inline-flex items-center text-amber-400 font-bold text-sm gap-1 cursor-pointer hover:gap-2 transition-all" onClick={() => window.location.href = '/crm/'}>
                     Подробнее <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform"/>
                   </div>
                 </div>
@@ -1175,13 +1201,11 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
             </div>
           </div>
 
-          {/* Row 5 — Дневник теннисиста */}
           <div className="mt-5">
-            <div className="bg-gradient-to-br from-lime-400 to-emerald-500 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-2xl hover:shadow-lime-400/30 transition-all duration-500">
+            <div ref={bindFeatureReveal('feature-diary')} data-reveal-id="feature-diary" style={getFeatureRevealStyle('feature-diary', 'right')} className="bg-gradient-to-br from-lime-400 to-emerald-500 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-2xl hover:shadow-lime-400/30 transition-all duration-500">
               <div className="absolute -top-20 -right-20 w-80 h-80 bg-white/10 rounded-full blur-[100px] group-hover:bg-white/20 transition-all duration-700 z-0"></div>
               <div className="absolute -bottom-16 -left-16 w-64 h-64 bg-emerald-700/20 rounded-full blur-[80px] z-0"></div>
               <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-                {/* Левая часть — текст */}
                 <div>
                   <div className="w-11 h-11 bg-slate-900/20 backdrop-blur rounded-2xl flex items-center justify-center text-slate-900 mb-6 group-hover:scale-110 transition-transform duration-500">
                     <Shield size={20} />
@@ -1196,9 +1220,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                   </div>
                 </div>
 
-                {/* Правая часть — два блока */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Блок: Дневник */}
                   <div className="bg-white/25 border border-white/40 rounded-2xl p-6 hover:bg-white/35 transition-all duration-300 backdrop-blur-sm">
                     <div className="text-2xl mb-3">📔</div>
                     <div className="font-bold text-slate-900 text-sm mb-2">Личный дневник</div>
@@ -1213,7 +1235,6 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                     </div>
                   </div>
 
-                  {/* Блок: Досье */}
                   <div className="bg-white/25 border border-white/40 rounded-2xl p-6 hover:bg-white/35 transition-all duration-300 backdrop-blur-sm">
                     <div className="text-2xl mb-3">🎯</div>
                     <div className="font-bold text-slate-900 text-sm mb-2">Досье соперника</div>
