@@ -7,11 +7,14 @@ import { api } from '../../services/api';
 
 export const RttStatsView = ({ user }: { user: User }) => {
     const [activeTab, setActiveTab] = useState<'rni' | 'tournaments'>('rni');
-    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const tournamentDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const playerSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastAutoQueryRef = useRef('');
     const abortRef = useRef<AbortController | null>(null);
-    const [rni, setRni] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(false);
     const [playerData, setPlayerData] = useState<any>(null);
+    const [searchResults, setSearchResults] = useState<any[]>([]);
     const [error, setError] = useState('');
     const [showAllMatches, setShowAllMatches] = useState(false);
     const [showAllTournaments, setShowAllTournaments] = useState(false);
@@ -55,8 +58,8 @@ export const RttStatsView = ({ user }: { user: User }) => {
         const newFilters = { ...tourFilters, [key]: value };
         setTourFilters(newFilters);
         // Дебаунс: ждём 300мс после последнего изменения фильтра
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => loadTournaments(newFilters), 300);
+        if (tournamentDebounceRef.current) clearTimeout(tournamentDebounceRef.current);
+        tournamentDebounceRef.current = setTimeout(() => loadTournaments(newFilters), 300);
     };
 
     const resetTourFilters = () => {
@@ -67,22 +70,24 @@ export const RttStatsView = ({ user }: { user: User }) => {
         setTourHasSearched(false);
     };
 
-    const handleSearch = async () => {
-        if (!rni || rni.length < 4) {
+    const loadPlayerStats = async (targetRni: string) => {
+        if (!targetRni || targetRni.length < 4) {
             setError('Введите корректный РНИ (минимум 4 цифры)');
             return;
         }
 
+        lastAutoQueryRef.current = targetRni;
         setLoading(true);
         setError('');
         setPlayerData(null);
+        setSearchResults([]);
 
         try {
-            // Получаем полную статистику с сервера
-            const response = await api.rtt.getPlayerStats(rni);
+            const response = await api.rtt.getPlayerStats(targetRni);
             
             if (response.success) {
                 setPlayerData(response);
+                setSearchQuery(targetRni);
             } else {
                 setError(response.error || 'Игрок не найден');
             }
@@ -93,6 +98,121 @@ export const RttStatsView = ({ user }: { user: User }) => {
             setLoading(false);
         }
     };
+
+    const runPlayerNameSearch = async (query: string) => {
+        lastAutoQueryRef.current = query;
+        setLoading(true);
+        setError('');
+        setPlayerData(null);
+        setSearchResults([]);
+
+        try {
+            const response = await api.rtt.searchPlayers(query);
+
+            if (response.success) {
+                const players = response.data || [];
+                setSearchResults(players);
+
+                if (players.length === 0) {
+                    setError('Игроки по этому запросу не найдены');
+                }
+            } else {
+                setError(response.error || 'Не удалось выполнить поиск');
+            }
+        } catch (err) {
+            setError('Ошибка при поиске игрока');
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSearch = async () => {
+        const query = searchQuery.trim();
+
+        if (!query) {
+            setError('Введите РНИ или ФИО игрока');
+            return;
+        }
+
+        if (/^\d+$/.test(query)) {
+            if (query.length < 4) {
+                setError('Введите корректный РНИ (минимум 4 цифры)');
+                return;
+            }
+
+            await loadPlayerStats(query);
+            return;
+        }
+
+        if (query.length < 2) {
+            setError('Введите минимум 2 символа для поиска по ФИО');
+            return;
+        }
+
+        await runPlayerNameSearch(query);
+    };
+
+    useEffect(() => {
+        if (activeTab !== 'rni') {
+            return;
+        }
+
+        const query = searchQuery.trim();
+
+        if (playerSearchDebounceRef.current) {
+            clearTimeout(playerSearchDebounceRef.current);
+        }
+
+        if (!query) {
+            lastAutoQueryRef.current = '';
+            setError('');
+            setSearchResults([]);
+            return;
+        }
+
+        if (query === lastAutoQueryRef.current) {
+            return;
+        }
+
+        if (/^\d+$/.test(query)) {
+            if (query.length < 4) {
+                setSearchResults([]);
+                return;
+            }
+
+            playerSearchDebounceRef.current = setTimeout(() => {
+                loadPlayerStats(query);
+            }, 450);
+            return;
+        }
+
+        if (query.length < 2) {
+            setSearchResults([]);
+            return;
+        }
+
+        playerSearchDebounceRef.current = setTimeout(() => {
+            runPlayerNameSearch(query);
+        }, 450);
+
+        return () => {
+            if (playerSearchDebounceRef.current) {
+                clearTimeout(playerSearchDebounceRef.current);
+            }
+        };
+    }, [activeTab, searchQuery]);
+
+    useEffect(() => {
+        return () => {
+            if (tournamentDebounceRef.current) {
+                clearTimeout(tournamentDebounceRef.current);
+            }
+            if (playerSearchDebounceRef.current) {
+                clearTimeout(playerSearchDebounceRef.current);
+            }
+        };
+    }, []);
 
     const winCount = playerData?.data?.wins ?? playerData?.data?.matches?.filter((m: any) => m.result === 'win').length ?? 0;
     const lossCount = playerData?.data?.matches?.filter((m: any) => m.result === 'loss').length || 0;
@@ -120,7 +240,7 @@ export const RttStatsView = ({ user }: { user: User }) => {
                                 : 'bg-slate-50 text-slate-400 hover:text-slate-600'
                         }`}
                     >
-                        🔍 Поиск по РНИ
+                        🔍 Поиск игрока
                     </button>
                     <button
                         onClick={() => setActiveTab('tournaments')}
@@ -134,33 +254,26 @@ export const RttStatsView = ({ user }: { user: User }) => {
                     </button>
                 </div>
 
-                {/* Вкладка: Поиск по РНИ */}
+                {/* Вкладка: Поиск игрока */}
                 {activeTab === 'rni' && (
                     <div className="p-6">
-                        <div className="flex gap-4">
-                            <div className="flex-1">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">
-                                    Номер РНИ
-                                </label>
-                                <input
-                                    type="text"
-                                    value={rni}
-                                    onChange={(e) => setRni(e.target.value.replace(/\D/g, ''))}
-                                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                                    placeholder="Введите РНИ (например, 53699)"
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-400 outline-none text-lg"
-                                />
-                                {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
-                            </div>
-                            <div className="flex items-end">
-                                <Button
-                                    onClick={handleSearch}
-                                    disabled={loading || !rni}
-                                    className="px-8 py-3 bg-orange-600 hover:bg-orange-700"
-                                >
-                                    {loading ? <Loader2 className="animate-spin" size={20} /> : 'Найти'}
-                                </Button>
-                            </div>
+                        <div className="w-full">
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">
+                                РНИ или ФИО игрока
+                            </label>
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => {
+                                    setSearchQuery(e.target.value);
+                                    setError('');
+                                }}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                                placeholder="Введите РНИ или ФИО (например, 53699 или Иванов Иван)"
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-400 outline-none text-lg"
+                            />
+                            <p className="text-xs text-slate-400 mt-2">Поиск запускается автоматически и по ФИО, и по РНИ. Для РНИ карточка откроется после короткой паузы или по Enter.</p>
+                            {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
                         </div>
                     </div>
                 )}
@@ -322,6 +435,44 @@ export const RttStatsView = ({ user }: { user: User }) => {
             </> }
             </div>{/* конец единого контейнера с вкладками */}
 
+            {activeTab === 'rni' && searchResults.length > 0 && (
+                <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-4">
+                        <div>
+                            <h3 className="text-lg font-black text-slate-900">Найденные игроки</h3>
+                            <p className="text-sm text-slate-500">Выберите игрока, чтобы открыть полную статистику РТТ</p>
+                        </div>
+                        <div className="text-xs font-bold uppercase tracking-wider text-slate-400">{searchResults.length} результатов</div>
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                        {searchResults.map((player) => (
+                            <button
+                                key={player.rni}
+                                onClick={() => loadPlayerStats(player.rni)}
+                                className="w-full px-6 py-4 text-left hover:bg-orange-50 transition-colors"
+                            >
+                                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                    <div>
+                                        <div className="text-base font-bold text-slate-900">{player.name}</div>
+                                        <div className="text-sm text-slate-500 mt-1">
+                                            РНИ: <span className="font-semibold text-slate-700">{player.rni}</span>
+                                            <span className="mx-2 text-slate-300">•</span>
+                                            {player.city}
+                                            <span className="mx-2 text-slate-300">•</span>
+                                            {player.category}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-4 text-sm">
+                                        <div className="text-slate-500">Очки: <span className="font-bold text-slate-900">{player.points}</span></div>
+                                        <div className="text-slate-500">Позиция: <span className="font-bold text-orange-600">#{player.rank}</span></div>
+                                    </div>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Player Data — вне вкладок, всегда видно на вкладке РНИ */}
             {activeTab === 'rni' && playerData && (
                 <div className="space-y-4 animate-fade-in-up">
@@ -347,7 +498,7 @@ export const RttStatsView = ({ user }: { user: User }) => {
                             </div>
                             <div className="bg-white rounded-xl px-4 py-2 shadow-sm border border-orange-200">
                                 <div className="text-xs font-bold text-orange-600 uppercase mb-0.5 text-center">РНИ</div>
-                                <div className="text-2xl font-black text-orange-600 text-center">{rni}</div>
+                                <div className="text-2xl font-black text-orange-600 text-center">{playerData.data.rni || searchQuery}</div>
                             </div>
                         </div>
 

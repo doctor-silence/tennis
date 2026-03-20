@@ -371,15 +371,56 @@ class RTTParser {
    */
   async searchPlayers(query) {
     try {
-      console.log(`Поиск спортсменов: ${query}`);
-      
-      // TODO: Реализовать поиск через API rttstat.ru если доступен
-      // Пока функция не реализована полностью
-      
+      const normalizedQuery = String(query || '').trim();
+      console.log(`Поиск спортсменов: ${normalizedQuery}`);
+
+      if (normalizedQuery.length < 2) {
+        return {
+          success: false,
+          error: 'Минимум 2 символа для поиска'
+        };
+      }
+
+      const response = await this.axios.get(`/search/${encodeURIComponent(normalizedQuery)}`);
+      const $ = cheerio.load(response.data);
+      const players = [];
+      const seenRni = new Set();
+
+      $('table tbody tr').each((_, row) => {
+        const cells = $(row).find('td');
+        if (cells.length < 7) {
+          return;
+        }
+
+        const profileLink = $(cells[1]).find('a').attr('href') || '';
+        const name = $(cells[1]).text().replace(/\s+/g, ' ').trim();
+        const rni = $(cells[2]).text().replace(/\D/g, '').trim();
+        const city = $(cells[3]).text().replace(/\s+/g, ' ').trim();
+        const pointsText = $(cells[4]).text().replace(/\s+/g, ' ').trim();
+        const rankText = $(cells[5]).text().replace(/\s+/g, ' ').trim();
+        const category = $(cells[6]).text().replace(/\s+/g, ' ').trim();
+
+        if (!name || !rni || seenRni.has(rni)) {
+          return;
+        }
+
+        seenRni.add(rni);
+        players.push({
+          name,
+          rni,
+          city: city || '—',
+          points: pointsText ? parseInt(pointsText, 10) || 0 : 0,
+          rank: rankText ? parseInt(rankText, 10) || 0 : 0,
+          category: category || '—',
+          link: profileLink ? `${this.baseURL}${profileLink}` : `${this.baseURL}/player/${rni}`
+        });
+      });
+
       return {
         success: true,
-        data: [],
-        message: 'Поиск по имени пока не реализован. Используйте РНИ для поиска.'
+        data: players,
+        query: normalizedQuery,
+        source: 'rttstat.ru'
       };
 
     } catch (error) {
