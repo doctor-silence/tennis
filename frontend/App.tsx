@@ -51,20 +51,132 @@ const App = () => {
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(true); // Add loading state
 
+  const validPaths = ['/', '/crm/', '/crm', '/trainer-crm/', '/trainer-crm', '/rtt/', '/rtt', '/news/', '/news', '/privacy/', '/privacy', '/pro/', '/pro', '/shop/', '/shop', '/terms/', '/terms', '/find-partner/', '/find-partner', '/find-courts/', '/find-courts', '/ai-coach/', '/ai-coach', '/amateur-tournaments/', '/amateur-tournaments', '/community/', '/community', '/3d-tactics/', '/3d-tactics', '/tennis-diary/', '/tennis-diary'];
+
+  const getPublicRouteState = (pathname: string, search: string) => {
+    const isValid = validPaths.some((path) => pathname === path || pathname.startsWith(path + '/'));
+
+    if (!isValid) {
+      return { isNotFound: true, nextView: 'landing' as ViewState, nextAuthMode: 'login' as const };
+    }
+
+    if (pathname.startsWith('/find-partner')) {
+      return { isNotFound: false, nextView: 'find-partner' as ViewState, nextAuthMode: 'login' as const };
+    }
+
+    if (pathname.startsWith('/find-courts')) {
+      return { isNotFound: false, nextView: 'find-courts' as ViewState, nextAuthMode: 'login' as const };
+    }
+
+    if (pathname.startsWith('/ai-coach')) {
+      return { isNotFound: false, nextView: 'ai-coach-info' as ViewState, nextAuthMode: 'login' as const };
+    }
+
+    if (pathname.startsWith('/amateur-tournaments')) {
+      return { isNotFound: false, nextView: 'amateur-tournaments' as ViewState, nextAuthMode: 'login' as const };
+    }
+
+    if (pathname.startsWith('/community')) {
+      return { isNotFound: false, nextView: 'community-info' as ViewState, nextAuthMode: 'login' as const };
+    }
+
+    if (pathname.startsWith('/3d-tactics')) {
+      return { isNotFound: false, nextView: 'tactics-3d-info' as ViewState, nextAuthMode: 'login' as const };
+    }
+
+    if (pathname.startsWith('/tennis-diary')) {
+      return { isNotFound: false, nextView: 'tennis-diary-info' as ViewState, nextAuthMode: 'login' as const };
+    }
+
+    if (pathname.startsWith('/trainer-crm')) {
+      return { isNotFound: false, nextView: 'crm-info' as ViewState, nextAuthMode: 'login' as const };
+    }
+
+    if (pathname.startsWith('/rtt')) {
+      return { isNotFound: false, nextView: 'rtt-info' as ViewState, nextAuthMode: 'login' as const };
+    }
+
+    if (pathname.startsWith('/pro')) {
+      return { isNotFound: false, nextView: 'pro' as ViewState, nextAuthMode: 'login' as const };
+    }
+
+    if (pathname.startsWith('/shop')) {
+      return { isNotFound: false, nextView: 'shop' as ViewState, nextAuthMode: 'login' as const };
+    }
+
+    if (pathname.startsWith('/news')) {
+      return { isNotFound: false, nextView: 'news' as ViewState, nextAuthMode: 'login' as const };
+    }
+
+    if (pathname.startsWith('/privacy')) {
+      return { isNotFound: false, nextView: 'privacy' as ViewState, nextAuthMode: 'login' as const };
+    }
+
+    if (pathname.startsWith('/terms')) {
+      return { isNotFound: false, nextView: 'terms' as ViewState, nextAuthMode: 'login' as const };
+    }
+
+    if (pathname.startsWith('/crm')) {
+      return { isNotFound: false, nextView: 'auth' as ViewState, nextAuthMode: 'login' as const };
+    }
+
+    const params = new URLSearchParams(search);
+    if (params.get('auth') === 'register') {
+      return { isNotFound: false, nextView: 'auth' as ViewState, nextAuthMode: 'register' as const };
+    }
+
+    if (params.get('auth') === 'login') {
+      return { isNotFound: false, nextView: 'auth' as ViewState, nextAuthMode: 'login' as const };
+    }
+
+    return { isNotFound: false, nextView: 'landing' as ViewState, nextAuthMode: 'login' as const };
+  };
+
+  const getPathForView = (target: ViewState, mode?: 'login' | 'register') => {
+    switch (target) {
+      case 'landing':
+        return '/';
+      case 'news':
+        return '/news/';
+      case 'privacy':
+        return '/privacy/';
+      case 'terms':
+        return '/terms/';
+      case 'pro':
+        return '/pro/';
+      case 'shop':
+        return '/shop/';
+      case 'rtt-info':
+        return '/rtt/';
+      case 'crm-info':
+        return '/trainer-crm/';
+      case 'find-partner':
+        return '/find-partner/';
+      case 'find-courts':
+        return '/find-courts/';
+      case 'ai-coach-info':
+        return '/ai-coach/';
+      case 'amateur-tournaments':
+        return '/amateur-tournaments/';
+      case 'community-info':
+        return '/community/';
+      case 'tactics-3d-info':
+        return '/3d-tactics/';
+      case 'tennis-diary-info':
+        return '/tennis-diary/';
+      case 'auth':
+        return mode === 'register' ? '/?auth=register' : '/?auth=login';
+      default:
+        return null;
+    }
+  };
+
   // New useEffect to load user from localStorage on initial render
   useEffect(() => {
     try {
       const storedUser = localStorage.getItem('currentUser');
       const pathname = window.location.pathname;
-
-      // Список допустимых путей SPA
-      const validPaths = ['/', '/crm/', '/crm', '/rtt/', '/rtt', '/news/', '/news', '/privacy/', '/privacy', '/pro/', '/pro', '/shop/', '/shop', '/terms/', '/terms', '/find-partner/', '/find-partner', '/find-courts/', '/find-courts', '/ai-coach/', '/ai-coach', '/amateur-tournaments/', '/amateur-tournaments', '/community/', '/community', '/3d-tactics/', '/3d-tactics', '/tennis-diary/', '/tennis-diary'];
-      const isValid = validPaths.some(p => pathname === p || pathname.startsWith(p + '/'));
-      if (!isValid) {
-        setIsNotFound(true);
-        setLoading(false);
-        return;
-      }
+      const search = window.location.search;
 
       if (storedUser) {
         const user: User = JSON.parse(storedUser);
@@ -75,38 +187,10 @@ const App = () => {
           setView('dashboard');
         }
       } else {
-        // Если открыт /find-partner — SEO-страница
-        if (pathname.startsWith('/find-partner')) {
-          setView('find-partner');
-        } else if (pathname.startsWith('/find-courts')) {
-          setView('find-courts');
-        } else if (pathname.startsWith('/ai-coach')) {
-          setView('ai-coach-info');
-        } else if (pathname.startsWith('/amateur-tournaments')) {
-          setView('amateur-tournaments');
-        } else if (pathname.startsWith('/community')) {
-          setView('community-info');
-        } else if (pathname.startsWith('/3d-tactics')) {
-          setView('tactics-3d-info');
-        } else if (pathname.startsWith('/tennis-diary')) {
-          setView('tennis-diary-info');
-        } else if (pathname.startsWith('/crm')) {
-          setAuthInitialMode('login');
-          setView('auth');
-        } else {
-          // Check URL parameters for auth routing
-          const params = new URLSearchParams(window.location.search);
-          if (params.get('auth') === 'register') {
-            setAuthInitialMode('register');
-            setView('auth');
-            // Clean up URL
-            window.history.replaceState({}, document.title, window.location.pathname);
-          } else if (params.get('auth') === 'login') {
-            setAuthInitialMode('login');
-            setView('auth');
-            window.history.replaceState({}, document.title, window.location.pathname);
-          }
-        }
+        const { isNotFound: nextNotFound, nextView, nextAuthMode } = getPublicRouteState(pathname, search);
+        setIsNotFound(nextNotFound);
+        setAuthInitialMode(nextAuthMode);
+        setView(nextView);
       }
     } catch (error) {
       console.error("Failed to parse user from localStorage", error);
@@ -116,6 +200,26 @@ const App = () => {
       setLoading(false); // Set loading to false after check
     }
   }, []); // Empty dependency array means this runs once on mount
+
+  useEffect(() => {
+    if (currentUser) {
+      return;
+    }
+
+    const handlePopState = () => {
+      const { isNotFound: nextNotFound, nextView, nextAuthMode } = getPublicRouteState(window.location.pathname, window.location.search);
+      setIsNotFound(nextNotFound);
+      setAuthInitialMode(nextAuthMode);
+      setView(nextView);
+      window.scrollTo(0, 0);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [currentUser]);
 
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
@@ -138,16 +242,29 @@ const App = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('currentUser'); // Remove user from localStorage
+    window.history.replaceState({}, '', '/');
     setView('landing');
   };
 
   const handleNavigate = (target: ViewState) => {
+    const path = getPathForView(target);
+    if (!currentUser && path && `${window.location.pathname}${window.location.search}` !== path) {
+      window.history.pushState({}, '', path);
+    }
+
+    setIsNotFound(false);
     setView(target);
     window.scrollTo(0, 0);
   };
 
   const handleAuthNavigate = (mode: 'login' | 'register') => {
+    const path = getPathForView('auth', mode);
+    if (!currentUser && path && `${window.location.pathname}${window.location.search}` !== path) {
+      window.history.pushState({}, '', path);
+    }
+
     setAuthInitialMode(mode);
+    setIsNotFound(false);
     setView('auth');
     window.scrollTo(0, 0);
   };
@@ -1000,7 +1117,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                   ))}
                 </div>
                 <div className="mt-8 flex flex-wrap gap-3">
-                  <a href="/crm/" className="inline-flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-amber-500 transition-all">
+                  <a href="/trainer-crm/" className="inline-flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-amber-500 transition-all">
                     Подробнее о CRM <ArrowRight size={16} />
                   </a>
                   <button onClick={onRegisterClick} className="inline-flex items-center gap-2 border border-slate-300 text-slate-700 px-6 py-3 rounded-xl font-bold text-sm hover:border-amber-400 hover:text-amber-600 transition-all">
@@ -1180,7 +1297,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                   </div>
                   <h3 className="text-2xl font-bold mb-3 text-white tracking-tight">CRM для тренеров</h3>
                   <p className="text-slate-400 text-sm leading-relaxed">Полный инструментарий для профессиональных тренеров: управление учениками, расписание тренировок, статистика прогресса каждого игрока и организация собственных турниров.</p>
-                  <div className="mt-6 inline-flex items-center text-amber-400 font-bold text-sm gap-1 cursor-pointer hover:gap-2 transition-all" onClick={() => window.location.href = '/crm/'}>
+                  <div className="mt-6 inline-flex items-center text-amber-400 font-bold text-sm gap-1 cursor-pointer hover:gap-2 transition-all" onClick={() => window.location.href = '/trainer-crm/'}>
                     Подробнее <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform"/>
                   </div>
                 </div>
@@ -1312,14 +1429,14 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
              <div>
                <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Возможности</h3>
                <ul className="space-y-2.5 text-sm">
-                 <li><button onClick={() => onNavigate('find-partner')} className="hover:text-lime-400 transition-colors text-left">Поиск партнёра по теннису</button></li>
-                 <li><button onClick={() => onNavigate('find-courts')} className="hover:text-lime-400 transition-colors text-left">Бронирование теннисных кортов</button></li>
-                 <li><button onClick={() => onNavigate('ai-coach-info')} className="hover:text-lime-400 transition-colors text-left">AI-тренер по теннису</button></li>
-                 <li><button onClick={() => onNavigate('amateur-tournaments')} className="hover:text-lime-400 transition-colors text-left">Любительские турниры</button></li>
-                 <li><button onClick={() => onNavigate('community-info')} className="hover:text-lime-400 transition-colors text-left">Сообщество</button></li>
-                 <li><button onClick={() => onNavigate('tactics-3d-info')} className="hover:text-lime-400 transition-colors text-left">3D тактика</button></li>
-                 <li><button onClick={() => onNavigate('tennis-diary-info')} className="hover:text-lime-400 transition-colors text-left">Дневник теннисиста</button></li>
-                 <li><button onClick={() => onNavigate('crm-info')} className="hover:text-lime-400 transition-colors text-left">CRM для тренеров</button></li>
+                 <li><a href="/find-partner/" className="hover:text-lime-400 transition-colors text-left">Поиск партнёра по теннису</a></li>
+                 <li><a href="/find-courts/" className="hover:text-lime-400 transition-colors text-left">Бронирование теннисных кортов</a></li>
+                 <li><a href="/ai-coach/" className="hover:text-lime-400 transition-colors text-left">AI-тренер по теннису</a></li>
+                 <li><a href="/amateur-tournaments/" className="hover:text-lime-400 transition-colors text-left">Любительские турниры</a></li>
+                 <li><a href="/community/" className="hover:text-lime-400 transition-colors text-left">Сообщество</a></li>
+                 <li><a href="/3d-tactics/" className="hover:text-lime-400 transition-colors text-left">3D тактика</a></li>
+                 <li><a href="/tennis-diary/" className="hover:text-lime-400 transition-colors text-left">Дневник теннисиста</a></li>
+                 <li><a href="/trainer-crm/" className="hover:text-lime-400 transition-colors text-left">CRM для тренеров</a></li>
                </ul>
              </div>
 
@@ -1349,7 +1466,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                Найди <a href="/?auth=register" className="hover:text-slate-400 underline underline-offset-2">партнёра для игры в теннис</a> по уровню NTRP или рейтингу РТТ в своём городе.
                Бронируй <a href="/?auth=register" className="hover:text-slate-400 underline underline-offset-2">теннисные корты</a> онлайн, тренируйся с <a href="/?auth=register" className="hover:text-slate-400 underline underline-offset-2">AI-тренером по теннису</a>,
                участвуй в <a href="/?auth=register" className="hover:text-slate-400 underline underline-offset-2">любительских теннисных турнирах</a> и веди <a href="/?auth=register" className="hover:text-slate-400 underline underline-offset-2">дневник теннисиста</a>.
-               Для профессиональных тренеров доступна <a href="/crm/" className="hover:text-slate-400 underline underline-offset-2">CRM-система для ведения учеников</a>.
+               Для профессиональных тренеров доступна <a href="/trainer-crm/" className="hover:text-slate-400 underline underline-offset-2">CRM-система для ведения учеников</a>.
                Верификация игроков <a href="/rtt/" className="hover:text-slate-400 underline underline-offset-2">Российского Теннисного Тура (РТТ)</a>.
              </p>
            </div>
