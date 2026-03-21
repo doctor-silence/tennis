@@ -16,13 +16,14 @@ const AdminTournamentsView: React.FC<AdminTournamentsViewProps> = ({ tournaments
   return (
     <div className="animate-fade-in-up">
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-200 flex justify-between items-center">
+        <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
           <h3 className="font-bold">Всего турниров: {tournaments.length}</h3>
           <Button size="sm" onClick={onAdd} className="gap-2">
             <Plus size={16}/> Создать турнир
           </Button>
         </div>
-        <table className="w-full text-sm text-left">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[980px] text-sm text-left">
           <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs">
             <tr>
               <th className="px-6 py-4">Название</th>
@@ -69,6 +70,7 @@ const AdminTournamentsView: React.FC<AdminTournamentsViewProps> = ({ tournaments
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

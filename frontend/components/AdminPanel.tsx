@@ -24,6 +24,7 @@ import {
     Shield,
     Trophy,
     MessageSquare,
+    Menu,
     ExternalLink,
     Newspaper,
     Eye,
@@ -82,6 +83,7 @@ const CITIES = [
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups' | 'tournaments' | 'support' | 'news' | 'health'>('support');
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
     // Toast notifications
     const [toasts, setToasts] = useState<{ id: number; message: string; type: 'success' | 'error' }[]>([]);
@@ -759,6 +761,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
         setShowConfirmDeleteModal(true);
     };
 
+    const setActiveAdminTab = (tab: 'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups' | 'tournaments' | 'support' | 'news' | 'health') => {
+        setActiveTab(tab);
+        setIsMobileSidebarOpen(false);
+    };
+
     const handleToggleNewsPublished = async (article: NewsArticle) => {
         try {
             await api.news.update(article.id, { is_published: !article.is_published });
@@ -770,10 +777,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
 
 
     return (
-        <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
+        <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
+            {isMobileSidebarOpen && (
+                <button
+                    type="button"
+                    aria-label="Закрыть меню"
+                    className="fixed inset-0 z-30 bg-slate-900/50 backdrop-blur-sm lg:hidden"
+                    onClick={() => setIsMobileSidebarOpen(false)}
+                />
+            )}
             {/* Sidebar */}
-            <aside className="w-64 bg-slate-900 text-white flex flex-col shadow-2xl z-20">
-                <div className="p-6 border-b border-slate-800 flex items-center gap-3">
+            <aside className={`fixed inset-y-0 left-0 z-40 w-[280px] max-w-[85vw] bg-slate-900 text-white flex flex-col shadow-2xl transition-transform duration-300 lg:static lg:w-64 lg:max-w-none ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+                <div className="p-4 sm:p-6 border-b border-slate-800 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-lime-400 rounded-lg flex items-center justify-center">
                         <div className="w-4 h-4 bg-slate-900 rounded-sm"></div>
                     </div>
@@ -783,19 +799,23 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         </div>
                         <div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Admin Panel</div>
                     </div>
+                    </div>
+                    <button type="button" onClick={() => setIsMobileSidebarOpen(false)} className="lg:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+                        <X size={18} />
+                    </button>
                 </div>
 
-                <nav className="flex-1 p-4 space-y-2">
-                    <SidebarLink icon={<LayoutDashboard size={20}/>} label="Обзор" active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} />
-                    <SidebarLink icon={<Users size={20}/>} label="Пользователи" active={activeTab === 'users'} onClick={() => setActiveTab('users')} />
-                    <SidebarLink icon={<Shield size={20}/>} label="Группы" active={activeTab === 'groups'} onClick={() => setActiveTab('groups')} />
-                    <SidebarLink icon={<Trophy size={20}/>} label="Турниры" active={activeTab === 'tournaments'} onClick={() => setActiveTab('tournaments')} />
-                    <SidebarLink icon={<MessageSquare size={20}/>} label="Поддержка" active={activeTab === 'support'} onClick={() => setActiveTab('support')} />
-                    <SidebarLink icon={<Newspaper size={20}/>} label="Новости" active={activeTab === 'news'} onClick={() => setActiveTab('news')} />
-                    <SidebarLink icon={<Map size={20}/>} label="Корты" active={activeTab === 'courts'} onClick={() => setActiveTab('courts')} />
-                    <SidebarLink icon={<ShoppingBag size={20}/>} label="Магазин" active={activeTab === 'shop'} onClick={() => setActiveTab('shop')} />
-                    <SidebarLink icon={<Terminal size={20}/>} label="Системные логи" active={activeTab === 'logs'} onClick={() => setActiveTab('logs')} />
-                    <SidebarLink icon={<Activity size={20}/>} label="Статус сервера" active={activeTab === 'health'} onClick={() => setActiveTab('health')} />
+                <nav className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2">
+                    <SidebarLink icon={<LayoutDashboard size={20}/>} label="Обзор" active={activeTab === 'overview'} onClick={() => setActiveAdminTab('overview')} />
+                    <SidebarLink icon={<Users size={20}/>} label="Пользователи" active={activeTab === 'users'} onClick={() => setActiveAdminTab('users')} />
+                    <SidebarLink icon={<Shield size={20}/>} label="Группы" active={activeTab === 'groups'} onClick={() => setActiveAdminTab('groups')} />
+                    <SidebarLink icon={<Trophy size={20}/>} label="Турниры" active={activeTab === 'tournaments'} onClick={() => setActiveAdminTab('tournaments')} />
+                    <SidebarLink icon={<MessageSquare size={20}/>} label="Поддержка" active={activeTab === 'support'} onClick={() => setActiveAdminTab('support')} />
+                    <SidebarLink icon={<Newspaper size={20}/>} label="Новости" active={activeTab === 'news'} onClick={() => setActiveAdminTab('news')} />
+                    <SidebarLink icon={<Map size={20}/>} label="Корты" active={activeTab === 'courts'} onClick={() => setActiveAdminTab('courts')} />
+                    <SidebarLink icon={<ShoppingBag size={20}/>} label="Магазин" active={activeTab === 'shop'} onClick={() => setActiveAdminTab('shop')} />
+                    <SidebarLink icon={<Terminal size={20}/>} label="Системные логи" active={activeTab === 'logs'} onClick={() => setActiveAdminTab('logs')} />
+                    <SidebarLink icon={<Activity size={20}/>} label="Статус сервера" active={activeTab === 'health'} onClick={() => setActiveAdminTab('health')} />
                 </nav>
 
                 <div className="p-4 border-t border-slate-800">
@@ -813,9 +833,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 overflow-y-auto bg-slate-50">
-                <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-10">
-                    <h2 className="text-xl font-bold text-slate-800">
+            <main className="flex-1 min-w-0 overflow-y-auto bg-slate-50">
+                <header className="min-h-16 bg-white border-b border-slate-200 flex items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 py-3 sticky top-0 z-20">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <button type="button" onClick={() => setIsMobileSidebarOpen(true)} className="lg:hidden p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors shrink-0">
+                            <Menu size={18} />
+                        </button>
+                    <h2 className="text-base sm:text-lg lg:text-xl font-bold text-slate-800 truncate">
                         {activeTab === 'overview' && 'Экономика приложения'}
                         {activeTab === 'users' && 'Управление пользователями'}
                         {activeTab === 'groups' && 'Управление группами'}
@@ -827,14 +851,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         {activeTab === 'news' && 'Управление новостями'}
                         {activeTab === 'health' && 'Статус сервера'}
                     </h2>
-                    <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-xs font-bold border border-green-200">
+                    </div>
+                    <div className="hidden sm:flex items-center gap-4">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-xs font-bold border border-green-200 whitespace-nowrap">
                             <Activity size={14}/> Systems Operational
                         </div>
                     </div>
                 </header>
 
-                <div className="p-8">
+                <div className="p-4 sm:p-6 lg:p-8">
                     {activeTab === 'overview' && (() => {
                         const totalUsers = users.length;
                         const amateurs = users.filter(u => u.role === 'amateur').length;
@@ -881,7 +906,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                                     <h3 className="font-bold text-lg mb-2">Сводка платформы</h3>
                                     <p className="text-sm text-slate-400 mb-6">Всё бесплатно · Бета-версия</p>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         {[
                                             { label: 'Новые регистрации', value: (stats?.newSignups || 0).toString(), sub: 'за последние 30 дн.' },
                                             { label: 'Активных сегодня', value: ((stats as any)?.activeToday ?? '—').toString(), sub: 'вошли за последние 24ч' },
@@ -908,7 +933,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                         <h3 className="font-bold text-lg">Двухфакторная аутентификация</h3>
                                         <p className="text-sm text-slate-500">Защита аккаунта с помощью TOTP (Google Authenticator)</p>
                                     </div>
-                                    <div className="ml-auto">
+                                    <div className="sm:ml-auto">
                                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${twoFaEnabled ? 'bg-lime-100 text-lime-700' : 'bg-red-100 text-red-600'}`}>
                                             {twoFaEnabled ? '✓ Включена' : '✗ Отключена'}
                                         </span>
@@ -916,7 +941,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                 </div>
 
                                 {twoFaStep === 'idle' && (
-                                    <div className="flex gap-3">
+                                    <div className="flex flex-col sm:flex-row gap-3">
                                         {!twoFaEnabled ? (
                                             <button onClick={handle2faSetup} disabled={twoFaLoading}
                                                 className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-700 disabled:opacity-50 transition-colors">
@@ -936,14 +961,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                     <div className="space-y-4">
                                         <p className="text-sm text-slate-600">1. Отсканируйте QR-код в <span className="font-bold">Google Authenticator</span> или совместимом приложении:</p>
                                         <div className="bg-slate-50 rounded-xl p-4 inline-block border border-slate-200">
-                                            <img src={twoFaQrCode} alt="2FA QR Code" className="w-48 h-48" />
+                                            <img src={twoFaQrCode} alt="2FA QR Code" className="w-40 h-40 sm:w-48 sm:h-48" />
                                         </div>
                                         <p className="text-sm text-slate-600">2. Введите код из приложения для подтверждения:</p>
-                                        <div className="flex gap-3 items-center">
+                                        <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
                                             <input type="text" inputMode="numeric" maxLength={6}
                                                 value={twoFaToken} onChange={(e) => setTwoFaToken(e.target.value.replace(/\D/g, ''))}
                                                 placeholder="000000"
-                                                className="w-36 border border-slate-300 rounded-xl px-4 py-2 text-center text-xl tracking-widest focus:ring-2 focus:ring-lime-400 outline-none"
+                                                className="w-full sm:w-36 border border-slate-300 rounded-xl px-4 py-2 text-center text-xl tracking-widest focus:ring-2 focus:ring-lime-400 outline-none"
                                             />
                                             <button onClick={handle2faEnable} disabled={twoFaLoading || twoFaToken.length !== 6}
                                                 className="px-4 py-2 bg-lime-500 text-white rounded-xl text-sm font-bold hover:bg-lime-600 disabled:opacity-50 transition-colors flex items-center gap-2">
@@ -1152,7 +1177,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                     {activeTab === 'news' && (
                         <div className="animate-fade-in-up space-y-4">
                             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                                <div className="p-4 border-b border-slate-200 flex justify-between items-center">
+                                <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                                     <h3 className="font-bold">Всего статей: {news.length}</h3>
                                     <Button size="sm" onClick={handleAddNews} className="gap-2">
                                         <Plus size={16}/> Добавить новость
@@ -1166,7 +1191,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                         </div>
                                     )}
                                     {news.map(article => (
-                                        <div key={article.id} className="flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-colors">
+                                        <div key={article.id} className="flex flex-col sm:flex-row sm:items-center gap-4 px-4 sm:px-6 py-4 hover:bg-slate-50 transition-colors">
                                             <img
                                                 src={article.image}
                                                 alt={article.title}
@@ -1182,7 +1207,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                                 <p className="font-semibold text-slate-900 text-sm truncate">{article.title}</p>
                                                 <p className="text-xs text-slate-400">{article.author} · {new Date(article.published_at).toLocaleDateString('ru-RU')} · {article.views ?? 0} просм.</p>
                                             </div>
-                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                            <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-auto">
                                                 <button
                                                     onClick={() => handleToggleNewsPublished(article)}
                                                     className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
@@ -1213,13 +1238,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                     {activeTab === 'groups' && (
                         <div className="animate-fade-in-up">
                             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                                <div className="p-4 border-b border-slate-200 flex justify-between items-center">
+                                <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                                     <h3 className="font-bold">Всего групп: {groups.length}</h3>
                                     <Button size="sm" onClick={handleAddGroup} className="gap-2">
                                         <Plus size={16}/> Добавить группу
                                     </Button>
                                 </div>
-                                <table className="w-full text-sm text-left">
+                                <div className="overflow-x-auto">
+                                <table className="w-full min-w-[720px] text-sm text-left">
                                     <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs">
                                         <tr>
                                             <th className="px-6 py-4">Название</th>
@@ -1246,6 +1272,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                         ))}
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -1253,17 +1280,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                     {activeTab === 'users' && (
                         <div className="animate-fade-in-up">
                             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                                <div className="p-4 border-b border-slate-200 flex justify-between items-center">
-                                    <div className="relative w-64">
+                                <div className="p-4 border-b border-slate-200 flex flex-col lg:flex-row justify-between lg:items-center gap-3">
+                                    <div className="relative w-full lg:w-64">
                                         <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
                                         <input className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg w-full text-sm outline-none focus:ring-2 focus:ring-slate-900" placeholder="Поиск пользователя..."/>
                                     </div>
-                                    <div className="flex gap-2">
+                                    <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                                          <Button size="sm" onClick={handleAddUser} className="gap-2"><Plus size={16}/> Добавить</Button>
                                          <Button size="sm" variant="outline">Экспорт CSV</Button>
                                     </div>
                                 </div>
-                                <table className="w-full text-sm text-left">
+                                <div className="overflow-x-auto">
+                                <table className="w-full min-w-[760px] text-sm text-left">
                                     <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs">
                                         <tr>
                                             <th className="px-6 py-4">Пользователь</th>
@@ -1314,13 +1342,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                         ))}
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
                         </div>
                     )}
 
                     {activeTab === 'shop' && (
                         <div className="animate-fade-in-up">
-                            <div className="flex justify-end mb-6">
+                            <div className="flex justify-stretch sm:justify-end mb-6">
                                 <Button className="gap-2" onClick={() => {
                                     setEditingProduct({ title: '', price: 0, category: 'rackets', image: '', rating: 5, reviews: 0 });
                                     setIsProductModalOpen(true);
@@ -1330,12 +1359,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                             </div>
                             <div className="grid grid-cols-1 gap-4">
                                 {(products || []).map(p => (
-                                    <div key={p.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 group hover:border-lime-400 transition-colors">
+                                    <div key={p.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 group hover:border-lime-400 transition-colors">
                                         <div className="w-20 h-20 bg-slate-100 rounded-lg overflow-hidden shrink-0">
                                             <img src={p.image} className="w-full h-full object-cover" alt=""/>
                                         </div>
                                         <div className="flex-1">
-                                            <div className="flex justify-between items-start">
+                                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
                                                 <div>
                                                     <h3 className="font-bold text-lg text-slate-900">{p.title}</h3>
                                                     <span className="text-xs font-bold text-slate-400 uppercase bg-slate-50 px-2 py-1 rounded mt-1 inline-block">{p.category}</span>
@@ -1343,7 +1372,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                                 <div className="text-xl font-bold">{p.price.toLocaleString()} ₽</div>
                                             </div>
                                         </div>
-                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity self-end sm:self-auto">
                                             <button onClick={() => { setEditingProduct(p); setIsProductModalOpen(true); }} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-lg"><Edit size={18}/></button>
                                             <button onClick={() => handleDeleteProduct(p.id)} className="p-2 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg"><Trash2 size={18}/></button>
                                         </div>
@@ -1355,8 +1384,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
 
                     {activeTab === 'courts' && (
                          <div className="animate-fade-in-up">
-                             <div className="flex justify-between items-center mb-6">
-                                 <div className="relative w-64">
+                             <div className="flex flex-col xl:flex-row justify-between xl:items-center gap-3 mb-6">
+                                 <div className="relative w-full xl:w-64">
                                      <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
                                      <input 
                                          className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg w-full text-sm outline-none focus:ring-2 focus:ring-lime-400/50 transition-all placeholder:text-slate-400 text-slate-900 font-medium" 
@@ -1365,10 +1394,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                          onChange={e => setCourtSearchName(e.target.value)}
                                      />
                                  </div>
-                                 <div className="flex gap-2">
+                                 <div className="flex flex-col sm:flex-row gap-2 w-full xl:w-auto">
                                      <div className="relative">
                                          <select
-                                             className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm font-medium pr-8 appearance-none"
+                                             className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm font-medium pr-8 appearance-none"
                                              value={courtSearchCity}
                                              onChange={e => setCourtSearchCity(e.target.value)}
                                          >
@@ -1386,7 +1415,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                  </div>
                              </div>
                              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                                 <table className="w-full text-sm text-left">
+                                 <div className="overflow-x-auto">
+                                 <table className="w-full min-w-[920px] text-sm text-left">
                                      <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs">
                                          <tr>
                                              <th className="px-6 py-4">Название</th>
@@ -1443,6 +1473,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                          ))}
                                      </tbody>
                                  </table>
+                                 </div>
                              </div>
                          </div>
                     )}
@@ -1477,7 +1508,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             <Modal isOpen={isTournamentModalOpen} onClose={() => setIsTournamentModalOpen(false)} title="Редактировать турнир" maxWidthClass="max-w-5xl">
                 {editingTournament && (
                     <form onSubmit={handleSaveTournament} className="space-y-5">
-                        <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl">
                             <button type="button" onClick={() => setTournamentModalMode('manual')} className={`rounded-xl px-4 py-2 text-sm font-bold transition-colors ${tournamentModalMode === 'manual' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                                 Ручное заполнение
                             </button>
@@ -1607,7 +1638,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                             <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.name || ''} onChange={e => setEditingTournament({...editingTournament, name: e.target.value})} />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Категория</label>
                                 <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.category || ''} onChange={e => setEditingTournament({...editingTournament, category: e.target.value})} />
@@ -1621,7 +1652,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Пол</label>
                                 <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.gender || 'Мужской'} onChange={e => setEditingTournament({...editingTournament, gender: e.target.value as any})}>
@@ -1636,7 +1667,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Система</label>
                                 <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.system || 'Олимпийская'} onChange={e => setEditingTournament({...editingTournament, system: e.target.value as any})}>
@@ -1650,7 +1681,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                             </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Начало</label>
                                 <input type="date" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.startDate ? editingTournament.startDate.split('T')[0] : ''} onChange={e => setEditingTournament({...editingTournament, startDate: e.target.value})} />
@@ -1715,7 +1746,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         {/* Avatar upload */}
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-slate-500 uppercase">Аватар группы</label>
-                            <div className="flex items-center gap-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                                 <div className="w-16 h-16 rounded-2xl bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden shrink-0">
                                     {editingGroup.avatar
                                         ? <img src={editingGroup.avatar} className="w-full h-full object-cover" alt="avatar" />
@@ -1774,7 +1805,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                             <label className="text-xs font-bold text-slate-500 uppercase">Название</label>
                             <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingProduct.title || ''} onChange={e => setEditingProduct({...editingProduct, title: e.target.value})} />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Цена (₽)</label>
                                 <input required type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingProduct.price || ''} onChange={e => setEditingProduct({...editingProduct, price: Number(e.target.value)})} />
@@ -1791,7 +1822,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         </div>
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Ссылка на фото</label>
-                            <div className="flex gap-2">
+                            <div className="flex flex-col sm:flex-row gap-2">
                                 <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingProduct.image || ''} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} />
                                 {editingProduct.image && <img src={editingProduct.image} className="w-10 h-10 rounded-lg object-cover border border-slate-200" alt=""/>}
                             </div>
@@ -1817,7 +1848,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                             <label className="text-xs font-bold text-slate-500 uppercase">Сайт</label>
                             <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" placeholder="https://example.com" value={editingCourt.website || ''} onChange={e => setEditingCourt({...editingCourt, website: e.target.value})} />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                              <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Цена (₽/час)</label>
                                 <input required type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingCourt.pricePerHour || ''} onChange={e => setEditingCourt({...editingCourt, pricePerHour: Number(e.target.value)})} />
@@ -1845,7 +1876,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         </div>
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Фото</label>
-                            <div className="flex items-center gap-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                                 <div className="w-20 h-20 bg-slate-100 rounded-lg overflow-hidden shrink-0 border border-slate-200 flex items-center justify-center">
                                     {editingCourt.image ? (
                                         <img src={editingCourt.image} className="w-full h-full object-cover" alt="preview"/>
@@ -1935,7 +1966,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                 />
                             </div>
                         )}
-                         <div className="grid grid-cols-2 gap-4">
+                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-1">
                                     <label className="text-xs font-bold text-slate-500 uppercase">Роль</label>
                                     <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingUser.role} onChange={e => setEditingUser({...editingUser, role: e.target.value as any})}>
@@ -1979,7 +2010,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                 {/* РНИ + кнопка */}
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-bold text-slate-500 uppercase">Номер РНИ (РТТ)</label>
-                                    <div className="flex gap-2">
+                                    <div className="flex flex-col sm:flex-row gap-2">
                                         <input
                                             type="text"
                                             placeholder="Например: 12345"
@@ -2015,7 +2046,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                         <option value="Взрослые">Взрослые</option>
                                     </select>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div className="space-y-1">
                                         <label className="text-[10px] font-bold text-slate-500 uppercase">Классиф. Очки (РТТ)</label>
                                         <input type="number" className="w-full bg-white border border-amber-200 rounded-lg px-3 py-2 outline-none" value={editingUser.rating} onChange={e => setEditingUser({...editingUser, rating: Number(e.target.value)})} />
@@ -2080,7 +2111,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                 placeholder="https://..."
                             />
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Категория</label>
                                 <select
@@ -2139,7 +2170,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             <Modal isOpen={showConfirmDeleteModal} onClose={() => setShowConfirmDeleteModal(false)} title="Подтверждение удаления">
                 <div className="space-y-4">
                     <p>Вы уверены, что хотите удалить этот элемент?</p>
-                    <div className="flex justify-end gap-2">
+                    <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
                         <Button variant="outline" onClick={() => {
                             setShowConfirmDeleteModal(false);
                             setItemToDeleteId(null);
@@ -2173,7 +2204,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         {/* Post type */}
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Тип публикации</label>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 <button type="button"
                                     onClick={() => setPublishResultForm(f => ({...f, type: 'match_result_update'}))}
                                     className={`p-3 rounded-xl border-2 text-left transition-all ${publishResultForm.type === 'match_result_update' ? 'border-lime-400 bg-lime-50' : 'border-slate-200 hover:border-slate-300'}`}
@@ -2217,7 +2248,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                 </div>
 
                                 {/* Игроки */}
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div className="space-y-1">
                                         <label className="text-xs font-bold text-slate-500 uppercase">Игрок 1</label>
                                         <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none text-sm" placeholder="Имя игрока" value={publishResultForm.player1} onChange={e => setPublishResultForm(f => ({...f, player1: e.target.value}))} />
@@ -2238,7 +2269,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                 {publishResultForm.player1 && publishResultForm.player2 && (
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-slate-500 uppercase">Победитель</label>
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                             {[publishResultForm.player1, publishResultForm.player2].map(name => (
                                                 <button
                                                     key={name}
@@ -2280,7 +2311,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                             <textarea rows={2} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none text-sm resize-none" placeholder="Отличный матч! Борьба до последнего..." value={publishResultForm.note} onChange={e => setPublishResultForm(f => ({...f, note: e.target.value}))} />
                         </div>
 
-                        <div className="flex gap-2 pt-1">
+                        <div className="flex flex-col sm:flex-row gap-2 pt-1">
                             <Button variant="outline" type="button" className="flex-1" onClick={() => setIsPublishResultModalOpen(false)}>Отмена</Button>
                             <Button type="submit" className="flex-1 gap-2" disabled={isPublishing}>
                                 {isPublishing ? <Loader2 size={16} className="animate-spin"/> : <Megaphone size={16}/>}
@@ -2310,12 +2341,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
 const SidebarLink = ({ icon, label, active, onClick }: any) => (
     <button 
         onClick={onClick}
-        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+        className={`w-full flex items-center gap-3 px-3 sm:px-4 py-3 rounded-lg transition-all text-left ${
             active ? 'bg-lime-400 text-slate-900 font-bold' : 'text-slate-400 hover:text-white hover:bg-white/5'
         }`}
     >
+        <span className="shrink-0">
         {icon}
-        <span className="text-sm">{label}</span>
+        </span>
+        <span className="text-sm leading-tight">{label}</span>
     </button>
 );
 
@@ -2355,16 +2388,16 @@ const StatCard = ({ title, value, change, icon, color }: { title: string, value:
 const Modal = ({ isOpen, onClose, title, children, maxWidthClass = 'max-w-lg' }: { isOpen: boolean; onClose: () => void; title: string; children?: React.ReactNode; maxWidthClass?: string }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
-            <div className={`relative bg-white rounded-3xl w-full ${maxWidthClass} max-h-[90vh] overflow-y-auto shadow-2xl animate-fade-in-up`}>
-        <div className="flex justify-between items-center p-6 border-b border-slate-100 bg-white sticky top-0 z-10">
-          <h3 className="text-xl font-bold text-slate-900">{title}</h3>
+                        <div className={`relative bg-white rounded-2xl sm:rounded-3xl w-full ${maxWidthClass} max-h-[92vh] overflow-y-auto shadow-2xl animate-fade-in-up`}>
+                <div className="flex justify-between items-center gap-3 p-4 sm:p-6 border-b border-slate-100 bg-white sticky top-0 z-10">
+                    <h3 className="text-lg sm:text-xl font-bold text-slate-900">{title}</h3>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 hover:text-slate-900 transition-colors">
             <X size={20} />
           </button>
         </div>
-        <div className="p-6">
+                <div className="p-4 sm:p-6">
           {children}
         </div>
       </div>
