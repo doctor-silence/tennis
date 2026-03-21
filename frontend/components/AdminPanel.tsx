@@ -115,6 +115,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout, onImpersonateUs
     const [courts, setCourts] = useState<Court[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
     const [logs, setLogs] = useState<SystemLog[]>([]);
+    const [logsLoadError, setLogsLoadError] = useState('');
     const [userSearchQuery, setUserSearchQuery] = useState('');
     const [logQuery, setLogQuery] = useState('');
     const [logLevelFilter, setLogLevelFilter] = useState<'all' | SystemLog['level']>('all');
@@ -610,8 +611,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout, onImpersonateUs
             }
         }
         if (activeTab === 'logs') {
-            const l = await api.admin.getLogs();
-            if (Array.isArray(l)) setLogs(l);
+            try {
+                setLogsLoadError('');
+                const l = await api.admin.getLogs();
+                if (Array.isArray(l)) setLogs(l);
+            } catch (error: any) {
+                setLogs([]);
+                setLogsLoadError(error?.message || 'Не удалось загрузить логи');
+                toast(`Не удалось загрузить логи: ${error?.message || 'проверьте backend и БД'}`, 'error');
+            }
         }
         if (activeTab === 'users') {
             const u = await api.admin.getUsers();
@@ -1791,6 +1799,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout, onImpersonateUs
                                 </div>
                             </div>
                             <div className={`p-4 sm:p-6 space-y-3 max-h-[70vh] overflow-y-auto ${panelSurfaceClass}`}>
+                                {logsLoadError && (
+                                    <div className={isDarkTheme ? 'text-red-300 bg-red-950/40 border border-red-900 rounded-2xl p-4' : 'text-red-600 bg-red-50 border border-red-200 rounded-2xl p-4'}>
+                                        Ошибка загрузки логов: {logsLoadError}
+                                    </div>
+                                )}
                                 {(logs || []).length === 0 && (
                                     <div className={panelEmptyStateClass}>
                                         Логи пока не найдены.

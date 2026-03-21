@@ -1150,11 +1150,12 @@ export const api = {
             } catch { return { 'Content-Type': 'application/json' }; }
         },
         getLogs: async (): Promise<SystemLog[]> => {
-             try {
-                 const res = await fetch(`${API_URL}/admin/logs`, { headers: api.admin._headers() });
-                 if (!res.ok) return [];
-                 return await res.json();
-             } catch(e) { return []; }
+             const res = await fetch(`${API_URL}/admin/logs`, { headers: api.admin._headers() });
+             if (!res.ok) {
+                 const err = await res.json().catch(() => ({ error: res.statusText }));
+                 throw new Error(err.error || 'Failed to fetch logs');
+             }
+             return await res.json();
         },
         getStats: async () => {
             try {

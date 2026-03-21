@@ -538,6 +538,18 @@ const humanizeSystemLogs = async (rows = []) => {
     return rows.map((row) => humanizeSystemLog(row, context));
 };
 
+const ensureSystemLogsTable = async () => {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS system_logs (
+            id SERIAL PRIMARY KEY,
+            level VARCHAR(20),
+            message TEXT,
+            module VARCHAR(50),
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+};
+
 const TOURNAMENT_STAGE_DEFINITIONS = [
     {
         label: 'Расписание на основной этап турнира',
@@ -4184,6 +4196,8 @@ app.get('/api/admin/news', requireAdmin, async (req, res) => {
 server.listen(PORT, async () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     try {
+        await ensureSystemLogsTable();
+        console.log('✅ System logs table ready');
         await ensureNewsTable();
         console.log('✅ News table ready');
         setTimeout(() => {
@@ -4193,7 +4207,7 @@ server.listen(PORT, async () => {
             syncTrackedTournamentStages().catch(err => console.error('Scheduled RTT tournament sync failed:', err.message));
         }, TOURNAMENT_STAGE_SYNC_INTERVAL_MS);
     } catch (err) {
-        console.error('Failed to ensure news table:', err.message);
+        console.error('Failed to ensure startup tables:', err.message);
     }
 });
 
