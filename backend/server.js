@@ -240,10 +240,10 @@ const buildLogReferenceContext = async (rows = []) => {
         challengeIds.length
             ? queryNamedMap(
                 `SELECT c.id,
-                        CONCAT(COALESCE(challenger.name, 'Игрок'), ' vs ', COALESCE(opponent.name, 'Игрок')) AS label
+                        CONCAT(COALESCE(challenger.name, 'Игрок'), ' vs ', COALESCE(defender.name, 'Игрок')) AS label
                  FROM challenges c
                  LEFT JOIN users challenger ON challenger.id = c.challenger_id
-                 LEFT JOIN users opponent ON opponent.id = c.opponent_id
+                 LEFT JOIN users defender ON defender.id = c.defender_id
                  WHERE c.id = ANY($1::int[])`,
                 challengeIds,
                 (row) => [Number(row.id), row.label || `Вызов #${row.id}`]
