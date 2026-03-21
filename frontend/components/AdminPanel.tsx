@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { 
     LayoutDashboard, 
     Users, 
@@ -102,6 +102,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [courts, setCourts] = useState<Court[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
     const [logs, setLogs] = useState<SystemLog[]>([]);
+    const [logQuery, setLogQuery] = useState('');
+    const [logLevelFilter, setLogLevelFilter] = useState<'all' | SystemLog['level']>('all');
+    const [logModuleFilter, setLogModuleFilter] = useState('all');
+    const [logActionFilter, setLogActionFilter] = useState<'all' | 'created' | 'updated' | 'deleted'>('all');
+    const [logActorFilter, setLogActorFilter] = useState('all');
+    const [logPeriodFilter, setLogPeriodFilter] = useState<'all' | 'today' | '7d' | '30d'>('all');
     const [tournaments, setTournaments] = useState<Tournament[]>([]);
     const [news, setNews] = useState<NewsArticle[]>([]);
     
@@ -143,6 +149,97 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [editingUser, setEditingUser] = useState<(Partial<User> & { password?: string, rni?: string }) | null>(null);
     const [rttFetching, setRttFetching] = useState(false);
     const [rttFetchResult, setRttFetchResult] = useState<{ok: boolean; msg: string} | null>(null);
+
+    const getLogActionType = (log: SystemLog): 'created' | 'updated' | 'deleted' | 'other' => {
+        const text = `${log.message || ''} ${log.details || ''}`.toLowerCase();
+
+        if (/(создал|создан|создана|добавил|добавлен|добавлена|опубликовал)/.test(text)) return 'created';
+        if (/(обновил|обновл[её]н|обновлена|изменил|изменена)/.test(text)) return 'updated';
+        if (/(удалил|удал[её]н|удалена)/.test(text)) return 'deleted';
+
+        return 'other';
+    };
+
+    const logModuleOptions = useMemo(() => {
+        const uniqueModules = Array.from(new Set((logs || []).map(log => log.moduleLabel || log.module).filter(Boolean)));
+        return uniqueModules.sort((a, b) => a.localeCompare(b, 'ru'));
+    }, [logs]);
+
+    const logActorOptions = useMemo(() => {
+        const uniqueActors = Array.from(new Set((logs || []).map(log => log.actor).filter(Boolean)));
+        return uniqueActors.sort((a, b) => a.localeCompare(b, 'ru'));
+    }, [logs]);
+
+    const logModuleCounts = useMemo(() => {
+        return (logs || []).reduce<Record<string, number>>((acc, log) => {
+            const moduleName = log.moduleLabel || log.module;
+            if (!moduleName) return acc;
+            acc[moduleName] = (acc[moduleName] || 0) + 1;
+            return acc;
+        }, {});
+    }, [logs]);
+
+    const logActionCounts = useMemo(() => {
+        return (logs || []).reduce(
+            (acc, log) => {
+                const actionType = getLogActionType(log);
+                if (actionType !== 'other') acc[actionType] += 1;
+                return acc;
+            },
+            { created: 0, updated: 0, deleted: 0 }
+        );
+    }, [logs]);
+
+    const isLogInPeriod = (log: SystemLog) => {
+        if (logPeriodFilter === 'all') return true;
+
+        const rawDate = log.timestampRaw ? new Date(log.timestampRaw) : null;
+        if (!rawDate || Number.isNaN(rawDate.getTime())) return false;
+
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        if (logPeriodFilter === 'today') {
+            return rawDate >= startOfToday;
+        }
+
+        const days = logPeriodFilter === '7d' ? 7 : 30;
+        const threshold = new Date(now);
+        threshold.setDate(threshold.getDate() - days);
+        return rawDate >= threshold;
+    };
+
+    const filteredLogs = useMemo(() => {
+        const query = logQuery.trim().toLowerCase();
+
+        return (logs || []).filter((log) => {
+            const levelMatches = logLevelFilter === 'all' || log.level === logLevelFilter;
+            const moduleValue = log.moduleLabel || log.module;
+            const moduleMatches = logModuleFilter === 'all' || moduleValue === logModuleFilter;
+            const actionMatches = logActionFilter === 'all' || getLogActionType(log) === logActionFilter;
+            const actorMatches = logActorFilter === 'all' || log.actor === logActorFilter;
+            const periodMatches = isLogInPeriod(log);
+
+            if (!levelMatches || !moduleMatches || !actionMatches || !actorMatches || !periodMatches) return false;
+            if (!query) return true;
+
+            const haystack = [
+                log.message,
+                log.details,
+                log.actor,
+                log.module,
+                log.moduleLabel,
+                log.level,
+                log.levelLabel,
+                log.timestamp
+            ]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+
+            return haystack.includes(query);
+        });
+    }, [logs, logLevelFilter, logModuleFilter, logActionFilter, logActorFilter, logPeriodFilter, logQuery]);
 
     const handleFetchRtt = async () => {
         if (!editingUser?.rni) return;
@@ -1479,27 +1576,161 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                     )}
 
                     {activeTab === 'logs' && (
-                        <div className="bg-slate-900 rounded-2xl p-6 shadow-2xl text-slate-300 font-mono text-sm h-[600px] overflow-y-auto animate-fade-in-up border border-slate-800">
-                             <div className="flex items-center gap-2 mb-4 text-slate-500 border-b border-slate-800 pb-2">
-                                 <Terminal size={16}/> System Logs / Live Stream
-                             </div>
-                             <div className="space-y-2">
-                                 {(logs || []).length === 0 && <div className="text-slate-600">No logs found in database.</div>}
-                                 {(logs || []).map((log) => (
-                                     <div key={log.id} className="flex gap-4 hover:bg-white/5 p-1 rounded transition-colors">
-                                         <span className="text-slate-500 shrink-0 w-20">{log.timestamp}</span>
-                                         <span className={`font-bold uppercase text-xs w-16 text-center rounded px-1 py-0.5 shrink-0 h-fit ${
-                                             log.level === 'info' ? 'bg-blue-900 text-blue-400' :
-                                             log.level === 'warning' ? 'bg-amber-900 text-amber-400' :
-                                             log.level === 'error' ? 'bg-red-900 text-red-400' :
-                                             'bg-green-900 text-green-400'
-                                         }`}>{log.level}</span>
-                                         <span className="text-slate-400 w-24 shrink-0">[{log.module}]</span>
-                                         <span className="text-slate-200">{log.message}</span>
-                                     </div>
-                                 ))}
-                                 <div className="animate-pulse text-lime-400 mt-2">_</div>
-                             </div>
+                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-fade-in-up">
+                            <div className="p-4 sm:p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div>
+                                    <div className="flex items-center gap-2 text-slate-900 font-bold">
+                                        <Terminal size={16}/> Журнал действий
+                                    </div>
+                                    <p className="text-sm text-slate-500 mt-1">Понятная история изменений: кто, что и когда сделал.</p>
+                                </div>
+                                <div className="text-sm text-slate-400">Найдено {filteredLogs.length} из {(logs || []).length}</div>
+                            </div>
+                            <div className="p-4 sm:p-6 border-b border-slate-200 bg-white">
+                                <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.5fr),180px,220px,180px,auto] gap-3">
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                        <input
+                                            type="text"
+                                            value={logQuery}
+                                            onChange={(e) => setLogQuery(e.target.value)}
+                                            placeholder="Поиск по действию, имени, детали или времени"
+                                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:ring-2 focus:ring-lime-400"
+                                        />
+                                    </div>
+                                    <select
+                                        value={logLevelFilter}
+                                        onChange={(e) => setLogLevelFilter(e.target.value as 'all' | SystemLog['level'])}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:ring-2 focus:ring-lime-400"
+                                    >
+                                        <option value="all">Все уровни</option>
+                                        <option value="info">Инфо</option>
+                                        <option value="warning">Внимание</option>
+                                        <option value="error">Ошибка</option>
+                                        <option value="success">Успешно</option>
+                                    </select>
+                                    <select
+                                        value={logActorFilter}
+                                        onChange={(e) => setLogActorFilter(e.target.value)}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:ring-2 focus:ring-lime-400"
+                                    >
+                                        <option value="all">Все исполнители</option>
+                                        {logActorOptions.map((actorName) => (
+                                            <option key={actorName} value={actorName}>{actorName}</option>
+                                        ))}
+                                    </select>
+                                    <select
+                                        value={logPeriodFilter}
+                                        onChange={(e) => setLogPeriodFilter(e.target.value as 'all' | 'today' | '7d' | '30d')}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:ring-2 focus:ring-lime-400"
+                                    >
+                                        <option value="all">Весь период</option>
+                                        <option value="today">Сегодня</option>
+                                        <option value="7d">Последние 7 дней</option>
+                                        <option value="30d">Последние 30 дней</option>
+                                    </select>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            setLogQuery('');
+                                            setLogLevelFilter('all');
+                                            setLogModuleFilter('all');
+                                            setLogActorFilter('all');
+                                            setLogActionFilter('all');
+                                            setLogPeriodFilter('all');
+                                        }}
+                                        className="w-full lg:w-auto"
+                                    >
+                                        Сбросить
+                                    </Button>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2 mt-3">
+                                    {[
+                                        { key: 'all', label: 'Все действия' },
+                                        { key: 'created', label: `Создал (${logActionCounts.created})` },
+                                        { key: 'updated', label: `Обновил (${logActionCounts.updated})` },
+                                        { key: 'deleted', label: `Удалил (${logActionCounts.deleted})` }
+                                    ].map((chip) => {
+                                        const active = logActionFilter === chip.key;
+                                        return (
+                                            <button
+                                                key={chip.key}
+                                                type="button"
+                                                onClick={() => setLogActionFilter(chip.key as 'all' | 'created' | 'updated' | 'deleted')}
+                                                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors border ${
+                                                    active
+                                                        ? 'bg-slate-900 text-white border-slate-900'
+                                                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-white'
+                                                }`}
+                                            >
+                                                {chip.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2 mt-3">
+                                    {[
+                                        { key: 'all', label: 'Все модули' },
+                                        ...logModuleOptions.map((moduleName) => ({
+                                            key: moduleName,
+                                            label: `${moduleName} (${logModuleCounts[moduleName] || 0})`
+                                        }))
+                                    ].map((chip) => {
+                                        const active = logModuleFilter === chip.key;
+                                        return (
+                                            <button
+                                                key={chip.key}
+                                                type="button"
+                                                onClick={() => setLogModuleFilter(chip.key)}
+                                                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors border ${
+                                                    active
+                                                        ? 'bg-lime-500 text-white border-lime-500'
+                                                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-white'
+                                                }`}
+                                            >
+                                                {chip.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            <div className="p-4 sm:p-6 space-y-3 max-h-[70vh] overflow-y-auto bg-slate-50">
+                                {(logs || []).length === 0 && (
+                                    <div className="text-slate-500 bg-white border border-dashed border-slate-300 rounded-2xl p-6 text-center">
+                                        Логи пока не найдены.
+                                    </div>
+                                )}
+                                {(logs || []).length > 0 && filteredLogs.length === 0 && (
+                                    <div className="text-slate-500 bg-white border border-dashed border-slate-300 rounded-2xl p-6 text-center">
+                                        По текущим фильтрам ничего не найдено.
+                                    </div>
+                                )}
+                                {filteredLogs.map((log) => (
+                                    <div key={log.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:border-slate-300 transition-colors">
+                                        <div className="flex flex-col lg:flex-row lg:items-start gap-3 lg:gap-4">
+                                            <div className="text-xs text-slate-500 shrink-0 min-w-[150px]">{log.timestamp}</div>
+                                            <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                                <span className={`font-bold text-xs rounded-full px-2.5 py-1 ${
+                                                    log.level === 'info' ? 'bg-blue-100 text-blue-700' :
+                                                    log.level === 'warning' ? 'bg-amber-100 text-amber-700' :
+                                                    log.level === 'error' ? 'bg-red-100 text-red-700' :
+                                                    'bg-emerald-100 text-emerald-700'
+                                                }`}>
+                                                    {log.levelLabel || log.level}
+                                                </span>
+                                                <span className="font-medium text-xs rounded-full px-2.5 py-1 bg-slate-100 text-slate-600">
+                                                    {log.moduleLabel || log.module}
+                                                </span>
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="font-semibold text-slate-900 break-words">{log.message}</div>
+                                                {log.actor && <div className="text-sm text-slate-500 mt-1">Кто: {log.actor}</div>}
+                                                {log.details && <div className="text-sm text-slate-500 mt-1 break-words">{log.details}</div>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>

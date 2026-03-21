@@ -193,7 +193,12 @@ export interface SystemLog {
   level: 'info' | 'warning' | 'error' | 'success';
   message: string;
   timestamp: string;
+  timestampRaw?: string;
   module: string;
+  levelLabel?: string;
+  moduleLabel?: string;
+  details?: string;
+  actor?: string;
 }
 
 export interface LadderPlayer {

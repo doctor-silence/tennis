@@ -73,6 +73,222 @@ const logSystemEvent = async (level, message, moduleName) => {
     }
 };
 
+const getLogLevelLabel = (level) => {
+    switch (level) {
+        case 'info':
+            return 'Инфо';
+        case 'warning':
+            return 'Внимание';
+        case 'error':
+            return 'Ошибка';
+        case 'success':
+            return 'Успешно';
+        default:
+            return 'Событие';
+    }
+};
+
+const getLogModuleLabel = (moduleName) => {
+    switch (moduleName) {
+        case 'Admin':
+            return 'Админка';
+        case 'Auth':
+            return 'Авторизация';
+        case 'RTT':
+            return 'РТТ';
+        case 'Shop':
+            return 'Магазин';
+        case 'News':
+            return 'Новости';
+        case 'Groups':
+            return 'Группы';
+        case 'Tournaments':
+            return 'Турниры';
+        case 'CRM':
+            return 'CRM';
+        case 'Ladder':
+            return 'Ладдер';
+        case 'Stats':
+            return 'Статистика';
+        case 'System':
+            return 'Система';
+        default:
+            return moduleName || 'Система';
+    }
+};
+
+const formatLogTimestamp = (timestamp) => new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+}).format(new Date(timestamp));
+
+const getAdminActorLabel = (admin) => {
+    if (!admin) return 'Администратор';
+    if (admin.name) return `Администратор ${admin.name}`;
+    if (admin.email) return `Администратор ${admin.email}`;
+    if (admin.id) return `Администратор #${admin.id}`;
+    return 'Администратор';
+};
+
+const logAdminAction = async (req, level, actionText, entityText, targetText, detailsText = '') => {
+    const actorLabel = getAdminActorLabel(req.admin);
+    const targetLabel = targetText ? ` «${targetText}»` : '';
+    const detailsSuffix = detailsText ? `. ${detailsText}` : '';
+    await logSystemEvent(level, `${actorLabel} ${actionText} ${entityText}${targetLabel}${detailsSuffix}`, 'Admin');
+};
+
+const humanizeSystemLog = (row) => {
+    const message = String(row.message || '');
+    let title = message;
+    let details = '';
+    let actor = '';
+
+    const legacyPatterns = [
+        {
+            match: /^Admin created user: (.+)$/,
+            map: ([, email]) => ({
+                title: `Создан пользователь ${email}`,
+                details: 'Действие выполнено администратором',
+                actor: 'Администратор'
+            })
+        },
+        {
+            match: /^Admin updated user (.+)$/,
+            map: ([, id]) => ({
+                title: `Обновлён пользователь #${id}`,
+                details: 'Действие выполнено администратором',
+                actor: 'Администратор'
+            })
+        },
+        {
+            match: /^Admin deleted user (.+)$/,
+            map: ([, id]) => ({
+                title: `Удалён пользователь #${id}`,
+                details: 'Действие выполнено администратором',
+                actor: 'Администратор'
+            })
+        },
+        {
+            match: /^Admin (.+) created group: (.+)$/,
+            map: ([, adminId, name]) => ({
+                title: `Создана группа «${name}»`,
+                details: `Инициатор: администратор #${adminId}`,
+                actor: `Администратор #${adminId}`
+            })
+        },
+        {
+            match: /^Admin updated group (.+)$/,
+            map: ([, id]) => ({
+                title: `Обновлена группа #${id}`,
+                details: 'Действие выполнено администратором',
+                actor: 'Администратор'
+            })
+        },
+        {
+            match: /^Admin deleted group (.+)$/,
+            map: ([, id]) => ({
+                title: `Удалена группа #${id}`,
+                details: 'Действие выполнено администратором',
+                actor: 'Администратор'
+            })
+        },
+        {
+            match: /^Admin created tournament: (.+)$/,
+            map: ([, name]) => ({
+                title: `Создан турнир «${name}»`,
+                details: 'Действие выполнено администратором',
+                actor: 'Администратор'
+            })
+        },
+        {
+            match: /^Admin updated tournament (.+) status=(.+)$/,
+            map: ([, id, status]) => ({
+                title: `Обновлён турнир #${id}`,
+                details: `Новый статус: ${status}`,
+                actor: 'Администратор'
+            })
+        },
+        {
+            match: /^Admin deleted tournament (.+)$/,
+            map: ([, id]) => ({
+                title: `Удалён турнир #${id}`,
+                details: 'Действие выполнено администратором',
+                actor: 'Администратор'
+            })
+        },
+        {
+            match: /^New court added: (.+)$/,
+            map: ([, name]) => ({
+                title: `Добавлен корт «${name}»`,
+                details: 'Действие выполнено администратором',
+                actor: 'Администратор'
+            })
+        },
+        {
+            match: /^Court deleted: (.+)$/,
+            map: ([, id]) => ({
+                title: `Удалён корт #${id}`,
+                details: 'Действие выполнено администратором',
+                actor: 'Администратор'
+            })
+        },
+        {
+            match: /^New product added: (.+)$/,
+            map: ([, titleText]) => ({
+                title: `Добавлен товар «${titleText}»`,
+                details: 'Действие выполнено администратором',
+                actor: 'Администратор'
+            })
+        },
+        {
+            match: /^Product deleted: (.+)$/,
+            map: ([, id]) => ({
+                title: `Удалён товар #${id}`,
+                details: 'Действие выполнено администратором',
+                actor: 'Администратор'
+            })
+        },
+        {
+            match: /^News created: (.+)$/,
+            map: ([, titleText]) => ({
+                title: `Создана новость «${titleText}»`,
+                details: 'Действие выполнено администратором',
+                actor: 'Администратор'
+            })
+        }
+    ];
+
+    const matchedPattern = legacyPatterns.find((pattern) => pattern.match.test(message));
+    if (matchedPattern) {
+        const parsed = matchedPattern.map(message.match(matchedPattern.match));
+        title = parsed.title;
+        details = parsed.details;
+        actor = parsed.actor;
+    } else if (message.startsWith('Администратор ')) {
+        const [firstSentence, ...rest] = message.split('. ');
+        title = firstSentence;
+        details = rest.join('. ');
+        const actorMatch = message.match(/^(Администратор[^«]+?)(?: создал| обновил| удалил| добавил| изменил| опубликовал)/i);
+        actor = actorMatch ? actorMatch[1].trim() : 'Администратор';
+    }
+
+    return {
+        id: row.id.toString(),
+        level: row.level,
+        levelLabel: getLogLevelLabel(row.level),
+        message: title,
+        details,
+        actor,
+        module: row.module,
+        moduleLabel: getLogModuleLabel(row.module),
+        timestamp: formatLogTimestamp(row.timestamp),
+        timestampRaw: new Date(row.timestamp).toISOString()
+    };
+};
+
 const TOURNAMENT_STAGE_DEFINITIONS = [
     {
         label: 'Расписание на основной этап турнира',
@@ -925,10 +1141,16 @@ const requireAdmin = async (req, res, next) => {
     const adminId = parsedId || devFallback;
     if (!adminId) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const result = await pool.query("SELECT role FROM users WHERE id = $1", [adminId]);
+        const result = await pool.query("SELECT id, name, email, role FROM users WHERE id = $1", [adminId]);
         if (!result.rows.length || result.rows[0].role !== 'admin') {
             return res.status(403).json({ error: 'Forbidden', hint: `User ${adminId} is not admin` });
         }
+        req.admin = {
+            id: String(result.rows[0].id),
+            name: result.rows[0].name,
+            email: result.rows[0].email,
+            role: result.rows[0].role
+        };
         next();
     } catch (e) {
         console.error('requireAdmin error:', e.message);
@@ -987,13 +1209,7 @@ app.get('/api/admin/stats', requireAdmin, async (req, res) => {
 app.get('/api/admin/logs', requireAdmin, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM system_logs ORDER BY timestamp DESC LIMIT 50');
-        res.json(result.rows.map(r => ({
-            id: r.id.toString(),
-            level: r.level,
-            message: r.message,
-            module: r.module,
-            timestamp: new Date(r.timestamp).toLocaleTimeString()
-        })));
+        res.json(result.rows.map(humanizeSystemLog));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -1044,7 +1260,7 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
             ]
         );
         const user = result.rows[0];
-        await logSystemEvent('info', `Admin created user: ${email}`, 'Admin');
+        await logAdminAction(req, 'info', 'создал', 'пользователя', name || email, `Email: ${email}, роль: ${role || 'amateur'}`);
         res.json({ ...user, id: user.id.toString(), rttRank: user.rtt_rank, rttCategory: user.rtt_category });
     } catch (err) {
         console.error("Admin Create User Error:", err);
@@ -1075,7 +1291,7 @@ app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
         if (notifications_enabled !== undefined) await client.query('UPDATE users SET notifications_enabled = $1 WHERE id = $2', [notifications_enabled, id]);
 
         await client.query('COMMIT');
-        await logSystemEvent('warning', `Admin updated user ${id}`, 'Admin');
+        await logAdminAction(req, 'info', 'обновил', 'пользователя', name || `#${id}`, `ID: ${id}`);
         res.json({ success: true });
     } catch (err) {
         await client.query('ROLLBACK');
@@ -1090,8 +1306,10 @@ app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
 app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     try {
+        const userResult = await pool.query('SELECT name, email FROM users WHERE id = $1', [id]);
         await pool.query('DELETE FROM users WHERE id = $1', [id]);
-        await logSystemEvent('warning', `Admin deleted user ${id}`, 'Admin');
+        const userLabel = userResult.rows[0]?.name || userResult.rows[0]?.email || `#${id}`;
+        await logAdminAction(req, 'warning', 'удалил', 'пользователя', userLabel, `ID: ${id}`);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -1159,7 +1377,7 @@ app.post('/api/admin/groups', requireAdmin, async (req, res) => {
             [newGroup.id, creatorId, 'admin']
         );
         await client.query('COMMIT');
-        await logSystemEvent('info', `Admin ${creatorId} created group: ${name}`, 'Admin');
+        await logAdminAction(req, 'info', 'создал', 'группу', name, `Создатель группы ID: ${creatorId}`);
         res.status(201).json({ ...newGroup, id: newGroup.id.toString() });
     } catch (err) {
         await client.query('ROLLBACK');
@@ -1181,7 +1399,7 @@ app.put('/api/admin/groups/:id', requireAdmin, async (req, res) => {
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Group not found' });
         }
-        await logSystemEvent('info', `Admin updated group ${id}`, 'Admin');
+        await logAdminAction(req, 'info', 'обновил', 'группу', name || `#${id}`, `ID: ${id}`);
         res.json({ ...result.rows[0], id: result.rows[0].id.toString() });
     } catch (err) {
         console.error("Admin Update Group Error:", err);
@@ -1194,11 +1412,12 @@ app.delete('/api/admin/groups/:id', requireAdmin, async (req, res) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+        const groupResult = await client.query('SELECT name FROM groups WHERE id = $1', [id]);
         await client.query('DELETE FROM group_members WHERE group_id = $1', [id]);
         await client.query('DELETE FROM posts WHERE group_id = $1', [id]);
         await client.query('DELETE FROM groups WHERE id = $1', [id]);
         await client.query('COMMIT');
-        await logSystemEvent('warning', `Admin deleted group ${id}`, 'Admin');
+        await logAdminAction(req, 'warning', 'удалил', 'группу', groupResult.rows[0]?.name || `#${id}`, `ID: ${id}`);
         res.json({ success: true });
     } catch (err) {
         await client.query('ROLLBACK');
@@ -1237,7 +1456,7 @@ app.post('/api/admin/tournaments', requireAdmin, async (req, res) => {
                 category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate, normalizedStageStatus, rttLink || null
             ]
         );
-        await logSystemEvent('info', `Admin created tournament: ${name}`, 'Admin');
+        await logAdminAction(req, 'info', 'создал', 'турнир', name, status ? `Статус: ${status}` : '');
         const newTournament = result.rows[0];
         res.status(201).json({ ...newTournament, id: newTournament.id.toString() });
     } catch (err) {
@@ -1285,7 +1504,7 @@ app.put('/api/admin/tournaments/:id', requireAdmin, async (req, res) => {
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Tournament not found' });
         }
-        await logSystemEvent('info', `Admin updated tournament ${id} status=${status}`, 'Admin');
+        await logAdminAction(req, 'info', 'обновил', 'турнир', name || `#${id}`, `ID: ${id}${status ? `, статус: ${status}` : ''}`);
         res.json({ ...result.rows[0], id: result.rows[0].id.toString() });
     } catch (err) {
         console.error("Admin Update Tournament Error:", err);
@@ -1296,8 +1515,9 @@ app.put('/api/admin/tournaments/:id', requireAdmin, async (req, res) => {
 app.delete('/api/admin/tournaments/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     try {
+        const tournamentResult = await pool.query('SELECT name FROM tournaments WHERE id = $1', [id]);
         await pool.query('DELETE FROM tournaments WHERE id = $1', [id]);
-        await logSystemEvent('warning', `Admin deleted tournament ${id}`, 'Admin');
+        await logAdminAction(req, 'warning', 'удалил', 'турнир', tournamentResult.rows[0]?.name || `#${id}`, `ID: ${id}`);
         res.json({ success: true });
     } catch (err) {
         console.error("Admin Delete Tournament Error:", err);
@@ -1357,7 +1577,7 @@ app.post('/api/courts', requireAdmin, async (req, res) => {
             'INSERT INTO courts (name, address, surface, price_per_hour, image, rating, website) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
             [name, address, surfaceJson, pricePerHour, image, rating, website]
         );
-        await logSystemEvent('info', `New court added: ${name}`, 'Admin');
+        await logAdminAction(req, 'info', 'добавил', 'корт', name, address ? `Адрес: ${address}` : '');
         const row = result.rows[0];
         res.json({
             id: row.id.toString(),
@@ -1386,6 +1606,7 @@ app.put('/api/courts/:id', requireAdmin, async (req, res) => {
             'UPDATE courts SET name=$1, address=$2, surface=$3, price_per_hour=$4, image=$5, rating=$6, website=$7 WHERE id=$8',
             [name, address, surfaceJson, pricePerHour, image, rating, website, id]
         );
+        await logAdminAction(req, 'info', 'обновил', 'корт', name || `#${id}`, `ID: ${id}`);
         res.json({ success: true });
     } catch (err) {
         console.error('❌ Error updating court:', err.message);
@@ -1395,8 +1616,9 @@ app.put('/api/courts/:id', requireAdmin, async (req, res) => {
 
 app.delete('/api/courts/:id', requireAdmin, async (req, res) => {
     try {
+        const courtResult = await pool.query('SELECT name FROM courts WHERE id = $1', [req.params.id]);
         await pool.query('DELETE FROM courts WHERE id = $1', [req.params.id]);
-        await logSystemEvent('warning', `Court deleted: ${req.params.id}`, 'Admin');
+        await logAdminAction(req, 'warning', 'удалил', 'корт', courtResult.rows[0]?.name || `#${req.params.id}`, `ID: ${req.params.id}`);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -1433,7 +1655,7 @@ app.post('/api/products', requireAdmin, async (req, res) => {
             'INSERT INTO products (title, category, price, image) VALUES ($1, $2, $3, $4) RETURNING *',
             [title, category, price, image]
         );
-        await logSystemEvent('info', `New product added: ${title}`, 'Shop');
+        await logAdminAction(req, 'info', 'добавил', 'товар', title, category ? `Категория: ${category}` : '');
         const row = result.rows[0];
         res.json({...row, id: row.id.toString()});
     } catch (err) {
@@ -1449,6 +1671,7 @@ app.put('/api/products/:id', requireAdmin, async (req, res) => {
             'UPDATE products SET title=$1, category=$2, price=$3, image=$4 WHERE id=$5',
             [title, category, price, image, id]
         );
+        await logAdminAction(req, 'info', 'обновил', 'товар', title || `#${id}`, `ID: ${id}`);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -1457,8 +1680,9 @@ app.put('/api/products/:id', requireAdmin, async (req, res) => {
 
 app.delete('/api/products/:id', requireAdmin, async (req, res) => {
     try {
+        const productResult = await pool.query('SELECT title FROM products WHERE id = $1', [req.params.id]);
         await pool.query('DELETE FROM products WHERE id = $1', [req.params.id]);
-        await logSystemEvent('warning', `Product deleted: ${req.params.id}`, 'Shop');
+        await logAdminAction(req, 'warning', 'удалил', 'товар', productResult.rows[0]?.title || `#${req.params.id}`, `ID: ${req.params.id}`);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -3634,7 +3858,7 @@ app.post('/api/news', requireAdmin, async (req, res) => {
              RETURNING *`,
             [title, summary, content, image || '', author || 'Редакция', category || 'general', is_published ?? true, views ?? 0]
         );
-        await logSystemEvent('info', `News created: ${title}`, 'News');
+        await logAdminAction(req, 'info', 'создал', 'новость', title, category ? `Категория: ${category}` : '');
         res.json({ ...result.rows[0], id: result.rows[0].id.toString() });
     } catch (err) {
         console.error("Create News Error:", err);
@@ -3653,6 +3877,7 @@ app.put('/api/news/:id', requireAdmin, async (req, res) => {
             [title, summary, content, image, author, category, is_published, views ?? 0, id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+        await logAdminAction(req, 'info', 'обновил', 'новость', title || `#${id}`, `ID: ${id}`);
         res.json({ ...result.rows[0], id: result.rows[0].id.toString() });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -3663,7 +3888,9 @@ app.put('/api/news/:id', requireAdmin, async (req, res) => {
 app.delete('/api/news/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     try {
+        const newsResult = await pool.query('SELECT title FROM news WHERE id = $1', [id]);
         await pool.query('DELETE FROM news WHERE id = $1', [id]);
+        await logAdminAction(req, 'warning', 'удалил', 'новость', newsResult.rows[0]?.title || `#${id}`, `ID: ${id}`);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
