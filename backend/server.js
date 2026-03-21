@@ -18,6 +18,8 @@ const server = http.createServer(app);
 
 const PORT = process.env.PORT || 3001;
 
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(helmet({ contentSecurityPolicy: false })); // Security headers
 app.use(cors({
