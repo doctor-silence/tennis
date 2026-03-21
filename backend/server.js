@@ -140,11 +140,151 @@ const logAdminAction = async (req, level, actionText, entityText, targetText, de
     await logSystemEvent(level, `${actorLabel} ${actionText} ${entityText}${targetLabel}${detailsSuffix}`, 'Admin');
 };
 
-const humanizeSystemLog = (row) => {
+const extractFirstNumericMatch = (text, regexp) => {
+    const matched = String(text || '').match(regexp);
+    if (!matched) return null;
+    return Number(matched[1]);
+};
+
+const collectLogReferenceIds = (rows = []) => {
+    const references = {
+        users: new Set(),
+        groups: new Set(),
+        tournaments: new Set(),
+        challenges: new Set(),
+        students: new Set(),
+        applications: new Set()
+    };
+
+    for (const row of rows) {
+        const message = String(row.message || '');
+
+        const userPatterns = [
+            /2FA enabled for user (\d+)/i,
+            /2FA disabled for user (\d+)/i,
+            /accepted by user (\d+)/i,
+            /User (\d+) created new group/i,
+            /User (\d+) joined group/i,
+            /User (\d+) applied for tournament/i,
+            /Coach (\d+) added student/i,
+            /Coach (\d+) booked lesson/i,
+            /matches added for user (\d+)/i,
+            /Match added for user (\d+)/i,
+            /by coach (\d+)/i,
+            /Winner: (\d+)/i
+        ];
+
+        userPatterns.forEach((pattern) => {
+            const value = extractFirstNumericMatch(message, pattern);
+            if (Number.isInteger(value)) references.users.add(value);
+        });
+
+        const secondUserMatch = message.match(/Challenge (\d+) was accepted by user (\d+)/i);
+        if (secondUserMatch) {
+            references.challenges.add(Number(secondUserMatch[1]));
+            references.users.add(Number(secondUserMatch[2]));
+        }
+
+        const groupId = extractFirstNumericMatch(message, /joined group (\d+)/i);
+        if (Number.isInteger(groupId)) references.groups.add(groupId);
+
+        const tournamentId = extractFirstNumericMatch(message, /applied for tournament (\d+)/i);
+        if (Number.isInteger(tournamentId)) references.tournaments.add(tournamentId);
+
+        const challengeId = extractFirstNumericMatch(message, /Challenge (\d+)/i) || extractFirstNumericMatch(message, /challenge (\d+)/i);
+        if (Number.isInteger(challengeId)) references.challenges.add(challengeId);
+
+        const studentId = extractFirstNumericMatch(message, /student (\d+)/i);
+        if (Number.isInteger(studentId)) references.students.add(studentId);
+
+        const applicationId = extractFirstNumericMatch(message, /Application (\d+)/i);
+        if (Number.isInteger(applicationId)) references.applications.add(applicationId);
+    }
+
+    return references;
+};
+
+const queryNamedMap = async (sql, ids, mapRow) => {
+    if (!ids.length) return new Map();
+    const result = await pool.query(sql, [ids]);
+    return new Map(result.rows.map(mapRow));
+};
+
+const buildLogReferenceContext = async (rows = []) => {
+    const referenceIds = collectLogReferenceIds(rows);
+    const userIds = Array.from(referenceIds.users);
+    const groupIds = Array.from(referenceIds.groups);
+    const tournamentIds = Array.from(referenceIds.tournaments);
+    const challengeIds = Array.from(referenceIds.challenges);
+    const studentIds = Array.from(referenceIds.students);
+    const applicationIds = Array.from(referenceIds.applications);
+
+    const [users, groups, tournaments, challenges, students, applications] = await Promise.all([
+        queryNamedMap(
+            'SELECT id, name, email FROM users WHERE id = ANY($1::int[])',
+            userIds,
+            (row) => [Number(row.id), row.name || row.email || `Пользователь #${row.id}`]
+        ),
+        queryNamedMap(
+            'SELECT id, name FROM groups WHERE id = ANY($1::int[])',
+            groupIds,
+            (row) => [Number(row.id), row.name || `Группа #${row.id}`]
+        ),
+        queryNamedMap(
+            'SELECT id, name FROM tournaments WHERE id = ANY($1::int[])',
+            tournamentIds,
+            (row) => [Number(row.id), row.name || `Турнир #${row.id}`]
+        ),
+        challengeIds.length
+            ? queryNamedMap(
+                `SELECT c.id,
+                        CONCAT(COALESCE(challenger.name, 'Игрок'), ' vs ', COALESCE(opponent.name, 'Игрок')) AS label
+                 FROM challenges c
+                 LEFT JOIN users challenger ON challenger.id = c.challenger_id
+                 LEFT JOIN users opponent ON opponent.id = c.opponent_id
+                 WHERE c.id = ANY($1::int[])`,
+                challengeIds,
+                (row) => [Number(row.id), row.label || `Вызов #${row.id}`]
+            )
+            : Promise.resolve(new Map()),
+        queryNamedMap(
+            'SELECT id, name FROM students WHERE id = ANY($1::int[])',
+            studentIds,
+            (row) => [Number(row.id), row.name || `Ученик #${row.id}`]
+        ),
+        applicationIds.length
+            ? queryNamedMap(
+                `SELECT ta.id,
+                        CONCAT(COALESCE(u.name, 'Пользователь'), ' → ', COALESCE(t.name, 'Турнир')) AS label
+                 FROM tournament_applications ta
+                 LEFT JOIN users u ON u.id = ta.user_id
+                 LEFT JOIN tournaments t ON t.id = ta.tournament_id
+                 WHERE ta.id = ANY($1::int[])`,
+                applicationIds,
+                (row) => [Number(row.id), row.label || `Заявка #${row.id}`]
+            )
+            : Promise.resolve(new Map())
+    ]);
+
+    return { users, groups, tournaments, challenges, students, applications };
+};
+
+const getContextLabel = (map, id, fallbackPrefix) => {
+    if (!Number.isInteger(id)) return '';
+    return map.get(id) || `${fallbackPrefix} #${id}`;
+};
+
+const humanizeSystemLog = (row, context = {}) => {
     const message = String(row.message || '');
     let title = message;
     let details = '';
     let actor = '';
+    const users = context.users || new Map();
+    const groups = context.groups || new Map();
+    const tournaments = context.tournaments || new Map();
+    const challenges = context.challenges || new Map();
+    const students = context.students || new Map();
+    const applications = context.applications || new Map();
 
     const legacyPatterns = [
         {
@@ -258,6 +398,110 @@ const humanizeSystemLog = (row) => {
                 details: 'Действие выполнено администратором',
                 actor: 'Администратор'
             })
+        },
+        {
+            match: /^2FA enabled for user (\d+)$/i,
+            map: ([, userId]) => ({
+                title: `Пользователь «${getContextLabel(users, Number(userId), 'Пользователь')}» включил двухфакторную аутентификацию`,
+                details: `ID пользователя: ${userId}`,
+                actor: getContextLabel(users, Number(userId), 'Пользователь')
+            })
+        },
+        {
+            match: /^2FA disabled for user (\d+)$/i,
+            map: ([, userId]) => ({
+                title: `Пользователь «${getContextLabel(users, Number(userId), 'Пользователь')}» отключил двухфакторную аутентификацию`,
+                details: `ID пользователя: ${userId}`,
+                actor: getContextLabel(users, Number(userId), 'Пользователь')
+            })
+        },
+        {
+            match: /^User (\d+) created new group: (.+)$/i,
+            map: ([, userId, groupName]) => ({
+                title: `Создана группа «${groupName}»`,
+                details: `Создатель: ${getContextLabel(users, Number(userId), 'Пользователь')}`,
+                actor: getContextLabel(users, Number(userId), 'Пользователь')
+            })
+        },
+        {
+            match: /^User (\d+) joined group (\d+)$/i,
+            map: ([, userId, groupId]) => ({
+                title: `Пользователь «${getContextLabel(users, Number(userId), 'Пользователь')}» вступил в группу «${getContextLabel(groups, Number(groupId), 'Группа')}»`,
+                details: `ID пользователя: ${userId}, ID группы: ${groupId}`,
+                actor: getContextLabel(users, Number(userId), 'Пользователь')
+            })
+        },
+        {
+            match: /^User (\d+) applied for tournament (\d+)$/i,
+            map: ([, userId, tournamentId]) => ({
+                title: `Пользователь «${getContextLabel(users, Number(userId), 'Пользователь')}» подал заявку на турнир «${getContextLabel(tournaments, Number(tournamentId), 'Турнир')}»`,
+                details: `ID пользователя: ${userId}, ID турнира: ${tournamentId}`,
+                actor: getContextLabel(users, Number(userId), 'Пользователь')
+            })
+        },
+        {
+            match: /^Challenge (\d+) was accepted by user (\d+)\.$/i,
+            map: ([, challengeId, userId]) => ({
+                title: `Принят вызов «${getContextLabel(challenges, Number(challengeId), 'Вызов')}»`,
+                details: `Принял: ${getContextLabel(users, Number(userId), 'Пользователь')}`,
+                actor: getContextLabel(users, Number(userId), 'Пользователь')
+            })
+        },
+        {
+            match: /^Score entered for challenge (\d+)\. Winner: (\d+)$/i,
+            map: ([, challengeId, winnerId]) => ({
+                title: `Вызов «${getContextLabel(challenges, Number(challengeId), 'Вызов')}» завершён с внесением счёта`,
+                details: `Победитель: ${getContextLabel(users, Number(winnerId), 'Пользователь')}`,
+                actor: getContextLabel(users, Number(winnerId), 'Пользователь')
+            })
+        },
+        {
+            match: /^Challenge (\d+) was cancelled\.$/i,
+            map: ([, challengeId]) => ({
+                title: `Отменён вызов «${getContextLabel(challenges, Number(challengeId), 'Вызов')}»`,
+                details: `ID вызова: ${challengeId}`,
+                actor: ''
+            })
+        },
+        {
+            match: /^Coach (\d+) added student (.+)$/i,
+            map: ([, coachId, studentName]) => ({
+                title: `Тренер «${getContextLabel(users, Number(coachId), 'Тренер')}» добавил ученика «${studentName}»`,
+                details: `ID тренера: ${coachId}`,
+                actor: getContextLabel(users, Number(coachId), 'Тренер')
+            })
+        },
+        {
+            match: /^Coach (\d+) booked lesson for student (\d+)$/i,
+            map: ([, coachId, studentId]) => ({
+                title: `Тренер «${getContextLabel(users, Number(coachId), 'Тренер')}» запланировал занятие для ученика «${getContextLabel(students, Number(studentId), 'Ученик')}»`,
+                details: `ID ученика: ${studentId}`,
+                actor: getContextLabel(users, Number(coachId), 'Тренер')
+            })
+        },
+        {
+            match: /^RTT sync: (\d+) matches added for user (\d+)$/i,
+            map: ([, addedCount, userId]) => ({
+                title: `Синхронизация РТТ добавила ${addedCount} матч(а/ей) пользователю «${getContextLabel(users, Number(userId), 'Пользователь')}»`,
+                details: `ID пользователя: ${userId}`,
+                actor: getContextLabel(users, Number(userId), 'Пользователь')
+            })
+        },
+        {
+            match: /^Match added for user (\d+) vs (.+)$/i,
+            map: ([, userId, opponentName]) => ({
+                title: `Пользователю «${getContextLabel(users, Number(userId), 'Пользователь')}» добавлен матч против «${opponentName}»`,
+                details: `ID пользователя: ${userId}`,
+                actor: getContextLabel(users, Number(userId), 'Пользователь')
+            })
+        },
+        {
+            match: /^Application (\d+) status updated to (.+) by coach (\d+)$/i,
+            map: ([, applicationId, status, coachId]) => ({
+                title: `Обновлён статус заявки «${getContextLabel(applications, Number(applicationId), 'Заявка')}»`,
+                details: `Новый статус: ${status}. Изменил: ${getContextLabel(users, Number(coachId), 'Тренер')}`,
+                actor: getContextLabel(users, Number(coachId), 'Тренер')
+            })
         }
     ];
 
@@ -287,6 +531,11 @@ const humanizeSystemLog = (row) => {
         timestamp: formatLogTimestamp(row.timestamp),
         timestampRaw: new Date(row.timestamp).toISOString()
     };
+};
+
+const humanizeSystemLogs = async (rows = []) => {
+    const context = await buildLogReferenceContext(rows);
+    return rows.map((row) => humanizeSystemLog(row, context));
 };
 
 const TOURNAMENT_STAGE_DEFINITIONS = [
@@ -1209,7 +1458,7 @@ app.get('/api/admin/stats', requireAdmin, async (req, res) => {
 app.get('/api/admin/logs', requireAdmin, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM system_logs ORDER BY timestamp DESC LIMIT 50');
-        res.json(result.rows.map(humanizeSystemLog));
+        res.json(await humanizeSystemLogs(result.rows));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -2538,9 +2787,12 @@ app.post('/api/groups', async (req, res) => {
             [newGroup.id, parsedUserId, 'admin']
         );
 
+        const creatorRes = await client.query('SELECT name FROM users WHERE id = $1', [parsedUserId]);
+        const creatorName = creatorRes.rows[0]?.name || `Пользователь #${parsedUserId}`;
+
         await client.query('COMMIT');
         
-        await logSystemEvent('info', `User ${parsedUserId} created new group: ${name}`, 'Groups');
+        await logSystemEvent('info', `Пользователь «${creatorName}» создал новую группу «${name}»`, 'Groups');
         res.status(201).json(newGroup);
     } catch (err) {
         await client.query('ROLLBACK');
@@ -2615,13 +2867,21 @@ app.post('/api/groups/:groupId/join', async (req, res) => {
             return res.status(409).json({ error: 'User is already a member of this group.' });
         }
 
+        const [userRes, groupRes] = await Promise.all([
+            pool.query('SELECT name FROM users WHERE id = $1', [parsedUserId]),
+            pool.query('SELECT name FROM groups WHERE id = $1', [parsedGroupId])
+        ]);
+
+        const memberName = userRes.rows[0]?.name || `Пользователь #${parsedUserId}`;
+        const groupName = groupRes.rows[0]?.name || `Группа #${parsedGroupId}`;
+
         // Add user to the group with 'member' role
         await pool.query(
             'INSERT INTO group_members (group_id, user_id, role) VALUES ($1, $2, $3)',
             [parsedGroupId, parsedUserId, 'member']
         );
 
-        await logSystemEvent('info', `User ${parsedUserId} joined group ${parsedGroupId}`, 'Groups');
+        await logSystemEvent('info', `Пользователь «${memberName}» вступил в группу «${groupName}»`, 'Groups');
         res.status(200).json({ success: true, message: 'Successfully joined group.' });
     } catch (err) {
         console.error("Join Group Error:", err);
@@ -2792,7 +3052,7 @@ app.post('/api/tournaments/:id/apply', async (req, res) => {
         );
 
         await client.query('COMMIT');
-        await logSystemEvent('info', `User ${userId} applied for tournament ${tournamentId}`, 'Tournaments');
+        await logSystemEvent('info', `Пользователь «${userName}» подал заявку на турнир «${tournamentName}»`, 'Tournaments');
         res.status(201).json({ success: true, message: 'Application submitted' });
 
     } catch (err) {
@@ -2992,6 +3252,9 @@ app.post('/api/students', async (req, res) => {
             }
         }
 
+        const coachRes = await client.query('SELECT name FROM users WHERE id = $1', [coachIdInt]);
+        const coachName = coachRes.rows[0]?.name || `Тренер #${coachIdInt}`;
+
         await client.query('COMMIT');
         
         // Re-fetch the student with aggregated skills to ensure consistency
@@ -3005,7 +3268,7 @@ app.post('/api/students', async (req, res) => {
         const finalStudentRow = finalResult.rows[0];
 
 
-        await logSystemEvent('info', `Coach ${coachId} added student ${name}`, 'CRM');
+    await logSystemEvent('info', `Тренер «${coachName}» добавил ученика «${name}»`, 'CRM');
         res.status(201).json({
             id: finalStudentRow.id.toString(),
             coachId: finalStudentRow.coach_id,
@@ -3201,7 +3464,9 @@ app.post('/api/lessons', async (req, res) => {
         const newLesson = result.rows[0];
         console.log('Lesson created in DB:', newLesson);
         console.log('Date stored in DB:', newLesson.date, 'Type:', typeof newLesson.date);
-        await logSystemEvent('info', `Coach ${coachId} booked lesson for student ${studentId}`, 'CRM');
+        const coachRes = await pool.query('SELECT name FROM users WHERE id = $1', [coachId]);
+        const coachName = coachRes.rows[0]?.name || `Тренер #${coachId}`;
+        await logSystemEvent('info', `Тренер «${coachName}» запланировал занятие для ученика «${studentName || `#${studentId}`}»`, 'CRM');
 
         // Format date as YYYY-MM-DD string
         const dateObj = new Date(newLesson.date);
@@ -3288,7 +3553,10 @@ app.post('/api/lessons/recurring', async (req, res) => {
             });
         }
         
-        await logSystemEvent('info', `Created ${createdLessons.length} recurring lessons`, 'CRM');
+        const coachId = lessons[0]?.coachId;
+        const coachRes = coachId ? await pool.query('SELECT name FROM users WHERE id = $1', [coachId]) : null;
+        const coachName = coachRes?.rows?.[0]?.name || (coachId ? `Тренер #${coachId}` : 'Тренер');
+        await logSystemEvent('info', `Тренер «${coachName}» создал ${createdLessons.length} повторяющихся занятий`, 'CRM');
         res.status(201).json(createdLessons);
     } catch (err) {
         console.error("Create Recurring Lessons Error:", err);
@@ -3307,7 +3575,8 @@ app.delete('/api/lessons/:id', async (req, res) => {
             return res.status(404).json({ error: 'Lesson not found' });
         }
         
-        await logSystemEvent('info', `Deleted lesson ${id}`, 'CRM');
+        const deletedLesson = result.rows[0];
+        await logSystemEvent('info', `Удалено занятие${deletedLesson?.student_name ? ` ученика «${deletedLesson.student_name}»` : ''}${deletedLesson?.date ? ` на ${new Date(deletedLesson.date).toLocaleDateString('ru-RU')}` : ''}`, 'CRM');
         res.status(200).json({ message: 'Lesson deleted successfully' });
     } catch (err) {
         console.error("Delete Lesson Error:", err);
@@ -3996,8 +4265,13 @@ app.put('/api/applications/:applicationId/status', async (req, res) => {
             );
         }
 
+        const applicantRes = await client.query('SELECT name FROM users WHERE id = $1', [applicantId]);
+        const coachRes = await client.query('SELECT name FROM users WHERE id = $1', [coachId]);
+        const applicantName = applicantRes.rows[0]?.name || `Пользователь #${applicantId}`;
+        const coachName = coachRes.rows[0]?.name || `Тренер #${coachId}`;
+
         await client.query('COMMIT');
-        await logSystemEvent('info', `Application ${applicationId} status updated to ${status} by coach ${coachId}`, 'Tournaments');
+        await logSystemEvent('info', `Тренер «${coachName}» изменил статус заявки пользователя «${applicantName}» на «${status}» для турнира «${tournament_name}»`, 'Tournaments');
         res.json({ ...result.rows[0], id: result.rows[0].id.toString() });
 
     } catch (err) {

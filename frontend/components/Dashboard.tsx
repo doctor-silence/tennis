@@ -26,9 +26,11 @@ interface DashboardProps {
   user: User;
   onLogout: () => void;
   onUserUpdate: (data: Partial<User>) => void;
+  impersonationAdmin?: User | null;
+  onReturnToAdmin?: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate, impersonationAdmin, onReturnToAdmin }) => {
   const [activeTab, setActiveTab] = useState<DashboardTab>('profile');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -303,6 +305,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate }) =
       {/* Main Content */}
       <main className="flex-1 md:ml-72 overflow-y-auto pt-14 md:pt-0 pb-20 md:pb-0 bg-[#F1F5F9]">
         <div className="p-3 sm:p-4 md:p-8 max-w-7xl mx-auto min-h-full">
+           {impersonationAdmin && (
+             <div className="mb-4 md:mb-6 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in-up">
+               <div>
+                 <p className="text-sm font-bold text-amber-900">Вы вошли под пользователем {user.name}</p>
+                 <p className="text-xs text-amber-700 mt-0.5">Режим просмотра от имени пользователя. Возврат: {impersonationAdmin.name}</p>
+               </div>
+               <button
+                 onClick={onReturnToAdmin}
+                 className="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 transition-colors"
+               >
+                 Вернуться в админку
+               </button>
+             </div>
+           )}
            <header className="flex justify-between items-center mb-4 md:mb-8">
               <div>
                 <h1 className="text-xl md:text-3xl font-bold text-slate-900">

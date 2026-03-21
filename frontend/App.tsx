@@ -44,10 +44,13 @@ import {
   Plus
 } from 'lucide-react';
 
+const IMPERSONATION_ADMIN_STORAGE_KEY = 'impersonationAdminUser';
+
 const App = () => {
   const [view, setView] = useState<ViewState>('landing');
   const [isNotFound, setIsNotFound] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [impersonationAdmin, setImpersonationAdmin] = useState<User | null>(null);
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(true); // Add loading state
 
@@ -175,18 +178,33 @@ const App = () => {
   useEffect(() => {
     try {
       const storedUser = localStorage.getItem('currentUser');
+      const storedImpersonationAdmin = localStorage.getItem(IMPERSONATION_ADMIN_STORAGE_KEY);
       const pathname = window.location.pathname;
       const search = window.location.search;
+
+      let parsedImpersonationAdmin: User | null = null;
+      if (storedImpersonationAdmin) {
+        parsedImpersonationAdmin = JSON.parse(storedImpersonationAdmin);
+      }
 
       if (storedUser) {
         const user: User = JSON.parse(storedUser);
         setCurrentUser(user);
+
         if (user.role === 'admin') {
+          if (parsedImpersonationAdmin) {
+            localStorage.removeItem(IMPERSONATION_ADMIN_STORAGE_KEY);
+          }
+          setImpersonationAdmin(null);
           setView('admin');
         } else {
+          setImpersonationAdmin(parsedImpersonationAdmin);
           setView('dashboard');
         }
       } else {
+        if (parsedImpersonationAdmin) {
+          localStorage.removeItem(IMPERSONATION_ADMIN_STORAGE_KEY);
+        }
         const { isNotFound: nextNotFound, nextView, nextAuthMode } = getPublicRouteState(pathname, search);
         setIsNotFound(nextNotFound);
         setAuthInitialMode(nextAuthMode);
@@ -222,6 +240,8 @@ const App = () => {
   }, [currentUser]);
 
   const handleLoginSuccess = (user: User) => {
+    setImpersonationAdmin(null);
+    localStorage.removeItem(IMPERSONATION_ADMIN_STORAGE_KEY);
     setCurrentUser(user);
     localStorage.setItem('currentUser', JSON.stringify(user)); // Store user in localStorage
     if (user.role === 'admin') {
@@ -240,10 +260,39 @@ const App = () => {
   };
 
   const handleLogout = () => {
+    setImpersonationAdmin(null);
     setCurrentUser(null);
     localStorage.removeItem('currentUser'); // Remove user from localStorage
+    localStorage.removeItem(IMPERSONATION_ADMIN_STORAGE_KEY);
     window.history.replaceState({}, '', '/');
     setView('landing');
+  };
+
+  const handleStartImpersonation = (targetUser: User) => {
+    if (!currentUser || currentUser.role !== 'admin') return;
+    if (targetUser.role === 'admin' || String(targetUser.id) === String(currentUser.id)) return;
+
+    setImpersonationAdmin(currentUser);
+    localStorage.setItem(IMPERSONATION_ADMIN_STORAGE_KEY, JSON.stringify(currentUser));
+    setCurrentUser(targetUser);
+    localStorage.setItem('currentUser', JSON.stringify(targetUser));
+    window.history.replaceState({}, '', '/');
+    setIsNotFound(false);
+    setView('dashboard');
+    window.scrollTo(0, 0);
+  };
+
+  const handleReturnToAdmin = () => {
+    if (!impersonationAdmin) return;
+
+    setCurrentUser(impersonationAdmin);
+    localStorage.setItem('currentUser', JSON.stringify(impersonationAdmin));
+    localStorage.removeItem(IMPERSONATION_ADMIN_STORAGE_KEY);
+    setImpersonationAdmin(null);
+    window.history.replaceState({}, '', '/');
+    setIsNotFound(false);
+    setView('admin');
+    window.scrollTo(0, 0);
   };
 
   const handleNavigate = (target: ViewState) => {
@@ -340,13 +389,15 @@ const App = () => {
               user={currentUser}
               onLogout={handleLogout}
               onUserUpdate={handleUserUpdate}
+              impersonationAdmin={impersonationAdmin}
+              onReturnToAdmin={handleReturnToAdmin}
           />
           <SupportChatWidget user={currentUser} />
         </>
       )}
 
       {view === 'admin' && currentUser && (
-          <AdminPanel user={currentUser} onLogout={handleLogout} />
+          <AdminPanel user={currentUser} onLogout={handleLogout} onImpersonateUser={handleStartImpersonation} />
       )}
 
       {view === 'news' && (

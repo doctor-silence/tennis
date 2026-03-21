@@ -32,7 +32,9 @@ import {
     Loader2,
     RefreshCw,
     Send,
-    Megaphone
+    Megaphone,
+    Moon,
+    Sun
 } from 'lucide-react';
 import AdminTournamentsView from './dashboard/AdminTournamentsView';
 import AdminSupportChat from './dashboard/AdminSupportChat';
@@ -43,6 +45,7 @@ import { api } from '../services/api';
 interface AdminPanelProps {
     user: User;
     onLogout: () => void;
+    onImpersonateUser: (targetUser: User) => void;
 }
 
 // Collection of high-quality tennis court images for auto-assignment
@@ -81,9 +84,19 @@ const CITIES = [
     'Волгоград'
 ];
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
+const ADMIN_THEME_STORAGE_KEY = 'adminTheme';
+
+const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout, onImpersonateUser }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups' | 'tournaments' | 'support' | 'news' | 'health'>('support');
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const [adminTheme, setAdminTheme] = useState<'light' | 'dark'>(() => {
+        try {
+            const savedTheme = localStorage.getItem(ADMIN_THEME_STORAGE_KEY);
+            return savedTheme === 'dark' ? 'dark' : 'light';
+        } catch {
+            return 'light';
+        }
+    });
 
     // Toast notifications
     const [toasts, setToasts] = useState<{ id: number; message: string; type: 'success' | 'error' }[]>([]);
@@ -102,6 +115,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [courts, setCourts] = useState<Court[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
     const [logs, setLogs] = useState<SystemLog[]>([]);
+    const [userSearchQuery, setUserSearchQuery] = useState('');
     const [logQuery, setLogQuery] = useState('');
     const [logLevelFilter, setLogLevelFilter] = useState<'all' | SystemLog['level']>('all');
     const [logModuleFilter, setLogModuleFilter] = useState('all');
@@ -149,6 +163,39 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [editingUser, setEditingUser] = useState<(Partial<User> & { password?: string, rni?: string }) | null>(null);
     const [rttFetching, setRttFetching] = useState(false);
     const [rttFetchResult, setRttFetchResult] = useState<{ok: boolean; msg: string} | null>(null);
+    const isDarkTheme = adminTheme === 'dark';
+
+    useEffect(() => {
+        try {
+            localStorage.setItem(ADMIN_THEME_STORAGE_KEY, adminTheme);
+        } catch {
+            // noop
+        }
+    }, [adminTheme]);
+
+    const filteredUsers = useMemo(() => {
+        const query = userSearchQuery.trim().toLowerCase();
+        if (!query) return users || [];
+
+        return (users || []).filter((userItem) => {
+            const haystack = [
+                userItem.name,
+                userItem.email,
+                userItem.city,
+                userItem.role,
+                userItem.level,
+                userItem.rttCategory,
+                userItem.rni,
+                userItem.rating,
+                userItem.rttRank
+            ]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+
+            return haystack.includes(query);
+        });
+    }, [users, userSearchQuery]);
 
     const getLogActionType = (log: SystemLog): 'created' | 'updated' | 'deleted' | 'other' => {
         const text = `${log.message || ''} ${log.details || ''}`.toLowerCase();
@@ -874,7 +921,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
 
 
     return (
-        <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
+        <div className={`admin-panel-theme flex min-h-screen font-sans ${isDarkTheme ? 'admin-theme-dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
             {isMobileSidebarOpen && (
                 <button
                     type="button"
@@ -930,13 +977,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 min-w-0 overflow-y-auto bg-slate-50">
-                <header className="min-h-16 bg-white border-b border-slate-200 flex items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 py-3 sticky top-0 z-20">
+            <main className={`flex-1 min-w-0 overflow-y-auto ${isDarkTheme ? 'bg-slate-950' : 'bg-slate-50'}`}>
+                <header className={`min-h-16 flex items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 py-3 sticky top-0 z-20 ${isDarkTheme ? 'bg-slate-900 border-b border-slate-800' : 'bg-white border-b border-slate-200'}`}>
                     <div className="flex items-center gap-3 min-w-0">
-                        <button type="button" onClick={() => setIsMobileSidebarOpen(true)} className="lg:hidden p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors shrink-0">
+                        <button type="button" onClick={() => setIsMobileSidebarOpen(true)} className={`lg:hidden p-2 rounded-xl transition-colors shrink-0 ${isDarkTheme ? 'border border-slate-700 text-slate-300 hover:bg-slate-800' : 'border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>
                             <Menu size={18} />
                         </button>
-                    <h2 className="text-base sm:text-lg lg:text-xl font-bold text-slate-800 truncate">
+                    <h2 className={`text-base sm:text-lg lg:text-xl font-bold truncate ${isDarkTheme ? 'text-slate-100' : 'text-slate-800'}`}>
                         {activeTab === 'overview' && 'Экономика приложения'}
                         {activeTab === 'users' && 'Управление пользователями'}
                         {activeTab === 'groups' && 'Управление группами'}
@@ -949,8 +996,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                         {activeTab === 'health' && 'Статус сервера'}
                     </h2>
                     </div>
-                    <div className="hidden sm:flex items-center gap-4">
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-xs font-bold border border-green-200 whitespace-nowrap">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setAdminTheme(prev => prev === 'dark' ? 'light' : 'dark')}
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors whitespace-nowrap ${isDarkTheme ? 'bg-slate-800 text-slate-100 border-slate-700 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'}`}
+                        >
+                            {isDarkTheme ? <Sun size={14}/> : <Moon size={14}/>}
+                            <span className="hidden sm:inline">{isDarkTheme ? 'Светлая тема' : 'Тёмная тема'}</span>
+                        </button>
+                        <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border whitespace-nowrap ${isDarkTheme ? 'bg-emerald-950/60 text-emerald-300 border-emerald-900' : 'bg-green-50 text-green-700 border-green-200'}`}>
                             <Activity size={14}/> Systems Operational
                         </div>
                     </div>
@@ -1380,9 +1435,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                 <div className="p-4 border-b border-slate-200 flex flex-col lg:flex-row justify-between lg:items-center gap-3">
                                     <div className="relative w-full lg:w-64">
                                         <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
-                                        <input className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg w-full text-sm outline-none focus:ring-2 focus:ring-slate-900" placeholder="Поиск пользователя..."/>
+                                        <input value={userSearchQuery} onChange={(e) => setUserSearchQuery(e.target.value)} className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg w-full text-sm outline-none focus:ring-2 focus:ring-slate-900" placeholder="Поиск пользователя..."/>
                                     </div>
                                     <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+                                         <div className="text-sm text-slate-500 flex items-center px-1">Найдено: {filteredUsers.length} из {users.length}</div>
                                          <Button size="sm" onClick={handleAddUser} className="gap-2"><Plus size={16}/> Добавить</Button>
                                          <Button size="sm" variant="outline">Экспорт CSV</Button>
                                     </div>
@@ -1399,7 +1455,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {(users || []).map(u => (
+                                        {filteredUsers.map(u => (
                                             <tr key={u.id} className="hover:bg-slate-50 transition-colors">
                                                 <td className="px-6 py-4 flex items-center gap-3">
                                                     <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-600">{u.name[0]}</div>
@@ -1431,12 +1487,27 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
                                                     <div className="flex justify-end gap-2">
+                                                        <button
+                                                            onClick={() => onImpersonateUser(u)}
+                                                            disabled={u.role === 'admin' || String(u.id) === String(user.id)}
+                                                            title={u.role === 'admin' ? 'Нельзя войти под другим администратором' : `Войти под пользователем ${u.name}`}
+                                                            className="p-2 hover:bg-lime-50 rounded-lg text-lime-600 disabled:text-slate-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                                                        >
+                                                            <Eye size={16}/>
+                                                        </button>
                                                         <button onClick={() => { setEditingUser(u); setIsUserModalOpen(true); setRttFetchResult(null); }} className="p-2 hover:bg-slate-200 rounded-lg text-slate-600"><Edit size={16}/></button>
                                                         <button onClick={() => handleDeleteUser(u.id)} className="p-2 hover:bg-red-50 rounded-lg text-red-500"><Trash2 size={16}/></button>
                                                     </div>
                                                 </td>
                                             </tr>
                                         ))}
+                                        {filteredUsers.length === 0 && (
+                                            <tr>
+                                                <td colSpan={5} className="px-6 py-10 text-center text-slate-400">
+                                                    По вашему запросу пользователи не найдены.
+                                                </td>
+                                            </tr>
+                                        )}
                                     </tbody>
                                 </table>
                                 </div>
