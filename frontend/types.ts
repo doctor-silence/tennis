@@ -279,7 +279,11 @@ export interface Group {
   location: string;
   description: string;
   creatorId?: string; // New field
+  userId?: string;
   avatar?: string;
+  contact?: string;
+  creator_name?: string;
+  members_count?: number;
 }
 
 export interface TournamentPlayer {
@@ -302,10 +306,17 @@ export interface Tournament {
   id: string;
   name: string;
   groupName?: string;
+  group_name?: string;
   prizePool: string;
-  status: 'draft' | 'live' | 'finished';
+  prize_pool?: string;
+  stageStatus?: string;
+  stage_status?: string;
+  status: 'draft' | 'open' | 'live' | 'finished';
   type: 'single_elimination' | 'round_robin';
   targetGroupId?: string;
+  target_group_id?: string;
+  rttLink?: string;
+  rtt_link?: string;
   rounds: {
     name: string;
     matches: TournamentMatch[];
@@ -313,14 +324,21 @@ export interface Tournament {
   userId?: string;
   category?: string;
   tournamentType?: 'Одиночный' | 'Парный';
+  tournament_type?: 'Одиночный' | 'Парный';
   gender?: 'Мужской' | 'Женский' | 'Смешанный';
   ageGroup?: string;
+  age_group?: string;
   system?: 'Олимпийская' | 'Круговая';
   matchFormat?: string;
+  match_format?: string;
   participantsCount?: number;
+  participants_count?: number;
   startDate?: string;
+  start_date?: string;
   endDate?: string;
+  end_date?: string;
   pending_applications_count?: number;
+  creator_role?: string;
 }
 
 export interface TournamentApplication {

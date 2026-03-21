@@ -28,6 +28,7 @@ const AdminTournamentsView: React.FC<AdminTournamentsViewProps> = ({ tournaments
               <th className="px-6 py-4">Название</th>
               <th className="px-6 py-4">Группа</th>
               <th className="px-6 py-4">Статус</th>
+              <th className="px-6 py-4">Этап RTT</th>
               <th className="px-6 py-4">Приз</th>
               <th className="px-6 py-4 text-right">Действия</th>
             </tr>
@@ -46,6 +47,9 @@ const AdminTournamentsView: React.FC<AdminTournamentsViewProps> = ({ tournaments
                   }`}>
                     {t.status === 'live' ? 'В игре' : t.status === 'open' ? 'Регистрация' : t.status === 'finished' ? 'Завершён' : 'Черновик'}
                   </span>
+                </td>
+                <td className="px-6 py-4 text-slate-600 max-w-[280px]">
+                  <div className="line-clamp-2">{(t as any).stage_status || t.stageStatus || '—'}</div>
                 </td>
                 <td className="px-6 py-4 font-bold text-slate-700">{(t as any).prize_pool || t.prizePool || '—'}</td>
                 <td className="px-6 py-4 text-right">

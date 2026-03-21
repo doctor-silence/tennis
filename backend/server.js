@@ -48,6 +48,7 @@ app.use('/api', apiLimiter);
 
 // Constants
 const SUPPORT_ADMIN_ID = 1;
+const TOURNAMENT_STAGE_SYNC_INTERVAL_MS = Number(process.env.TOURNAMENT_STAGE_SYNC_INTERVAL_MS || 30 * 60 * 1000);
 
 // Initialize DeepSeek AI
 if (!process.env.DEEPSEEK_API_KEY) {
@@ -69,6 +70,152 @@ const logSystemEvent = async (level, message, moduleName) => {
         await pool.query('INSERT INTO system_logs (level, message, module) VALUES ($1, $2, $3)', [level, message, moduleName]);
     } catch (e) {
         console.error("Failed to write log to DB", e);
+    }
+};
+
+const TOURNAMENT_STAGE_DEFINITIONS = [
+    {
+        label: 'Расписание на основной этап турнира',
+        patterns: ['расписание на основной этап турнира', 'расписание основного этапа турнира']
+    },
+    {
+        label: 'Жеребьевка на основной этап турнира',
+        patterns: ['жеребьевка на основной этап турнира', 'жеребьёвка на основной этап турнира', 'жеребьевка основного этапа турнира', 'жеребьёвка основного этапа турнира']
+    },
+    {
+        label: 'Начало регистрации на основной этап турнира',
+        patterns: ['начало регистрации на основной этап турнира', 'открыта регистрация на основной этап турнира', 'регистрация на основной этап турнира']
+    }
+];
+
+const normalizeTournamentStageStatus = (value = '') => {
+    const normalizedValue = String(value || '').trim().toLowerCase();
+    if (!normalizedValue) return null;
+
+    const matchedStage = TOURNAMENT_STAGE_DEFINITIONS.find(stage =>
+        stage.patterns.some(pattern => normalizedValue.includes(pattern)) || normalizedValue === stage.label.toLowerCase()
+    );
+
+    return matchedStage ? matchedStage.label : null;
+};
+
+const buildTournamentStageMessage = ({ tournamentName, groupName, stageStatus }) => {
+    const groupSuffix = groupName ? ` · группа «${groupName}»` : '';
+    return `Турнир «${tournamentName}»: ${stageStatus}${groupSuffix}`;
+};
+
+const publishTournamentStageUpdate = async (client, tournament, stageStatus) => {
+    if (!tournament.target_group_id || !/^\d+$/.test(String(tournament.target_group_id))) {
+        return;
+    }
+
+    const numericGroupId = parseInt(String(tournament.target_group_id), 10);
+    const groupName = tournament.group_name || tournament.groupName || null;
+    const message = buildTournamentStageMessage({
+        tournamentName: tournament.name,
+        groupName,
+        stageStatus
+    });
+
+    await client.query(
+        `INSERT INTO posts (user_id, group_id, type, content)
+         VALUES ($1, $2, $3, $4::jsonb)`,
+        [
+            tournament.user_id,
+            numericGroupId,
+            'tournament_stage_update',
+            JSON.stringify({
+                tournamentId: String(tournament.id),
+                tournamentName: tournament.name,
+                groupName,
+                stageLabel: stageStatus,
+                message,
+                rttLink: tournament.rtt_link || null
+            })
+        ]
+    );
+
+    await client.query(
+        `INSERT INTO notifications (user_id, type, message, reference_id)
+         SELECT gm.user_id, $1, $2, $3
+         FROM group_members gm
+         JOIN users u ON u.id = gm.user_id
+         WHERE gm.group_id = $4
+           AND COALESCE(u.notifications_enabled, TRUE) = TRUE`,
+        ['tournament_stage_update', message, String(tournament.id), numericGroupId]
+    );
+};
+
+let isTournamentStageSyncRunning = false;
+
+const syncTrackedTournamentStages = async () => {
+    if (isTournamentStageSyncRunning) {
+        return;
+    }
+
+    isTournamentStageSyncRunning = true;
+
+    try {
+        const trackedTournaments = await pool.query(
+            `SELECT t.id, t.user_id, t.name, t.group_name, t.target_group_id, t.rtt_link, t.stage_status,
+                    COALESCE(g.name, t.group_name) AS "groupName"
+             FROM tournaments t
+             LEFT JOIN groups g
+               ON t.target_group_id IS NOT NULL
+              AND t.target_group_id != ''
+              AND t.target_group_id ~ '^\\d+$'
+              AND CAST(t.target_group_id AS INTEGER) = g.id
+             WHERE COALESCE(t.rtt_link, '') != ''
+               AND COALESCE(t.target_group_id, '') != ''
+               AND t.target_group_id ~ '^\\d+$'
+               AND COALESCE(t.status, '') != 'finished'
+             ORDER BY t.id DESC`
+        );
+
+        let publishedCount = 0;
+
+        for (const tournament of trackedTournaments.rows) {
+            try {
+                const details = await rttParser.getTournamentDetails(tournament.rtt_link);
+                if (!details?.success) {
+                    continue;
+                }
+
+                const detectedStageStatus = normalizeTournamentStageStatus(details.tournament?.stageStatus || '');
+                const previousStageStatus = normalizeTournamentStageStatus(tournament.stage_status || '');
+
+                if (!detectedStageStatus || detectedStageStatus === previousStageStatus) {
+                    continue;
+                }
+
+                const client = await pool.connect();
+                try {
+                    await client.query('BEGIN');
+                    await client.query(
+                        'UPDATE tournaments SET stage_status = $1 WHERE id = $2',
+                        [detectedStageStatus, tournament.id]
+                    );
+                    await publishTournamentStageUpdate(client, tournament, detectedStageStatus);
+                    await client.query('COMMIT');
+                    publishedCount += 1;
+                } catch (syncErr) {
+                    await client.query('ROLLBACK');
+                    console.error(`Tournament stage sync failed for ${tournament.id}:`, syncErr.message);
+                } finally {
+                    client.release();
+                }
+            } catch (tournamentErr) {
+                console.error(`Tournament RTT sync error for ${tournament.id}:`, tournamentErr.message);
+            }
+        }
+
+        if (publishedCount > 0) {
+            await logSystemEvent('info', `RTT stage sync published ${publishedCount} tournament updates`, 'RTT');
+        }
+    } catch (err) {
+        console.error('RTT tracked tournaments sync error:', err.message);
+    } finally {
+        isTournamentStageSyncRunning = false;
     }
 };
 
@@ -481,12 +628,12 @@ app.get('/api/rtt/tournament', async (req, res) => {
 
 // Get tournaments list with filters
 app.get('/api/rtt/tournaments', async (req, res) => {
-    // Жёсткий таймаут 8 сек — не ждём вечно rttstat.ru
+    // Жёсткий таймаут должен быть больше, чем timeout у RTT parser
     const timeout = setTimeout(() => {
         if (!res.headersSent) {
             res.json({ success: true, data: { tournaments: [], filters: {} } });
         }
-    }, 8000);
+    }, 18000);
 
     try {
         const { age, g, l1, l2, l3 } = req.query;
@@ -682,6 +829,10 @@ pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP`).ca
 
 // Добавляем колонку avatar в groups если её ещё нет
 pool.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS avatar TEXT`).catch(() => {});
+
+// Добавляем RTT tracking-поля в tournaments, если их ещё нет
+pool.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS stage_status VARCHAR(255)`).catch(() => {});
+pool.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS rtt_link TEXT`).catch(() => {});
 
 // Создаём таблицу ghost_users если не существует
 pool.query(`
@@ -1071,18 +1222,19 @@ app.get('/api/admin/tournaments', requireAdmin, async (req, res) => {
 app.post('/api/admin/tournaments', requireAdmin, async (req, res) => {
     const { 
         name, groupName, prizePool, status, type, target_group_id, rounds, userId,
-        category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate 
+        category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate, stageStatus, rttLink 
     } = req.body;
+    const normalizedStageStatus = normalizeTournamentStageStatus(stageStatus || '');
     try {
         const result = await pool.query(
             `INSERT INTO tournaments (
                 user_id, name, group_name, prize_pool, status, type, target_group_id, rounds,
-                category, tournament_type, gender, age_group, system, match_format, start_date, end_date
+                category, tournament_type, gender, age_group, system, match_format, start_date, end_date, stage_status, rtt_link
             )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING *`,
             [
                 userId, name, groupName, prizePool, status, type, target_group_id, JSON.stringify(rounds),
-                category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate
+                category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate, normalizedStageStatus, rttLink || null
             ]
         );
         await logSystemEvent('info', `Admin created tournament: ${name}`, 'Admin');
@@ -1098,8 +1250,9 @@ app.put('/api/admin/tournaments/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { 
         name, groupName, prizePool, status, type, target_group_id, rounds,
-        category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate
+        category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate, stageStatus, rttLink
     } = req.body;
+    const normalizedStageStatus = normalizeTournamentStageStatus(stageStatus || '');
     try {
         // Safely serialize rounds: avoid double-serialization if already a string
         let roundsJson = null;
@@ -1112,18 +1265,20 @@ app.put('/api/admin/tournaments/:id', requireAdmin, async (req, res) => {
         if (roundsJson !== null) {
             query = `UPDATE tournaments 
                  SET name = $1, group_name = $2, prize_pool = $3, status = $4, type = $5, target_group_id = $6, rounds = $7,
-                     category = $8, tournament_type = $9, gender = $10, age_group = $11, system = $12, match_format = $13, start_date = $14, end_date = $15
-                 WHERE id = $16 RETURNING *`;
+                     category = $8, tournament_type = $9, gender = $10, age_group = $11, system = $12, match_format = $13, start_date = $14, end_date = $15,
+                     stage_status = COALESCE($16, stage_status), rtt_link = COALESCE($17, rtt_link)
+                 WHERE id = $18 RETURNING *`;
             params = [name, groupName, prizePool, status, type, target_group_id, roundsJson,
-                category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate, id];
+                category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate, normalizedStageStatus, rttLink || null, id];
         } else {
             // Don't overwrite rounds — only update meta fields
             query = `UPDATE tournaments 
                  SET name = $1, group_name = $2, prize_pool = $3, status = $4, type = $5, target_group_id = $6,
-                     category = $7, tournament_type = $8, gender = $9, age_group = $10, system = $11, match_format = $12, start_date = $13, end_date = $14
-                 WHERE id = $15 RETURNING *`;
+                     category = $7, tournament_type = $8, gender = $9, age_group = $10, system = $11, match_format = $12, start_date = $13, end_date = $14,
+                     stage_status = COALESCE($15, stage_status), rtt_link = COALESCE($16, rtt_link)
+                 WHERE id = $17 RETURNING *`;
             params = [name, groupName, prizePool, status, type, target_group_id,
-                category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate, id];
+                category, tournamentType, gender, ageGroup, system, matchFormat, startDate, endDate, normalizedStageStatus, rttLink || null, id];
         }
 
         const result = await pool.query(query, params);
@@ -2286,8 +2441,9 @@ app.get('/api/tournaments', async (req, res) => {
 app.post('/api/tournaments', async (req, res) => {
     const { 
         userId, name, groupName, prize_pool, status, type, target_group_id, rounds,
-        category, tournament_type, gender, age_group, system, match_format, start_date, end_date, participants_count
+        category, tournament_type, gender, age_group, system, match_format, start_date, end_date, participants_count, stage_status, rtt_link
     } = req.body;
+    const normalizedStageStatus = normalizeTournamentStageStatus(stage_status || '');
     if (!userId || !name) {
         return res.status(400).json({ error: 'userId and name are required' });
     }
@@ -2295,12 +2451,12 @@ app.post('/api/tournaments', async (req, res) => {
         const result = await pool.query(
             `INSERT INTO tournaments (
                 user_id, name, group_name, prize_pool, status, type, target_group_id, rounds,
-                category, tournament_type, gender, age_group, system, match_format, start_date, end_date, participants_count
+                category, tournament_type, gender, age_group, system, match_format, start_date, end_date, participants_count, stage_status, rtt_link
             )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING *`,
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) RETURNING *`,
             [
                 userId, name, groupName, prize_pool, status, type, target_group_id, JSON.stringify(rounds),
-                category, tournament_type, gender, age_group, system, match_format, start_date, end_date, participants_count
+                category, tournament_type, gender, age_group, system, match_format, start_date, end_date, participants_count, normalizedStageStatus, rtt_link || null
             ]
         );
         const newTournament = result.rows[0];
@@ -2428,8 +2584,9 @@ app.put('/api/tournaments/:id', async (req, res) => {
     const { id } = req.params;
     const { 
         name, groupName, prize_pool, status, type, target_group_id, rounds,
-        category, tournament_type, gender, age_group, system, match_format, start_date, end_date, participants_count
+        category, tournament_type, gender, age_group, system, match_format, start_date, end_date, participants_count, stage_status, rtt_link
     } = req.body;
+    const normalizedStageStatus = normalizeTournamentStageStatus(stage_status || '');
 
     try {
         // Safely serialize rounds: avoid double-serialization if already a string
@@ -2437,12 +2594,13 @@ app.put('/api/tournaments/:id', async (req, res) => {
         const result = await pool.query(
             `UPDATE tournaments 
              SET name = $1, group_name = $2, prize_pool = $3, status = $4, type = $5, target_group_id = $6, rounds = $7,
-                 category = $8, tournament_type = $9, gender = $10, age_group = $11, system = $12, match_format = $13, start_date = $14, end_date = $15, participants_count = $17
+                 category = $8, tournament_type = $9, gender = $10, age_group = $11, system = $12, match_format = $13, start_date = $14, end_date = $15, participants_count = $17,
+                 stage_status = COALESCE($18, stage_status), rtt_link = COALESCE($19, rtt_link)
              WHERE id = $16 RETURNING *`,
             [
                 name, groupName, prize_pool, status, type, target_group_id, roundsJson,
                 category, tournament_type, gender, age_group, system, match_format, start_date, end_date,
-                id, participants_count
+                id, participants_count, normalizedStageStatus, rtt_link || null
             ]
         );
         if (result.rows.length === 0) {
@@ -3532,6 +3690,12 @@ server.listen(PORT, async () => {
     try {
         await ensureNewsTable();
         console.log('✅ News table ready');
+        setTimeout(() => {
+            syncTrackedTournamentStages().catch(err => console.error('Initial RTT tournament sync failed:', err.message));
+        }, 15000);
+        setInterval(() => {
+            syncTrackedTournamentStages().catch(err => console.error('Scheduled RTT tournament sync failed:', err.message));
+        }, TOURNAMENT_STAGE_SYNC_INTERVAL_MS);
     } catch (err) {
         console.error('Failed to ensure news table:', err.message);
     }

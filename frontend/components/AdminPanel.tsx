@@ -80,8 +80,6 @@ const CITIES = [
     'Волгоград'
 ];
 
-type AdminGroup = Group & { creator_name: string; members_count: number };
-
 const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups' | 'tournaments' | 'support' | 'news' | 'health'>('support');
 
@@ -100,7 +98,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [users, setUsers] = useState<User[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
     const [courts, setCourts] = useState<Court[]>([]);
-    const [groups, setGroups] = useState<AdminGroup[]>([]);
+    const [groups, setGroups] = useState<Group[]>([]);
     const [logs, setLogs] = useState<SystemLog[]>([]);
     const [tournaments, setTournaments] = useState<Tournament[]>([]);
     const [news, setNews] = useState<NewsArticle[]>([]);
@@ -115,6 +113,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [editingGroup, setEditingGroup] = useState<Partial<Group> | null>(null);
     const [isTournamentModalOpen, setIsTournamentModalOpen] = useState(false);
     const [editingTournament, setEditingTournament] = useState<Partial<Tournament> | null>(null);
+    const [tournamentModalMode, setTournamentModalMode] = useState<'manual' | 'rtt'>('manual');
+    const [rttTournamentFilters, setRttTournamentFilters] = useState({ age: '', gender: '', district: '', subject: '', city: '' });
+    const [rttTournamentQuery, setRttTournamentQuery] = useState('');
+    const [rttTournamentOptions, setRttTournamentOptions] = useState<{districts: any[], subjects: any[], cities: any[]}>({ districts: [], subjects: [], cities: [] });
+    const [rttTournamentList, setRttTournamentList] = useState<any[]>([]);
+    const [rttTournamentLoading, setRttTournamentLoading] = useState(false);
+    const [rttTournamentError, setRttTournamentError] = useState('');
+    const [rttTournamentHasSearched, setRttTournamentHasSearched] = useState(false);
+    const [rttImportLoadingLink, setRttImportLoadingLink] = useState<string | null>(null);
     const [isPublishResultModalOpen, setIsPublishResultModalOpen] = useState(false);
     const [publishResultTournament, setPublishResultTournament] = useState<Tournament | null>(null);
     const [publishResultForm, setPublishResultForm] = useState({
@@ -183,6 +190,187 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     const [twoFaToken, setTwoFaToken] = useState<string>('');
     const [twoFaLoading, setTwoFaLoading] = useState(false);
     const [twoFaEnabled, setTwoFaEnabled] = useState<boolean>(user?.totp_enabled ?? false);
+
+    const normalizeRttDate = (rawDate?: string) => {
+        if (!rawDate) return '';
+        const match = rawDate.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+        if (!match) return '';
+        return `${match[3]}-${match[2]}-${match[1]}`;
+    };
+
+    const normalizeRttDateRange = (rawDate?: string) => {
+        if (!rawDate) return { startDate: '', endDate: '' };
+
+        const normalizedDate = rawDate.replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim();
+
+        const fullRangeMatch = normalizedDate.match(/(\d{2})\.(\d{2})\.(\d{4})\s*-\s*(\d{2})\.(\d{2})\.(\d{4})/);
+        if (fullRangeMatch) {
+            return {
+                startDate: `${fullRangeMatch[3]}-${fullRangeMatch[2]}-${fullRangeMatch[1]}`,
+                endDate: `${fullRangeMatch[6]}-${fullRangeMatch[5]}-${fullRangeMatch[4]}`
+            };
+        }
+
+        const shortDayRangeMatch = normalizedDate.match(/(\d{2})\s*-\s*(\d{2})\.(\d{2})\.(\d{4})/);
+        if (shortDayRangeMatch) {
+            return {
+                startDate: `${shortDayRangeMatch[4]}-${shortDayRangeMatch[3]}-${shortDayRangeMatch[1]}`,
+                endDate: `${shortDayRangeMatch[4]}-${shortDayRangeMatch[3]}-${shortDayRangeMatch[2]}`
+            };
+        }
+
+        const shortMonthRangeMatch = normalizedDate.match(/(\d{2})\.(\d{2})\s*-\s*(\d{2})\.(\d{2})\.(\d{4})/);
+        if (shortMonthRangeMatch) {
+            return {
+                startDate: `${shortMonthRangeMatch[5]}-${shortMonthRangeMatch[2]}-${shortMonthRangeMatch[1]}`,
+                endDate: `${shortMonthRangeMatch[5]}-${shortMonthRangeMatch[4]}-${shortMonthRangeMatch[3]}`
+            };
+        }
+
+        const matches = [...rawDate.matchAll(/(\d{2})\.(\d{2})\.(\d{4})/g)];
+        if (matches.length === 0) return { startDate: '', endDate: '' };
+
+        const toIso = (match: RegExpMatchArray) => `${match[3]}-${match[2]}-${match[1]}`;
+        const startDate = toIso(matches[0]);
+        const endDate = matches.length > 1 ? toIso(matches[matches.length - 1]) : '';
+
+        return { startDate, endDate };
+    };
+
+    const getTournamentMetaFieldConfig = (value?: string) => {
+        const normalizedValue = (value || '').trim();
+        if (normalizedValue.toLowerCase().startsWith('средний рейтинг:')) {
+            return {
+                label: 'Средний рейтинг участников',
+                placeholder: 'Например: Средний рейтинг: 269'
+            };
+        }
+
+        return {
+            label: 'Призовой фонд',
+            placeholder: 'Например: 10000 RUB'
+        };
+    };
+
+    const mapRttStatusToTournamentStatus = (status?: string): Tournament['status'] => {
+        const normalized = (status || '').toLowerCase();
+        if (normalized.includes('идут') || normalized.includes('в игре')) return 'live';
+        if (normalized.includes('завер')) return 'finished';
+        if (normalized.includes('подача') || normalized.includes('регистра')) return 'open';
+        return 'draft';
+    };
+
+    const guessTournamentType = (value?: string): Tournament['tournamentType'] => {
+        return (value || '').toLowerCase().includes('пар') ? 'Парный' : 'Одиночный';
+    };
+
+    const importRttTournamentToForm = async (rttTournament: any) => {
+        try {
+            setRttImportLoadingLink(rttTournament.link || rttTournament.name);
+            let details: any = null;
+            if (rttTournament.link) {
+                const response = await api.rtt.getTournamentDetails(rttTournament.link);
+                if (response?.success) {
+                    details = response.tournament;
+                }
+            }
+
+            const participantsCount = Number(String(rttTournament.applications || '').replace(/\D/g, '')) || details?.participants?.length || 16;
+            const rawTournamentDate = details?.date || rttTournament.startDate || '';
+            const tournamentDates = normalizeRttDateRange(rawTournamentDate);
+            const mappedTournament: Partial<Tournament> = {
+                ...editingTournament,
+                name: rttTournament.name || details?.name || 'Турнир РТТ',
+                category: rttTournament.category || details?.surface || '',
+                tournamentType: guessTournamentType(rttTournament.type),
+                gender: (rttTournament.type || '').toLowerCase().includes('жен') ? 'Женский' : (rttTournament.type || '').toLowerCase().includes('смеш') ? 'Смешанный' : 'Мужской',
+                ageGroup: rttTournament.ageGroup || '',
+                system: 'Олимпийская',
+                matchFormat: details?.surface ? `Покрытие: ${details.surface}` : '',
+                startDate: tournamentDates.startDate,
+                endDate: tournamentDates.endDate,
+                participantsCount,
+                prizePool: rttTournament.avgRating ? `Средний рейтинг: ${rttTournament.avgRating}` : '',
+                stageStatus: details?.stageStatus || rttTournament.status || '',
+                status: mapRttStatusToTournamentStatus(rttTournament.status),
+                type: 'single_elimination',
+                rttLink: rttTournament.link || '',
+                rounds: editingTournament?.rounds || [],
+                userId: user.id,
+            };
+
+            setEditingTournament(mappedTournament);
+            setTournamentModalMode('manual');
+            toast(`Турнир «${mappedTournament.name}» импортирован в форму`);
+        } catch (e: any) {
+            toast('Ошибка импорта турнира РТТ: ' + e.message, 'error');
+        } finally {
+            setRttImportLoadingLink(null);
+        }
+    };
+
+    const loadRttTournaments = async (filters = rttTournamentFilters) => {
+        setRttTournamentLoading(true);
+        setRttTournamentError('');
+        setRttTournamentHasSearched(true);
+        try {
+            const res = await api.rtt.getTournamentsList(filters);
+            if (res.success) {
+                setRttTournamentList(res.data?.tournaments || []);
+                if (res.data?.filters) {
+                    setRttTournamentOptions(res.data.filters);
+                }
+            } else {
+                setRttTournamentError(res.error || 'Не удалось загрузить турниры РТТ');
+            }
+        } catch (e: any) {
+            setRttTournamentError(e?.message || 'Ошибка загрузки турниров РТТ');
+        } finally {
+            setRttTournamentLoading(false);
+        }
+    };
+
+    const handleRttTournamentFilterChange = (key: 'age' | 'gender' | 'district' | 'subject' | 'city', value: string) => {
+        const nextFilters = { ...rttTournamentFilters, [key]: value };
+        if (key === 'district') {
+            nextFilters.subject = '';
+            nextFilters.city = '';
+        }
+        if (key === 'subject') {
+            nextFilters.city = '';
+        }
+        setRttTournamentFilters(nextFilters);
+        loadRttTournaments(nextFilters);
+    };
+
+    const resetRttTournamentFilters = () => {
+        const empty = { age: '', gender: '', district: '', subject: '', city: '' };
+        setRttTournamentFilters(empty);
+        setRttTournamentQuery('');
+        setRttTournamentList([]);
+        setRttTournamentError('');
+        setRttTournamentHasSearched(false);
+    };
+
+    const filteredRttTournamentList = rttTournamentList.filter((tournament: any) => {
+        const query = rttTournamentQuery.trim().toLowerCase();
+        if (!query) return true;
+
+        const haystack = [
+            tournament.name,
+            tournament.city,
+            tournament.ageGroup,
+            tournament.category,
+            tournament.type,
+            tournament.status,
+            tournament.startDate,
+        ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+
+        return haystack.includes(query);
+    });
 
     const handle2faSetup = async () => {
         setTwoFaLoading(true);
@@ -473,6 +661,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     };
 
     const handleAddTournament = () => {
+        setTournamentModalMode('manual');
         setEditingTournament({
             name: 'Новый турнир',
             prizePool: '10000 RUB',
@@ -485,18 +674,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
     };
 
     const handleEditTournament = (tournament: Tournament) => {
+        setTournamentModalMode('manual');
         setEditingTournament({
             ...tournament,
             // Map snake_case DB fields → camelCase form fields
             startDate: (tournament.startDate || (tournament as any).start_date || ''),
             endDate: (tournament.endDate || (tournament as any).end_date || ''),
             prizePool: (tournament.prizePool || (tournament as any).prize_pool || ''),
+            stageStatus: (tournament.stageStatus || (tournament as any).stage_status || ''),
             tournamentType: (tournament.tournamentType || (tournament as any).tournament_type || 'Одиночный'),
             ageGroup: (tournament.ageGroup || (tournament as any).age_group || ''),
             matchFormat: (tournament.matchFormat || (tournament as any).match_format || ''),
             groupName: (tournament.groupName || (tournament as any).group_name || ''),
             participantsCount: (tournament.participantsCount || (tournament as any).participants_count || 16),
             target_group_id: (tournament.target_group_id || (tournament as any).target_group_id || ''),
+            rttLink: (tournament.rttLink || (tournament as any).rtt_link || ''),
         });
         setIsTournamentModalOpen(true);
     };
@@ -1216,14 +1408,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                                                  </td>
                                                  <td className="px-6 py-4 text-slate-600">{c.address}</td>
                                                  <td className="px-6 py-4">
+                                                     {(() => {
+                                                         const primarySurface = Array.isArray(c.surface) ? c.surface[0] : c.surface;
+                                                         return (
                                                      <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase ${
-                                                         c.surface === 'clay' ? 'bg-orange-100 text-orange-800' :
-                                                         c.surface === 'hard' ? 'bg-blue-100 text-blue-800' :
-                                                         c.surface === 'grass' ? 'bg-green-100 text-green-800' :
+                                                         primarySurface === 'clay' ? 'bg-orange-100 text-orange-800' :
+                                                         primarySurface === 'hard' ? 'bg-blue-100 text-blue-800' :
+                                                         primarySurface === 'grass' ? 'bg-green-100 text-green-800' :
                                                          'bg-indigo-100 text-indigo-800'
                                                      }`}>
                                                          {Array.isArray(c.surface) ? c.surface.join(', ') : c.surface}
                                                      </span>
+                                                         );
+                                                     })()}
                                                  </td>
                                                  <td className="px-6 py-4 font-bold">{c.pricePerHour} ₽/ч</td>
                                                  <td className="px-6 py-4">
@@ -1277,9 +1474,134 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                 </div>
             </main>
 
-            <Modal isOpen={isTournamentModalOpen} onClose={() => setIsTournamentModalOpen(false)} title="Редактировать турнир">
+            <Modal isOpen={isTournamentModalOpen} onClose={() => setIsTournamentModalOpen(false)} title="Редактировать турнир" maxWidthClass="max-w-5xl">
                 {editingTournament && (
-                    <form onSubmit={handleSaveTournament} className="space-y-4">
+                    <form onSubmit={handleSaveTournament} className="space-y-5">
+                        <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl">
+                            <button type="button" onClick={() => setTournamentModalMode('manual')} className={`rounded-xl px-4 py-2 text-sm font-bold transition-colors ${tournamentModalMode === 'manual' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                                Ручное заполнение
+                            </button>
+                            <button type="button" onClick={() => { setTournamentModalMode('rtt'); if (!rttTournamentHasSearched) loadRttTournaments(); }} className={`rounded-xl px-4 py-2 text-sm font-bold transition-colors ${tournamentModalMode === 'rtt' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                                Импорт из РТТ
+                            </button>
+                        </div>
+
+                        {tournamentModalMode === 'rtt' && (
+                            <div className="space-y-5 border border-slate-200 rounded-2xl p-5 md:p-6 bg-slate-50">
+                                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                    <div className="max-w-2xl">
+                                        <h4 className="font-bold text-slate-900">Поиск турнира РТТ</h4>
+                                        <p className="text-sm text-slate-500">Найдите турнир в базе РТТ и подтяните его данные в форму создания.</p>
+                                    </div>
+                                    <button type="button" onClick={() => loadRttTournaments()} className="p-2 rounded-lg hover:bg-white text-slate-500 hover:text-slate-800 transition-colors" title="Обновить список">
+                                        <RefreshCw size={16} className={rttTournamentLoading ? 'animate-spin' : ''} />
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Возраст</label>
+                                        <select value={rttTournamentFilters.age} onChange={(e) => handleRttTournamentFilterChange('age', e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm bg-white outline-none min-h-[48px]">
+                                            <option value="">Все возраста</option>
+                                            <option value="131">9-10 лет</option>
+                                            <option value="132">до 13 лет</option>
+                                            <option value="133">до 15 лет</option>
+                                            <option value="134">до 17 лет</option>
+                                            <option value="135">до 19 лет</option>
+                                            <option value="136">19+ лет</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Пол</label>
+                                        <select value={rttTournamentFilters.gender} onChange={(e) => handleRttTournamentFilterChange('gender', e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm bg-white outline-none min-h-[48px]">
+                                            <option value="">Все</option>
+                                            <option value="1">М</option>
+                                            <option value="2">Ж</option>
+                                            <option value="3">Микст</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Округ</label>
+                                        <select value={rttTournamentFilters.district} onChange={(e) => handleRttTournamentFilterChange('district', e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm bg-white outline-none min-h-[48px]">
+                                            <option value="">Не выбрано</option>
+                                            {rttTournamentOptions.districts.map((d: any) => <option key={d.value} value={d.value}>{d.label}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Субъект</label>
+                                        <select value={rttTournamentFilters.subject} onChange={(e) => handleRttTournamentFilterChange('subject', e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm bg-white outline-none min-h-[48px]">
+                                            <option value="">Не выбрано</option>
+                                            {rttTournamentOptions.subjects.filter((s: any) => !rttTournamentFilters.district || s.parent === rttTournamentFilters.district).map((s: any) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Город</label>
+                                        <select value={rttTournamentFilters.city} onChange={(e) => handleRttTournamentFilterChange('city', e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm bg-white outline-none min-h-[48px]">
+                                            <option value="">Не выбрано</option>
+                                            {rttTournamentOptions.cities.filter((c: any) => !rttTournamentFilters.subject || c.parent === rttTournamentFilters.subject).map((c: any) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                    <p className="text-sm text-slate-400 max-w-2xl">Используется тот же источник, что и во вкладке статистики РТТ.</p>
+                                    {rttTournamentHasSearched && (
+                                        <button type="button" onClick={resetRttTournamentFilters} className="text-sm text-slate-500 hover:text-red-500 transition-colors text-left sm:text-right">
+                                            Сбросить фильтры
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                    <input
+                                        type="text"
+                                        value={rttTournamentQuery}
+                                        onChange={(e) => setRttTournamentQuery(e.target.value)}
+                                        placeholder="Введите название, город, категорию или дату турнира"
+                                        className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 bg-white text-sm outline-none focus:ring-2 focus:ring-orange-400"
+                                    />
+                                </div>
+
+                                {rttTournamentLoading ? (
+                                    <div className="flex items-center justify-center py-10 text-slate-500 gap-3">
+                                        <Loader2 size={20} className="animate-spin text-orange-500" />
+                                        Загружаем турниры РТТ...
+                                    </div>
+                                ) : rttTournamentError ? (
+                                    <div className="py-6 text-center text-sm text-red-500">{rttTournamentError}</div>
+                                ) : !rttTournamentHasSearched ? (
+                                    <div className="py-8 text-center text-sm text-slate-400">Выберите фильтры или нажмите обновить, чтобы загрузить турниры РТТ.</div>
+                                ) : filteredRttTournamentList.length === 0 ? (
+                                    <div className="py-8 text-center text-sm text-slate-400">Подходящие турниры не найдены.</div>
+                                ) : (
+                                    <div className="max-h-80 overflow-auto divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
+                                        {filteredRttTournamentList.map((tournament: any, index: number) => (
+                                            <div key={tournament.link || `${tournament.name}-${index}`} className="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 hover:bg-orange-50 transition-colors">
+                                                <div>
+                                                    <div className="font-bold text-slate-900">{tournament.name}</div>
+                                                    <div className="text-sm text-slate-500 mt-1">{[tournament.city, tournament.ageGroup, tournament.startDate].filter(Boolean).join(' • ')}</div>
+                                                    <div className="text-xs text-slate-400 mt-1">{[tournament.type, tournament.category, tournament.status].filter(Boolean).join(' • ')}</div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {tournament.link && (
+                                                        <a href={tournament.link} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors" title="Открыть турнир в РТТ">
+                                                            <ExternalLink size={16} />
+                                                        </a>
+                                                    )}
+                                                    <Button type="button" onClick={() => importRttTournamentToForm(tournament)} disabled={rttImportLoadingLink === (tournament.link || tournament.name)} className="px-4 py-2 text-sm">
+                                                        {rttImportLoadingLink === (tournament.link || tournament.name) ? <Loader2 size={16} className="animate-spin" /> : 'Импортировать'}
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {tournamentModalMode === 'manual' && (
+                            <>
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Название</label>
                             <input required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.name || ''} onChange={e => setEditingTournament({...editingTournament, name: e.target.value})} />
@@ -1343,10 +1665,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                             <label className="text-xs font-bold text-slate-500 uppercase">Кол-во участников</label>
                             <input type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.participantsCount || 16} onChange={e => setEditingTournament({...editingTournament, participantsCount: Number(e.target.value)})} />
                         </div>
+
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Этап RTT</label>
+                            <input
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none"
+                                placeholder="Например: Жеребьевка на основной этап турнира"
+                                value={editingTournament.stageStatus || ''}
+                                onChange={e => setEditingTournament({ ...editingTournament, stageStatus: e.target.value })}
+                            />
+                            <p className="text-[10px] text-slate-400 mt-1">Автообновляется для импортированных RTT-турниров и используется для уведомлений в группе.</p>
+                        </div>
                         
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase">Приз</label>
-                            <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" value={editingTournament.prizePool || ''} onChange={e => setEditingTournament({...editingTournament, prizePool: e.target.value})} />
+                            <label className="text-xs font-bold text-slate-500 uppercase">{getTournamentMetaFieldConfig(editingTournament.prizePool).label}</label>
+                            <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" placeholder={getTournamentMetaFieldConfig(editingTournament.prizePool).placeholder} value={editingTournament.prizePool || ''} onChange={e => setEditingTournament({...editingTournament, prizePool: e.target.value})} />
                         </div>
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Группа</label>
@@ -1370,6 +1703,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout }) => {
                             <p className="text-[10px] text-slate-400 mt-1">⚠️ «Черновик» — турнир не виден игрокам. Для видимости выберите «Открыт» или «В игре».</p>
                         </div>
                         <Button type="submit" className="w-full mt-4">Сохранить</Button>
+                            </>
+                        )}
                     </form>
                 )}
             </Modal>
@@ -2017,12 +2352,12 @@ const StatCard = ({ title, value, change, icon, color }: { title: string, value:
 };
 
 // Copied Modal from Dashboard to avoid export dependency issues
-const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean; onClose: () => void; title: string; children?: React.ReactNode }) => {
+const Modal = ({ isOpen, onClose, title, children, maxWidthClass = 'max-w-lg' }: { isOpen: boolean; onClose: () => void; title: string; children?: React.ReactNode; maxWidthClass?: string }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
-      <div className="relative bg-white rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl animate-fade-in-up">
+            <div className={`relative bg-white rounded-3xl w-full ${maxWidthClass} max-h-[90vh] overflow-y-auto shadow-2xl animate-fade-in-up`}>
         <div className="flex justify-between items-center p-6 border-b border-slate-100 bg-white sticky top-0 z-10">
           <h3 className="text-xl font-bold text-slate-900">{title}</h3>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 hover:text-slate-900 transition-colors">

@@ -425,6 +425,8 @@ const initDb = async () => {
     await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS start_date DATE;`);
     await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS end_date DATE;`);
     await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS participants_count INTEGER;`);
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS stage_status VARCHAR(255);`);
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS rtt_link TEXT;`);
     console.log('✅ Table "tournaments" checked and migrated.');
 
     // 16. Create Tournament Applications Table

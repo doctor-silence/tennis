@@ -5,8 +5,25 @@ import { Heart, MessageCircle, Calendar, Globe, Swords, Trophy, Users, ShoppingC
 import { api } from '../../services/api';
 import Button from '../Button';
 import Tooltip from '../Tooltip';
-import { MarketplaceItem, LadderPlayer, User, Group } from '../../types';
+import { MarketplaceItem, LadderPlayer, User, Group, Tournament } from '../../types';
 import { Modal } from '../Shared';
+
+const getTournamentMetaLabel = (value?: string | null) => {
+    const normalizedValue = (value || '').trim();
+
+    if (!normalizedValue) {
+        return { label: 'Призовой фонд', value: 'Не указан' };
+    }
+
+    if (normalizedValue.toLowerCase().startsWith('средний рейтинг:')) {
+        return {
+            label: 'Средний рейтинг участников',
+            value: normalizedValue.replace(/^средний рейтинг:\s*/i, '').trim() || 'Не указан',
+        };
+    }
+
+    return { label: 'Призовой фонд', value: normalizedValue };
+};
 
 // --- Modal Component ---
 // --- Modal Component ---
@@ -547,11 +564,16 @@ const TournamentAnnouncementPost = ({ post }: { post: any }) => (
             <div className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded">ТУРНИР</div>
         </div>
         <h3 className="text-xl font-black text-slate-900 mb-2">{post.content.title}</h3>
+        {(() => {
+            const tournamentMeta = getTournamentMetaLabel(post.content.prizePool);
+            return (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
             {post.content.groupName && <p><strong>Группа:</strong> {post.content.groupName}</p>}
-            <p><strong>Призовой фонд:</strong> {post.content.prizePool}</p>
+            <p><strong>{tournamentMeta.label}:</strong> {tournamentMeta.value}</p>
             <p><strong>Дата:</strong> {new Date(post.content.date).toLocaleDateString('ru-RU')}</p>
         </div>
+            );
+        })()}
     </div>
 );
 
@@ -675,6 +697,32 @@ const TournamentResultPost = ({ post }: { post: any }) => (
     </div>
 );
 
+const TournamentStageUpdatePost = ({ post }: { post: any }) => {
+    const content = post.content || {};
+
+    return (
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-violet-200">
+            <div className="flex justify-between items-start mb-4 gap-4">
+                <div className="flex gap-3 items-center">
+                    <div className="w-10 h-10 bg-violet-100 rounded-full flex items-center justify-center">
+                        <Calendar size={20} className="text-violet-600" />
+                    </div>
+                    <div>
+                        <p className="font-bold text-violet-700">Обновление турнира</p>
+                        <p className="text-xs text-slate-400">{new Date(post.created_at).toLocaleString()}</p>
+                    </div>
+                </div>
+                <div className="text-xs font-bold bg-violet-100 text-violet-700 px-2 py-1 rounded">ЭТАП</div>
+            </div>
+
+            <h3 className="text-lg font-black text-slate-900 mb-2">{content.tournamentName}</h3>
+            <p className="text-base font-bold text-violet-700 mb-3">{content.stageLabel}</p>
+            {content.groupName && <p className="text-sm text-slate-500 mb-2"><strong>Группа:</strong> {content.groupName}</p>}
+            <p className="text-sm text-slate-600">{content.message}</p>
+        </div>
+    );
+};
+
 
 // --- Feed Component ---
 
@@ -704,6 +752,8 @@ const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate, onSta
                         return <MarketplacePost key={item.id} post={item} user={user} onStartConversation={onStartConversation} onUpdate={onUpdate} />;
                     case 'tournament_announcement':
                         return <TournamentAnnouncementPost key={item.id} post={item} />;
+                    case 'tournament_stage_update':
+                        return <TournamentStageUpdatePost key={item.id} post={item} />;
                     case 'tournament_result':
                         return <TournamentResultPost key={item.id} post={item} />;
                     default:
@@ -1023,7 +1073,10 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
                                     ? new Date(selectedTournament.end_date).toLocaleDateString('ru-RU')
                                     : 'Не указана'
                             }</p>
-                            <p className="text-slate-600 col-span-2"><strong>Призовой фонд:</strong> {selectedTournament.prize_pool || 'Не указан'}</p>
+                            {(() => {
+                                const tournamentMeta = getTournamentMetaLabel(selectedTournament.prize_pool);
+                                return <p className="text-slate-600 col-span-2"><strong>{tournamentMeta.label}:</strong> {tournamentMeta.value}</p>;
+                            })()}
                         </div>
                         
                         {(canApply || hasApplied) && (

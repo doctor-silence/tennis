@@ -9,9 +9,10 @@ const cheerio = require('cheerio');
 class RTTParser {
   constructor() {
     this.baseURL = 'https://rttstat.ru';
+    this.requestTimeout = 15000;
     this.axios = axios.create({
       baseURL: this.baseURL,
-      timeout: 6000,
+      timeout: this.requestTimeout,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml',
@@ -21,6 +22,53 @@ class RTTParser {
     // Кэш для списка турниров: key → { data, expireAt }
     this._tourCache = new Map();
     this._tourCacheTTL = 5 * 60 * 1000; // 5 минут
+  }
+
+  extractLabeledValue(text, labels, stopLabels = []) {
+    const escapedLabels = labels.map(label => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const stopPattern = stopLabels.length
+      ? `(?=\\s*(?:${stopLabels.map(label => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b|$)`
+      : '$';
+    const regex = new RegExp(`(?:${escapedLabels.join('|')})\\s*:?\\s*(.+?)${stopPattern}`, 'i');
+    const match = text.match(regex);
+    return match ? match[1].trim() : '';
+  }
+
+  detectTournamentStageStatus(text = '') {
+    const normalizedText = text.toLowerCase();
+    const stageDefinitions = [
+      {
+        label: 'Расписание на основной этап турнира',
+        patterns: [
+          'расписание на основной этап турнира',
+          'опубликовано расписание на основной этап турнира',
+          'расписание основного этапа турнира'
+        ]
+      },
+      {
+        label: 'Жеребьевка на основной этап турнира',
+        patterns: [
+          'жеребьевка на основной этап турнира',
+          'жеребьёвка на основной этап турнира',
+          'жеребьевка основного этапа турнира',
+          'жеребьёвка основного этапа турнира'
+        ]
+      },
+      {
+        label: 'Начало регистрации на основной этап турнира',
+        patterns: [
+          'начало регистрации на основной этап турнира',
+          'открыта регистрация на основной этап турнира',
+          'регистрация на основной этап турнира'
+        ]
+      }
+    ];
+
+    const matchedStage = stageDefinitions.find(stage =>
+      stage.patterns.some(pattern => normalizedText.includes(pattern))
+    );
+
+    return matchedStage ? matchedStage.label : '';
   }
 
   /**
@@ -462,18 +510,27 @@ class RTTParser {
       // Информация о турнире из блоков
       let tournamentInfo = {};
       const allText = $('body').text();
-      
-      // Ищем дату
-      const dateMatch = allText.match(/Дата[:\s]+([^\n]+)/i);
-      if (dateMatch) tournamentInfo.date = dateMatch[1].trim();
-      
-      // Ищем город
-      const cityMatch = allText.match(/Город[:\s]+([^\n]+)/i);
-      if (cityMatch) tournamentInfo.city = cityMatch[1].trim();
-      
-      // Ищем покрытие
-      const surfaceMatch = allText.match(/Покрытие[:\s]+([^\n]+)/i);
-      if (surfaceMatch) tournamentInfo.surface = surfaceMatch[1].trim();
+      const normalizedText = allText.replace(/\s+/g, ' ').trim();
+      const metaStopLabels = ['Город', 'Покрытие', 'Возрастная группа', 'Категория', 'Заявок', 'Средний рейтинг', 'Название'];
+
+      const explicitStartDate = this.extractLabeledValue(normalizedText, ['Дата начала'], metaStopLabels).match(/\d{2}\.\d{2}\.\d{4}/)?.[0] || '';
+      const explicitEndDate = this.extractLabeledValue(normalizedText, ['Дата окончания'], metaStopLabels).match(/\d{2}\.\d{2}\.\d{4}/)?.[0] || '';
+      const rangeFromMeta = this.extractLabeledValue(normalizedText, ['Дата', 'Сроки проведения', 'Период проведения', 'Сроки'], metaStopLabels);
+
+      if (explicitStartDate && explicitEndDate) {
+        tournamentInfo.date = `${explicitStartDate} - ${explicitEndDate}`;
+      } else if (rangeFromMeta) {
+        tournamentInfo.date = rangeFromMeta;
+      }
+
+      const detectedStageStatus = this.detectTournamentStageStatus(normalizedText);
+      if (detectedStageStatus) tournamentInfo.stageStatus = detectedStageStatus;
+
+      const cityValue = this.extractLabeledValue(normalizedText, ['Город'], ['Покрытие', 'Дата', 'Сроки проведения', 'Период проведения', 'Возрастная группа', 'Категория']);
+      if (cityValue) tournamentInfo.city = cityValue;
+
+      const surfaceValue = this.extractLabeledValue(normalizedText, ['Покрытие'], ['Город', 'Дата', 'Сроки проведения', 'Период проведения', 'Возрастная группа', 'Категория']);
+      if (surfaceValue) tournamentInfo.surface = surfaceValue;
 
       console.log('📋 Информация о турнире:', tournamentInfo);
 
@@ -747,10 +804,13 @@ class RTTParser {
       };
 
     } catch (error) {
+      const timeoutMessage = error.code === 'ECONNABORTED'
+        ? `RTT не ответил за ${Math.round(this.requestTimeout / 1000)} сек.`
+        : error.message;
       console.error('❌ Ошибка при получении списка турниров:', error.message);
       return {
         success: false,
-        error: 'Ошибка при получении списка турниров: ' + error.message,
+        error: 'Ошибка при получении списка турниров: ' + timeoutMessage,
         data: { tournaments: [], filters: {} }
       };
     }
