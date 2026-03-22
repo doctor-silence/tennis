@@ -1710,7 +1710,7 @@ app.get('/api/admin/groups', requireAdmin, async (req, res) => {
 });
 
 app.post('/api/admin/groups', requireAdmin, async (req, res) => {
-    const { name, description, location, contact, creatorId } = req.body;
+    const { name, description, location, contact, avatar, creatorId } = req.body;
     if (!name || !creatorId) {
         return res.status(400).json({ error: 'Name and creatorId are required' });
     }
@@ -1718,8 +1718,8 @@ app.post('/api/admin/groups', requireAdmin, async (req, res) => {
     try {
         await client.query('BEGIN');
         const groupResult = await client.query(
-            'INSERT INTO groups (name, description, location, contact, creator_id) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [name, description, location, contact, creatorId]
+            'INSERT INTO groups (name, description, location, contact, avatar, creator_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [name, description, location, contact, avatar || null, creatorId]
         );
         const newGroup = groupResult.rows[0];
         await client.query(
