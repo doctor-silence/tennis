@@ -268,6 +268,11 @@ const queryNamedMap = async (sql, ids, mapRow) => {
     return new Map(result.rows.map(mapRow));
 };
 
+const formatUserLogLabel = (row) => {
+    const baseLabel = row.name || row.email || `Пользователь #${row.id}`;
+    return row.rni ? `${baseLabel} (RNI: ${row.rni})` : baseLabel;
+};
+
 const buildLogReferenceContext = async (rows = []) => {
     const referenceIds = collectLogReferenceIds(rows);
     const userIds = Array.from(referenceIds.users);
@@ -279,9 +284,9 @@ const buildLogReferenceContext = async (rows = []) => {
 
     const [users, groups, tournaments, challenges, students, applications] = await Promise.all([
         queryNamedMap(
-            'SELECT id, name, email FROM users WHERE id = ANY($1::int[])',
+            'SELECT id, name, email, rni FROM users WHERE id = ANY($1::int[])',
             userIds,
-            (row) => [Number(row.id), row.name || row.email || `Пользователь #${row.id}`]
+            (row) => [Number(row.id), formatUserLogLabel(row)]
         ),
         queryNamedMap(
             'SELECT id, name FROM groups WHERE id = ANY($1::int[])',
@@ -984,6 +989,34 @@ app.post('/api/auth/register', async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const defaultAvatar = `https://ui-avatars.com/api/?name=${name.replace(' ', '+')}&background=random&color=fff`;
+
+        let resolvedRating = Number(rating) || 0;
+        let resolvedRttRank = Number(rttRank) || 0;
+        let resolvedRttCategory = rttCategory || null;
+        let resolvedRole = role || 'amateur';
+        let resolvedLevel = level || '';
+        let resolvedRni = rni || null;
+
+        if (resolvedRole === 'rtt_pro') {
+            if (!resolvedRni) {
+                return res.status(400).json({ error: 'Укажите РНИ для профи РТТ' });
+            }
+
+            const rttVerification = await rttParser.getPlayerByRNI(resolvedRni);
+            if (!rttVerification.success || !rttVerification.data) {
+                return res.status(400).json({ error: rttVerification.error || 'Не удалось подтвердить РНИ' });
+            }
+
+            resolvedRating = Number(rttVerification.data.points) || 0;
+            resolvedRttRank = Number(rttVerification.data.rank) || 0;
+            resolvedRttCategory = rttVerification.data.category || resolvedRttCategory;
+            resolvedLevel = '';
+        } else {
+            resolvedRni = null;
+            resolvedRttCategory = null;
+            resolvedRttRank = 0;
+            resolvedRating = resolvedRole === 'amateur' ? resolvedRating : 0;
+        }
         
         const result = await pool.query(
             `INSERT INTO users (name, email, password, city, avatar, role, rating, age, level, rtt_rank, rtt_category, rni, xp) 
@@ -995,13 +1028,13 @@ app.post('/api/auth/register', async (req, res) => {
                 hashedPassword, 
                 city, 
                 defaultAvatar, 
-                role || 'amateur', 
-                rating || 0,
+                resolvedRole, 
+                resolvedRating,
                 ageNum,
-                level || '',
-                rttRank || 0,
-                rttCategory || null,
-                rni || null
+                resolvedLevel,
+                resolvedRttRank,
+                resolvedRttCategory,
+                resolvedRni
             ]
         );
 

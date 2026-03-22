@@ -1908,6 +1908,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
   const [rni, setRni] = useState('');             // РНИ (Регистрационный номер игрока)
   const [rniVerifying, setRniVerifying] = useState(false);
   const [rniVerified, setRniVerified] = useState(false);
+  const isRttRniLocked = role === 'rtt_pro' && Boolean(rni.trim());
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -2018,6 +2019,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
         if (isNaN(ageNum) || ageNum < 5 || ageNum > 99) throw new Error("Укажите корректный возраст (5–99 лет)");
         if (role === 'rtt_pro') {
             if (!rni) throw new Error("Укажите РНИ для профи РТТ");
+          if (!rniVerified) throw new Error("Подтвердите РНИ, чтобы загрузить данные РТТ");
             if (!rttPoints) throw new Error("Укажите очки классификации");
             if (!rttRank) throw new Error("Укажите позицию в рейтинге");
         }
@@ -2357,7 +2359,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
                                         onChange={(e) => setRttPoints(e.target.value.replace(/\D/g, ''))}
                                         className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white outline-none focus:border-amber-400 placeholder:text-slate-600"
                                         placeholder="1450"
-                                        disabled={rniVerified}
+                                      disabled={isRttRniLocked}
                                     />
                                 </div>
                                 <div>
@@ -2369,14 +2371,16 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
                                         onChange={(e) => setRttRank(e.target.value.replace(/\D/g, ''))}
                                         className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white outline-none focus:border-amber-400 placeholder:text-slate-600"
                                         placeholder="№ 123"
-                                        disabled={rniVerified}
+                                        disabled={isRttRniLocked}
                                     />
                                 </div>
                             </div>
                             <p className="text-[10px] text-slate-500 leading-tight">
                                 {rniVerified 
                                     ? 'Данные проверены через базу РТТ.' 
-                                    : 'Данные будут проверены через базу РТТ.'
+                                      : isRttRniLocked
+                                        ? 'Поля заблокированы до подтверждения и загрузки данных из РТТ.'
+                                        : 'Данные будут проверены через базу РТТ.'
                                 }
                             </p>
                         </div>
