@@ -742,6 +742,17 @@ const TournamentModal = ({ isOpen, onClose, tournament }: { isOpen: boolean; onC
     const modalRoot = document.getElementById('modal-root');
     const [tournamentDetails, setTournamentDetails] = useState<any>(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
+
+    const displayTitle = tournamentDetails?.name || tournament?.name || tournament?.tournament || 'Турнир РТТ';
+    const displayCity = tournamentDetails?.city || tournament?.city || '—';
+    const displayDate = tournamentDetails?.date || tournament?.date || tournament?.startDate || '—';
+    const displayAgeGroup = tournamentDetails?.ageGroup || tournament?.ageGroup || tournament?.category || '—';
+    const displayType = tournamentDetails?.type || tournament?.type || '—';
+    const displayCategory = tournamentDetails?.category || tournament?.category || tournament?.ageGroup || '—';
+    const displaySurface = tournamentDetails?.surface || tournament?.surface || '—';
+    const displayGender = tournamentDetails?.gender || '—';
+    const displayApplications = tournamentDetails?.participantsCount || tournament?.applicationsCount || tournament?.applications || '—';
+    const displayAvgRating = tournamentDetails?.avgRating || tournament?.avgRating || '—';
     
     if (!elRef.current) {
         elRef.current = document.createElement('div');
@@ -783,19 +794,19 @@ const TournamentModal = ({ isOpen, onClose, tournament }: { isOpen: boolean; onC
             <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" onClick={onClose}></div>
             <div className="relative bg-white rounded-3xl w-full max-w-6xl max-h-[90vh] overflow-hidden shadow-2xl animate-fade-in-up">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-orange-500 to-amber-500 px-8 py-6 text-white">
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <h2 className="text-3xl font-black mb-2">{tournament.tournament}</h2>
-                            <div className="flex gap-6 text-sm font-medium text-white/90">
-                                <div>📍 {tournament.city}</div>
-                                <div>📅 {tournament.date}</div>
-                                <div>👥 {tournament.ageGroup}</div>
+                <div className="bg-gradient-to-r from-orange-500 to-amber-500 px-5 py-5 md:px-8 md:py-6 text-white">
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                            <h2 className="text-2xl md:text-3xl font-black mb-2 break-words leading-tight">{displayTitle}</h2>
+                            <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-white/90">
+                                <div className="break-words">📍 {displayCity}</div>
+                                <div className="break-words">📅 {displayDate}</div>
+                                <div className="break-words">👥 {displayAgeGroup}</div>
                             </div>
                         </div>
                         <button 
                             onClick={onClose}
-                            className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
+                            className="shrink-0 text-white hover:bg-white/20 rounded-full p-2 transition-colors"
                         >
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -805,7 +816,7 @@ const TournamentModal = ({ isOpen, onClose, tournament }: { isOpen: boolean; onC
                 </div>
 
                 {/* Content */}
-                <div className="p-8 overflow-y-auto max-h-[calc(90vh-200px)]">
+                <div className="p-5 md:p-8 overflow-y-auto max-h-[calc(90vh-200px)]">
                     {loadingDetails ? (
                         <div className="flex items-center justify-center py-20">
                             <Loader2 className="animate-spin text-orange-500" size={48} />
@@ -813,22 +824,64 @@ const TournamentModal = ({ isOpen, onClose, tournament }: { isOpen: boolean; onC
                     ) : (
                         <>
                             {/* Tournament Info */}
-                            <div className="grid grid-cols-4 gap-4 mb-8">
-                                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-4 border border-blue-200">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+                                <div className="min-w-0 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-4 border border-blue-200">
                                     <div className="text-xs font-bold text-blue-600 uppercase mb-1">Категория</div>
-                                    <div className="text-2xl font-black text-blue-900">{tournament.category || tournament.ageGroup}</div>
+                                    <div className="text-xl md:text-2xl font-black text-blue-900 break-words leading-tight">{displayCategory}</div>
                                 </div>
-                                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-4 border border-green-200">
+                                <div className="min-w-0 bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-4 border border-green-200">
                                     <div className="text-xs font-bold text-green-600 uppercase mb-1">Заявок</div>
-                                    <div className="text-2xl font-black text-green-900">{tournamentDetails?.participantsCount || tournament.applicationsCount || '—'}</div>
+                                    <div className="text-xl md:text-2xl font-black text-green-900 break-words leading-tight">{displayApplications}</div>
                                 </div>
-                                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-4 border border-purple-200">
+                                <div className="min-w-0 bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-4 border border-purple-200">
                                     <div className="text-xs font-bold text-purple-600 uppercase mb-1">Ср. рейтинг</div>
-                                    <div className="text-2xl font-black text-purple-900">{tournament.avgRating || '—'}</div>
+                                    <div className="text-xl md:text-2xl font-black text-purple-900 break-words leading-tight">{displayAvgRating}</div>
                                 </div>
-                                <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl p-4 border border-orange-200">
+                                <div className="min-w-0 bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl p-4 border border-orange-200">
                                     <div className="text-xs font-bold text-orange-600 uppercase mb-1">Город</div>
-                                    <div className="text-lg font-black text-orange-900">{tournamentDetails?.city || tournament.city}</div>
+                                    <div className="text-lg font-black text-orange-900 break-words leading-tight">{displayCity}</div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                                <div className="bg-slate-50 rounded-2xl border border-slate-200 p-5">
+                                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider mb-4">О турнире</h3>
+                                    <div className="space-y-3 text-sm">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <span className="text-slate-500">Дата</span>
+                                            <span className="text-right font-semibold text-slate-900 break-words">{displayDate}</span>
+                                        </div>
+                                        <div className="flex items-start justify-between gap-4">
+                                            <span className="text-slate-500">Тип</span>
+                                            <span className="text-right font-semibold text-slate-900 break-words">{displayType}</span>
+                                        </div>
+                                        <div className="flex items-start justify-between gap-4">
+                                            <span className="text-slate-500">Возраст</span>
+                                            <span className="text-right font-semibold text-slate-900 break-words">{displayAgeGroup}</span>
+                                        </div>
+                                        <div className="flex items-start justify-between gap-4">
+                                            <span className="text-slate-500">Пол</span>
+                                            <span className="text-right font-semibold text-slate-900 break-words">{displayGender}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 rounded-2xl border border-slate-200 p-5">
+                                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider mb-4">Площадка</h3>
+                                    <div className="space-y-3 text-sm">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <span className="text-slate-500">Город</span>
+                                            <span className="text-right font-semibold text-slate-900 break-words">{displayCity}</span>
+                                        </div>
+                                        <div className="flex items-start justify-between gap-4">
+                                            <span className="text-slate-500">Покрытие</span>
+                                            <span className="text-right font-semibold text-slate-900 break-words">{displaySurface}</span>
+                                        </div>
+                                        <div className="flex items-start justify-between gap-4">
+                                            <span className="text-slate-500">Категория</span>
+                                            <span className="text-right font-semibold text-slate-900 break-words">{displayCategory}</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 

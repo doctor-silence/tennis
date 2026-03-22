@@ -32,6 +32,92 @@ class RTTParser {
       .trim();
   }
 
+  buildPlayerSearchQueries(query = '') {
+    const normalizedQuery = String(query || '').replace(/\s+/g, ' ').trim();
+
+    if (!normalizedQuery) {
+      return [];
+    }
+
+    const queries = [normalizedQuery];
+    const parts = normalizedQuery.split(' ').filter(Boolean);
+
+    if (parts.length > 1) {
+      const reversedQuery = [...parts].reverse().join(' ');
+
+      if (reversedQuery !== normalizedQuery) {
+        queries.push(reversedQuery);
+      }
+    }
+
+    return queries;
+  }
+
+  extractPlayersFromSearchHtml(html) {
+    const $ = cheerio.load(html);
+    const players = [];
+    const seenRni = new Set();
+
+    $('table tbody tr').each((_, row) => {
+      const cells = $(row).find('td');
+      if (cells.length < 7) {
+        return;
+      }
+
+      const profileLink = $(cells[1]).find('a').attr('href') || '';
+      const name = $(cells[1]).text().replace(/\s+/g, ' ').trim();
+      const rni = $(cells[2]).text().replace(/\D/g, '').trim();
+      const city = $(cells[3]).text().replace(/\s+/g, ' ').trim();
+      const pointsText = $(cells[4]).text().replace(/\s+/g, ' ').trim();
+      const rankText = $(cells[5]).text().replace(/\s+/g, ' ').trim();
+      const category = $(cells[6]).text().replace(/\s+/g, ' ').trim();
+
+      if (!name || !rni || seenRni.has(rni)) {
+        return;
+      }
+
+      seenRni.add(rni);
+      players.push({
+        name,
+        rni,
+        city: city || '—',
+        points: pointsText ? parseInt(pointsText, 10) || 0 : 0,
+        rank: rankText ? parseInt(rankText, 10) || 0 : 0,
+        category: category || '—',
+        link: profileLink ? `${this.baseURL}${profileLink}` : `${this.baseURL}/player/${rni}`
+      });
+    });
+
+    return players;
+  }
+
+  scorePlayersForQuery(players = [], query = '') {
+    const queryParts = String(query || '')
+      .toLowerCase()
+      .split(' ')
+      .map(part => part.trim())
+      .filter(Boolean);
+
+    if (queryParts.length === 0 || !Array.isArray(players) || players.length === 0) {
+      return 0;
+    }
+
+    return players.reduce((totalScore, player) => {
+      const nameParts = this.extractCleanPlayerName(player?.name || '')
+        .toLowerCase()
+        .split(' ')
+        .map(part => part.trim())
+        .filter(Boolean);
+
+      const playerScore = queryParts.reduce((score, queryPart, index) => {
+        const namePart = nameParts[index] || '';
+        return namePart.startsWith(queryPart) ? score + 1 : score;
+      }, 0);
+
+      return totalScore + playerScore;
+    }, 0);
+  }
+
   extractCleanPlayerName(rawName = '') {
     let name = String(rawName || '').replace(/\s+/g, ' ').trim();
     name = name.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
@@ -54,6 +140,31 @@ class RTTParser {
     const regex = new RegExp(`(?:${escapedLabels.join('|')})\\s*:?\\s*(.+?)${stopPattern}`, 'i');
     const match = text.match(regex);
     return match ? match[1].trim() : '';
+  }
+
+  sanitizeTournamentMetaValue(value = '', stopLabels = []) {
+    const normalizedValue = String(value || '').replace(/\s+/g, ' ').trim();
+
+    if (!normalizedValue) {
+      return '';
+    }
+
+    const earliestStopIndex = stopLabels.reduce((closestIndex, label) => {
+      const labelIndex = normalizedValue.toLowerCase().indexOf(label.toLowerCase());
+      if (labelIndex === -1) {
+        return closestIndex;
+      }
+      if (closestIndex === -1 || labelIndex < closestIndex) {
+        return labelIndex;
+      }
+      return closestIndex;
+    }, -1);
+
+    const trimmedValue = earliestStopIndex === -1
+      ? normalizedValue
+      : normalizedValue.slice(0, earliestStopIndex).trim();
+
+    return trimmedValue.replace(/[,:;\-–—\s]+$/g, '').trim();
   }
 
   detectTournamentStageStatus(text = '') {
@@ -505,45 +616,31 @@ class RTTParser {
         };
       }
 
-      const response = await this.axios.get(`/search/${encodeURIComponent(normalizedQuery)}`);
-      const $ = cheerio.load(response.data);
-      const players = [];
-      const seenRni = new Set();
+      const queriesToTry = this.buildPlayerSearchQueries(normalizedQuery);
+      let players = [];
+      let matchedQuery = normalizedQuery;
+      let bestScore = -1;
 
-      $('table tbody tr').each((_, row) => {
-        const cells = $(row).find('td');
-        if (cells.length < 7) {
-          return;
+      for (const candidateQuery of queriesToTry) {
+        const response = await this.axios.get(`/search/${encodeURIComponent(candidateQuery)}`);
+        const candidatePlayers = this.extractPlayersFromSearchHtml(response.data);
+        const candidateScore = this.scorePlayersForQuery(candidatePlayers, candidateQuery);
+
+        if (
+          candidateScore > bestScore ||
+          (candidateScore === bestScore && candidatePlayers.length > players.length)
+        ) {
+          players = candidatePlayers;
+          matchedQuery = candidateQuery;
+          bestScore = candidateScore;
         }
-
-        const profileLink = $(cells[1]).find('a').attr('href') || '';
-        const name = $(cells[1]).text().replace(/\s+/g, ' ').trim();
-        const rni = $(cells[2]).text().replace(/\D/g, '').trim();
-        const city = $(cells[3]).text().replace(/\s+/g, ' ').trim();
-        const pointsText = $(cells[4]).text().replace(/\s+/g, ' ').trim();
-        const rankText = $(cells[5]).text().replace(/\s+/g, ' ').trim();
-        const category = $(cells[6]).text().replace(/\s+/g, ' ').trim();
-
-        if (!name || !rni || seenRni.has(rni)) {
-          return;
-        }
-
-        seenRni.add(rni);
-        players.push({
-          name,
-          rni,
-          city: city || '—',
-          points: pointsText ? parseInt(pointsText, 10) || 0 : 0,
-          rank: rankText ? parseInt(rankText, 10) || 0 : 0,
-          category: category || '—',
-          link: profileLink ? `${this.baseURL}${profileLink}` : `${this.baseURL}/player/${rni}`
-        });
-      });
+      }
 
       return {
         success: true,
         data: players,
         query: normalizedQuery,
+        effectiveQuery: matchedQuery,
         source: 'rttstat.ru'
       };
 
@@ -587,7 +684,26 @@ class RTTParser {
       let tournamentInfo = {};
       const allText = $('body').text();
       const normalizedText = allText.replace(/\s+/g, ' ').trim();
-      const metaStopLabels = ['Город', 'Покрытие', 'Возрастная группа', 'Категория', 'Заявок', 'Средний рейтинг', 'Название'];
+      const metaStopLabels = [
+        'Город',
+        'Покрытие',
+        'Дата',
+        'Дата начала',
+        'Дата окончания',
+        'Сроки проведения',
+        'Период проведения',
+        'Возрастная группа',
+        'Пол',
+        'Тип',
+        'Категория',
+        'Категория турнира',
+        'Заявок',
+        'Количество участников',
+        'Средний рейтинг',
+        'Сайт РТТ',
+        'Таблица очков',
+        'Название'
+      ];
 
       const explicitStartDate = this.extractLabeledValue(normalizedText, ['Дата начала'], metaStopLabels).match(/\d{2}\.\d{2}\.\d{4}/)?.[0] || '';
       const explicitEndDate = this.extractLabeledValue(normalizedText, ['Дата окончания'], metaStopLabels).match(/\d{2}\.\d{2}\.\d{4}/)?.[0] || '';
@@ -602,11 +718,54 @@ class RTTParser {
       const detectedStageStatus = this.detectTournamentStageStatus(normalizedText);
       if (detectedStageStatus) tournamentInfo.stageStatus = detectedStageStatus;
 
-      const cityValue = this.extractLabeledValue(normalizedText, ['Город'], ['Покрытие', 'Дата', 'Сроки проведения', 'Период проведения', 'Возрастная группа', 'Категория']);
+      const cityValue = this.sanitizeTournamentMetaValue(
+        this.extractLabeledValue(normalizedText, ['Город'], metaStopLabels.filter(label => label !== 'Город')),
+        metaStopLabels.filter(label => label !== 'Город')
+      );
       if (cityValue) tournamentInfo.city = cityValue;
 
-      const surfaceValue = this.extractLabeledValue(normalizedText, ['Покрытие'], ['Город', 'Дата', 'Сроки проведения', 'Период проведения', 'Возрастная группа', 'Категория']);
+      const surfaceValue = this.sanitizeTournamentMetaValue(
+        this.extractLabeledValue(normalizedText, ['Покрытие'], metaStopLabels.filter(label => label !== 'Покрытие')),
+        metaStopLabels.filter(label => label !== 'Покрытие')
+      );
       if (surfaceValue) tournamentInfo.surface = surfaceValue;
+
+      const ageGroupValue = this.sanitizeTournamentMetaValue(
+        this.extractLabeledValue(normalizedText, ['Возрастная группа'], metaStopLabels.filter(label => label !== 'Возрастная группа')),
+        metaStopLabels.filter(label => label !== 'Возрастная группа')
+      );
+      if (ageGroupValue) tournamentInfo.ageGroup = ageGroupValue;
+
+      const genderValue = this.sanitizeTournamentMetaValue(
+        this.extractLabeledValue(normalizedText, ['Пол'], metaStopLabels.filter(label => label !== 'Пол')),
+        metaStopLabels.filter(label => label !== 'Пол')
+      );
+      if (genderValue) tournamentInfo.gender = genderValue;
+
+      const typeValue = this.sanitizeTournamentMetaValue(
+        this.extractLabeledValue(normalizedText, ['Тип'], metaStopLabels.filter(label => label !== 'Тип')),
+        metaStopLabels.filter(label => label !== 'Тип')
+      );
+      if (typeValue) tournamentInfo.type = typeValue;
+
+      const categoryValue = this.sanitizeTournamentMetaValue(
+        this.extractLabeledValue(normalizedText, ['Категория турнира', 'Категория'], metaStopLabels.filter(label => label !== 'Категория турнира' && label !== 'Категория')),
+        metaStopLabels.filter(label => label !== 'Категория турнира' && label !== 'Категория')
+      );
+      if (categoryValue) tournamentInfo.category = categoryValue;
+
+      const participantsMetaValue = this.sanitizeTournamentMetaValue(
+        this.extractLabeledValue(normalizedText, ['Количество участников', 'Заявок'], metaStopLabels.filter(label => label !== 'Количество участников' && label !== 'Заявок')),
+        metaStopLabels.filter(label => label !== 'Количество участников' && label !== 'Заявок')
+      );
+      const participantsCount = participantsMetaValue.match(/\d+/)?.[0] || '';
+      if (participantsCount) tournamentInfo.participantsCount = participantsCount;
+
+      const avgRatingValue = this.sanitizeTournamentMetaValue(
+        this.extractLabeledValue(normalizedText, ['Средний рейтинг'], metaStopLabels.filter(label => label !== 'Средний рейтинг')),
+        metaStopLabels.filter(label => label !== 'Средний рейтинг')
+      );
+      if (avgRatingValue) tournamentInfo.avgRating = avgRatingValue.match(/\d+/)?.[0] || avgRatingValue;
 
       console.log('📋 Информация о турнире:', tournamentInfo);
 
