@@ -1057,6 +1057,7 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
                             <p className="text-slate-600"><strong>Группа:</strong> {selectedTournament.groupName || 'N/A'}</p>
                             <p className="text-slate-600"><strong>Статус:</strong> {
                                 selectedTournament.status === 'draft' ? 'Набор' :
+                                selectedTournament.status === 'open' ? 'Регистрация' :
                                 selectedTournament.status === 'live' ? 'Идет' :
                                 selectedTournament.status === 'finished' ? 'Завершен' :
                                 selectedTournament.status

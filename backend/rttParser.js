@@ -126,6 +126,33 @@ class RTTParser {
     return name.replace(/\s+/g, ' ').trim();
   }
 
+  isLikelyHumanName(value = '') {
+    const cleaned = this.extractCleanPlayerName(value);
+    if (!cleaned || cleaned.length < 3) {
+      return false;
+    }
+
+    if (/^\d+$/.test(cleaned)) {
+      return false;
+    }
+
+    return /[A-Za-zА-Яа-яЁё]/.test(cleaned);
+  }
+
+  extractParticipantName(cells = [], rowLinks = []) {
+    const linkName = rowLinks
+      .map(linkText => this.extractCleanPlayerName(linkText))
+      .find(linkText => this.isLikelyHumanName(linkText));
+
+    if (linkName) {
+      return linkName;
+    }
+
+    return cells
+      .map(cell => this.extractCleanPlayerName(cell))
+      .find((cellText, index) => index > 0 && this.isLikelyHumanName(cellText)) || '';
+  }
+
   extractTournamentCity(tournamentLabel = '') {
     const normalized = String(tournamentLabel || '').trim();
     if (!normalized.includes('.')) return '';
@@ -165,6 +192,69 @@ class RTTParser {
       : normalizedValue.slice(0, earliestStopIndex).trim();
 
     return trimmedValue.replace(/[,:;\-–—\s]+$/g, '').trim();
+  }
+
+  parseRuDateToTimestamp(value = '') {
+    const matched = String(value || '').match(/(\d{2})\.(\d{2})\.(\d{4})/);
+    if (!matched) {
+      return 0;
+    }
+
+    return new Date(`${matched[3]}-${matched[2]}-${matched[1]}T00:00:00Z`).getTime();
+  }
+
+  deriveTournamentLifecycle({ normalizedText = '', startDate = '', endDate = '', stageStatus = '' } = {}) {
+    const text = String(normalizedText || '').toLowerCase();
+    const now = new Date();
+    const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    const startTimestamp = this.parseRuDateToTimestamp(startDate);
+    const endTimestamp = this.parseRuDateToTimestamp(endDate || startDate);
+
+    if (
+      text.includes('турнир завершен') ||
+      text.includes('турнир завершён') ||
+      text.includes('завершен') ||
+      text.includes('завершён')
+    ) {
+      return {
+        status: 'finished',
+        label: 'Турнир завершен'
+      };
+    }
+
+    if (startTimestamp && todayUtc < startTimestamp) {
+      return {
+        status: 'open',
+        label: stageStatus || 'Турнир еще не начался'
+      };
+    }
+
+    if (endTimestamp && todayUtc > (endTimestamp + oneDayMs - 1)) {
+      return {
+        status: 'finished',
+        label: 'Турнир завершен'
+      };
+    }
+
+    if (startTimestamp && todayUtc >= startTimestamp) {
+      return {
+        status: 'live',
+        label: stageStatus || 'Турнир идет'
+      };
+    }
+
+    if (stageStatus) {
+      return {
+        status: 'open',
+        label: stageStatus
+      };
+    }
+
+    return {
+      status: null,
+      label: ''
+    };
   }
 
   detectTournamentStageStatus(text = '') {
@@ -709,11 +799,23 @@ class RTTParser {
       const explicitEndDate = this.extractLabeledValue(normalizedText, ['Дата окончания'], metaStopLabels).match(/\d{2}\.\d{2}\.\d{4}/)?.[0] || '';
       const rangeFromMeta = this.extractLabeledValue(normalizedText, ['Дата', 'Сроки проведения', 'Период проведения', 'Сроки'], metaStopLabels);
 
+      let startDate = explicitStartDate;
+      let endDate = explicitEndDate;
+
+      if (!startDate || !endDate) {
+        const rangeDates = rangeFromMeta.match(/\d{2}\.\d{2}\.\d{4}/g) || [];
+        if (!startDate) startDate = rangeDates[0] || '';
+        if (!endDate) endDate = rangeDates[1] || rangeDates[0] || '';
+      }
+
       if (explicitStartDate && explicitEndDate) {
         tournamentInfo.date = `${explicitStartDate} - ${explicitEndDate}`;
       } else if (rangeFromMeta) {
         tournamentInfo.date = rangeFromMeta;
       }
+
+      if (startDate) tournamentInfo.startDate = startDate;
+      if (endDate) tournamentInfo.endDate = endDate;
 
       const detectedStageStatus = this.detectTournamentStageStatus(normalizedText);
       if (detectedStageStatus) tournamentInfo.stageStatus = detectedStageStatus;
@@ -767,6 +869,21 @@ class RTTParser {
       );
       if (avgRatingValue) tournamentInfo.avgRating = avgRatingValue.match(/\d+/)?.[0] || avgRatingValue;
 
+      const lifecycle = this.deriveTournamentLifecycle({
+        normalizedText,
+        startDate,
+        endDate,
+        stageStatus: tournamentInfo.stageStatus || ''
+      });
+
+      if (lifecycle.status) {
+        tournamentInfo.lifecycleStatus = lifecycle.status;
+      }
+
+      if (lifecycle.label) {
+        tournamentInfo.statusLabel = lifecycle.label;
+      }
+
       console.log('📋 Информация о турнире:', tournamentInfo);
 
       // Парсим ВСЕ таблицы на странице
@@ -808,6 +925,13 @@ class RTTParser {
             $row.find('td').each((i, cell) => {
               cells.push($(cell).text().trim());
             });
+            const rowLinkTexts = [];
+            $row.find('td a').each((i, link) => {
+              const linkText = $(link).text().replace(/\s+/g, ' ').trim();
+              if (linkText) {
+                rowLinkTexts.push(linkText);
+              }
+            });
 
             // Ищем РНИ в ссылках (обычно в первой или второй ячейке)
             let rni = null;
@@ -830,17 +954,20 @@ class RTTParser {
                 return;
               }
 
+              const participantName = this.extractParticipantName(cells, rowLinkTexts);
+
               const participant = {
                 place: cells[0] || '',
-                name: cells[1] || '',
+                name: participantName,
                 rating: cells[2] || '',
                 city: cells[3] || '',
                 age: cells[4] || '',
-                points: cells[5] || ''
+                points: cells[5] || '',
+                rni: rni || ''
               };
 
               // Проверяем, что это реальный участник (есть имя длиной больше 2 символов)
-              if (participant.name.length > 2) {
+              if (this.isLikelyHumanName(participant.name)) {
                 participants.push(participant);
                 console.log(`✅ Участник ${participants.length}:`, participant.name);
               }

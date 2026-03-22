@@ -639,6 +639,15 @@ const normalizeTournamentStageStatus = (value = '') => {
     return matchedStage ? matchedStage.label : null;
 };
 
+const mapRttLifecycleToTournamentStatus = (value = '') => {
+    const normalizedValue = String(value || '').trim().toLowerCase();
+    if (!normalizedValue) return null;
+    if (normalizedValue === 'finished') return 'finished';
+    if (normalizedValue === 'live') return 'live';
+    if (normalizedValue === 'open') return 'open';
+    return null;
+};
+
 const buildTournamentStageMessage = ({ tournamentName, groupName, stageStatus }) => {
     const groupSuffix = groupName ? ` · группа «${groupName}»` : '';
     return `Турнир «${tournamentName}»: ${stageStatus}${groupSuffix}`;
@@ -658,6 +667,13 @@ const extractCleanPlayerName = (rawName = '') => {
     return name.replace(/\s+/g, ' ').trim();
 };
 
+const isLikelyHumanName = (value = '') => {
+    const cleaned = extractCleanPlayerName(value);
+    if (!cleaned || cleaned.length < 3) return false;
+    if (/^\d+$/.test(cleaned)) return false;
+    return /[A-Za-zА-Яа-яЁё]/.test(cleaned);
+};
+
 const parseRuDateToTimestamp = (value = '') => {
     const matched = String(value || '').match(/(\d{2})\.(\d{2})\.(\d{4})/);
     if (!matched) return 0;
@@ -666,7 +682,9 @@ const parseRuDateToTimestamp = (value = '') => {
 
 const pickTournamentWinner = (participants = []) => {
     const winnerRow = participants.find((participant) => /^1([.)]|$)/.test(String(participant.place || '').trim()));
-    return winnerRow ? extractCleanPlayerName(winnerRow.name) : '';
+    if (!winnerRow) return '';
+    const winnerName = extractCleanPlayerName(winnerRow.name);
+    return isLikelyHumanName(winnerName) ? winnerName : '';
 };
 
 const findRelevantFinalMatch = ({ tournament, detailsTournament, recentMatches, winnerName }) => {
@@ -722,6 +740,7 @@ const publishTournamentCompletionPosts = async (client, tournament, completionDa
     const numericGroupId = parseInt(String(tournament.target_group_id), 10);
     const groupName = tournament.group_name || tournament.groupName || null;
     const authorLabel = 'Администрация';
+    const safeWinnerName = isLikelyHumanName(completionData.finalWinnerName) ? extractCleanPlayerName(completionData.finalWinnerName) : '';
     let publishedCount = 0;
 
     if (completionData.finalMatch && !(await hasTournamentPost(client, tournament.id, 'match_result'))) {
@@ -740,7 +759,7 @@ const publishTournamentCompletionPosts = async (client, tournament, completionDa
                     player1Name: completionData.finalMatch.player1Name,
                     player2Name: completionData.finalMatch.player2Name,
                     score: completionData.finalMatch.score,
-                    winnerName: completionData.finalWinnerName,
+                    winnerName: safeWinnerName || undefined,
                     note: 'Результат финала автоматически загружен из РТТ',
                     authorLabel,
                     rttLink: tournament.rtt_link || null
@@ -750,7 +769,7 @@ const publishTournamentCompletionPosts = async (client, tournament, completionDa
         publishedCount += 1;
     }
 
-    if (completionData.finalWinnerName && !(await hasTournamentPost(client, tournament.id, 'tournament_result'))) {
+    if (safeWinnerName && !(await hasTournamentPost(client, tournament.id, 'tournament_result'))) {
         await client.query(
             `INSERT INTO posts (user_id, group_id, type, content)
              VALUES ($1, $2, $3, $4::jsonb)`,
@@ -762,8 +781,8 @@ const publishTournamentCompletionPosts = async (client, tournament, completionDa
                     tournamentId: String(tournament.id),
                     tournamentName: tournament.name,
                     groupName,
-                    winnerName: completionData.finalWinnerName,
-                    winnerAvatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(completionData.finalWinnerName)}&background=f59e0b&color=fff`,
+                    winnerName: safeWinnerName,
+                    winnerAvatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(safeWinnerName)}&background=f59e0b&color=fff`,
                     note: 'Победитель автоматически определён по данным РТТ',
                     authorLabel,
                     rttLink: tournament.rtt_link || null
@@ -845,7 +864,7 @@ const syncTrackedTournamentStages = async () => {
         const recentMatches = recentMatchesResult?.success ? recentMatchesResult.data : [];
 
         const trackedTournaments = await pool.query(
-            `SELECT t.id, t.user_id, t.name, t.group_name, t.target_group_id, t.rtt_link, t.stage_status,
+            `SELECT t.id, t.user_id, t.name, t.group_name, t.target_group_id, t.rtt_link, t.stage_status, t.status,
                     COALESCE(g.name, t.group_name) AS "groupName"
              FROM tournaments t
              LEFT JOIN groups g
@@ -856,7 +875,6 @@ const syncTrackedTournamentStages = async () => {
              WHERE COALESCE(t.rtt_link, '') != ''
                AND COALESCE(t.target_group_id, '') != ''
                AND t.target_group_id ~ '^\\d+$'
-               AND COALESCE(t.status, '') != 'finished'
              ORDER BY t.id DESC`
         );
 
@@ -873,13 +891,18 @@ const syncTrackedTournamentStages = async () => {
                 const detailsTournament = details.tournament || {};
                 const detectedStageStatus = normalizeTournamentStageStatus(detailsTournament.stageStatus || '');
                 const previousStageStatus = normalizeTournamentStageStatus(tournament.stage_status || '');
-                const winnerName = pickTournamentWinner(detailsTournament.participants || []);
-                const finalMatch = findRelevantFinalMatch({
-                    tournament,
-                    detailsTournament,
-                    recentMatches,
-                    winnerName
-                });
+                const detectedTournamentStatus = mapRttLifecycleToTournamentStatus(detailsTournament.lifecycleStatus || '');
+                const previousTournamentStatus = String(tournament.status || '').trim().toLowerCase();
+                const tournamentMarkedFinished = detectedTournamentStatus === 'finished';
+                const winnerName = tournamentMarkedFinished ? pickTournamentWinner(detailsTournament.participants || []) : '';
+                const finalMatch = tournamentMarkedFinished
+                    ? findRelevantFinalMatch({
+                        tournament,
+                        detailsTournament,
+                        recentMatches,
+                        winnerName
+                    })
+                    : null;
 
                 let finalWinnerName = winnerName;
                 if (!finalWinnerName && finalMatch?.score) {
@@ -888,9 +911,14 @@ const syncTrackedTournamentStages = async () => {
                         : finalMatch.player2Name;
                 }
 
-                const tournamentCompleted = Boolean(finalWinnerName || finalMatch);
+                const tournamentCompleted = tournamentMarkedFinished;
+                const nextStageStatus = detailsTournament.statusLabel || detectedStageStatus || tournament.stage_status || null;
 
-                if (!tournamentCompleted && (!detectedStageStatus || detectedStageStatus === previousStageStatus)) {
+                if (
+                    !tournamentCompleted &&
+                    detectedTournamentStatus === previousTournamentStatus &&
+                    (!detectedStageStatus || detectedStageStatus === previousStageStatus)
+                ) {
                     continue;
                 }
 
@@ -898,15 +926,17 @@ const syncTrackedTournamentStages = async () => {
                 try {
                     await client.query('BEGIN');
 
-                    if (tournamentCompleted) {
+                    if (detectedTournamentStatus && detectedTournamentStatus !== previousTournamentStatus) {
                         await client.query(
                             `UPDATE tournaments
-                             SET status = 'finished',
-                                 stage_status = $1
-                             WHERE id = $2`,
-                            ['Турнир завершен', tournament.id]
+                             SET status = $1,
+                                 stage_status = COALESCE($2, stage_status)
+                             WHERE id = $3`,
+                            [detectedTournamentStatus, nextStageStatus, tournament.id]
                         );
+                    }
 
+                    if (tournamentCompleted && previousTournamentStatus !== 'finished') {
                         const completionResult = await publishTournamentCompletionPosts(client, tournament, {
                             finalMatch,
                             finalWinnerName

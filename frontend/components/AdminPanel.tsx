@@ -432,6 +432,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout, onImpersonateUs
         return 'draft';
     };
 
+    const mapRttLifecycleToTournamentStatus = (status?: string): Tournament['status'] | null => {
+        const normalized = (status || '').toLowerCase().trim();
+        if (normalized === 'live') return 'live';
+        if (normalized === 'finished') return 'finished';
+        if (normalized === 'open') return 'open';
+        return null;
+    };
+
     const guessTournamentType = (value?: string): Tournament['tournamentType'] => {
         return (value || '').toLowerCase().includes('пар') ? 'Парный' : 'Одиночный';
     };
@@ -463,8 +471,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout, onImpersonateUs
                 endDate: tournamentDates.endDate,
                 participantsCount,
                 prizePool: rttTournament.avgRating ? `Средний рейтинг: ${rttTournament.avgRating}` : '',
-                stageStatus: details?.stageStatus || rttTournament.status || '',
-                status: mapRttStatusToTournamentStatus(rttTournament.status),
+                stageStatus: details?.statusLabel || details?.stageStatus || rttTournament.status || '',
+                status: mapRttLifecycleToTournamentStatus(details?.lifecycleStatus) || mapRttStatusToTournamentStatus(rttTournament.status),
                 type: 'single_elimination',
                 rttLink: rttTournament.link || '',
                 rounds: editingTournament?.rounds || [],
