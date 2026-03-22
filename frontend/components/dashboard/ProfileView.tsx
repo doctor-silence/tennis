@@ -1,12 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   MapPin, CheckCircle2, Activity, Zap, Trophy, Calendar, 
-  BarChart2, Loader2, ChevronDown, Plus, Upload
+    Loader2, Upload
 } from 'lucide-react';
 import { User, Match, Tournament } from '../../types';
 import Button from '../Button';
-import { StatCard, ProgressChart, Modal } from '../Shared';
+import { StatCard, Modal } from '../Shared';
 import { api, API_URL } from '../../services/api';
 
 const trainings = [
@@ -115,43 +115,18 @@ const NearbyTournamentsWidget: React.FC<{ userId: string; city: string }> = ({ u
 };
 
 // Виджет матчей РТТ с rttstat.ru
-const RttMatchesWidget: React.FC<{ userId: string; rni: string }> = ({ userId, rni }) => {
-  const [rttMatches, setRttMatches] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(`${API_URL}/rtt/stats/${rni}`);
-        const data = await res.json();
-        if (data.success && data.data?.matches) {
-          setRttMatches(data.data.matches);
-        } else {
-          setError(data.error || 'Нет данных');
-        }
-      } catch {
-        setError('Ошибка загрузки');
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [rni]);
-
+const RttMatchesWidget: React.FC<{ matches: any[]; loading: boolean; error: string | null }> = ({ matches, loading, error }) => {
   if (loading) return <div className="flex justify-center py-6"><Loader2 className="animate-spin text-slate-300" /></div>;
   if (error) return <p className="text-slate-400 text-sm py-2">{error}</p>;
-  if (!rttMatches.length) return <p className="text-slate-400 text-sm py-2">Матчи на rttstat.ru не найдены.</p>;
+    if (!matches.length) return <p className="text-slate-400 text-sm py-2">Матчи на rttstat.ru не найдены.</p>;
 
   return (
     <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-      {rttMatches.map((m: any, i: number) => (
+            {matches.map((m: any, i: number) => (
         <div key={i} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
           <div className={`w-1.5 h-10 rounded-full flex-shrink-0 ${m.result === 'win' ? 'bg-lime-500' : 'bg-red-400'}`} />
           <div className="flex-1 min-w-0">
-            <div className="font-bold text-sm truncate">vs. {m.opponent}</div>
+                        <div className="font-bold text-sm truncate">vs. {m.opponentName || m.opponent}</div>
             <div className="text-xs text-slate-400 truncate">{m.tournament || '—'} • {m.date}</div>
           </div>
           <div className="text-right flex-shrink-0">
@@ -168,18 +143,25 @@ const RttMatchesWidget: React.FC<{ userId: string; rni: string }> = ({ userId, r
 
 const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showAddStatsModal, setShowAddStatsModal] = useState(false);
   const [showTournamentsModal, setShowTournamentsModal] = useState(false);
   const [showTrainingModal, setShowTrainingModal] = useState(false);
   const [isTrainingCompleted, setIsTrainingCompleted] = useState(false);
   const [currentTrainingIndex, setCurrentTrainingIndex] = useState(0);
   
   const [matches, setMatches] = useState<Match[]>([]);
-  const [loadingMatches, setLoadingMatches] = useState(true);
-  const [matchesError, setMatchesError] = useState(false);
-  const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
+  const [rttMatches, setRttMatches] = useState<Match[]>([]);
+  const [loadingRttMatches, setLoadingRttMatches] = useState(false);
+  const [rttMatchesError, setRttMatchesError] = useState<string | null>(null);
   const [syncingRtt, setSyncingRtt] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
+
+  const isRttProfile = Boolean(user.rni);
+  const profileMatchesCount = isRttProfile
+      ? (loadingRttMatches || rttMatchesError ? '—' : rttMatches.length)
+      : matches.length;
+  const profileWinsCount = isRttProfile
+      ? (loadingRttMatches || rttMatchesError ? '—' : rttMatches.filter(match => match.result === 'win').length)
+      : matches.filter(match => match.result === 'win').length;
 
   const handleRttSync = async () => {
       setSyncingRtt(true);
@@ -187,9 +169,24 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
       try {
           const data = await api.rttSyncMatches(user.id);
           setSyncResult(data.added > 0 ? `Добавлено ${data.added} матчей из РТТ` : 'Новых матчей нет');
-          if (data.added > 0) {
-              const updated = await api.matches.getAll(user.id);
-              setMatches(updated);
+          const updated = await api.matches.getAll(user.id);
+          setMatches(updated);
+
+          if (user.rni) {
+              const rttData = await api.rtt.getPlayerStats(user.rni);
+              if (rttData.success && Array.isArray(rttData.data?.matches)) {
+                  const mappedMatches: Match[] = rttData.data.matches.map((match: any, index: number) => ({
+                      id: `rtt-${user.id}-${index}`,
+                      userId: String(user.id),
+                      opponentName: match.opponent || 'Неизвестный соперник',
+                      score: match.score || '—',
+                      date: match.date,
+                      result: match.result === 'win' ? 'win' : 'loss',
+                      surface: 'hard'
+                  }));
+                  setRttMatches(mappedMatches);
+                  setRttMatchesError(null);
+              }
           }
       } catch (e: any) {
           setSyncResult(e.message || 'Ошибка синхронизации');
@@ -238,53 +235,58 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
       });
   }, [user]);
 
-  const [newMatchStats, setNewMatchStats] = useState({
-      opponentName: '',
-      score: '',
-      result: 'win' as 'win' | 'loss',
-      surface: 'hard' as 'hard' | 'clay' | 'grass',
-      stats: {
-          firstServePercent: 60,
-          doubleFaults: 2,
-          unforcedErrors: 10,
-          winners: 5,
-          aces: 1,
-          breakPointsWon: 0,
-          totalBreakPoints: 0
-      }
-  });
-
   useEffect(() => {
       const fetchMatches = async () => {
-          setLoadingMatches(true);
-          setMatchesError(false);
           try {
               const data = await api.matches.getAll(String(user.id));
               setMatches(data);
           } catch(e) {
               console.error(e);
-              setMatchesError(true);
-          } finally {
-              setLoadingMatches(false);
           }
       };
       fetchMatches();
   }, [user.id]);
 
-  const handleSaveMatch = async () => {
-      try {
-          const matchPayload = {
-              userId: user.id,
-              ...newMatchStats,
-              stats: newMatchStats.stats
-          };
-          const savedMatch = await api.matches.add(matchPayload);
-          setMatches([savedMatch, ...matches]);
-          setShowAddStatsModal(false);
-      } catch (e) {
-          alert('Ошибка сохранения');
-      }
-  };
+  useEffect(() => {
+      const fetchRttMatches = async () => {
+          if (!user.rni) {
+              setRttMatches([]);
+              setRttMatchesError(null);
+              setLoadingRttMatches(false);
+              return;
+          }
+
+          setLoadingRttMatches(true);
+          setRttMatchesError(null);
+
+          try {
+              const data = await api.rtt.getPlayerStats(user.rni);
+              if (data.success && Array.isArray(data.data?.matches)) {
+                  const mappedMatches: Match[] = data.data.matches.map((match: any, index: number) => ({
+                      id: `rtt-${user.id}-${index}`,
+                      userId: String(user.id),
+                      opponentName: match.opponent || 'Неизвестный соперник',
+                      score: match.score || '—',
+                      date: match.date,
+                      result: match.result === 'win' ? 'win' : 'loss',
+                      surface: 'hard'
+                  }));
+                  setRttMatches(mappedMatches);
+              } else {
+                  setRttMatches([]);
+                  setRttMatchesError(data.error || 'Нет данных');
+              }
+          } catch (error) {
+              console.error(error);
+              setRttMatches([]);
+              setRttMatchesError('Ошибка загрузки');
+          } finally {
+              setLoadingRttMatches(false);
+          }
+      };
+
+      fetchRttMatches();
+  }, [user.id, user.rni]);
 
   const handleSaveProfile = async () => {
       try {
@@ -332,9 +334,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
             return { month: 'ERR', day: '00', dayOfWeek: 'Error' };
         }
     };
-
-
-  return (
+    return (
     <>
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-2 space-y-6">
@@ -388,109 +388,13 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
   
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-10">
                 <StatCard label="NTRP / РТТ" value={user.level || user.rating || "N/A"} icon={<Activity className="text-lime-600" />} />
-                <StatCard label="Матчей" value={matches.length} icon={<Trophy className="text-blue-500" />} />
-                <StatCard label="Побед" value={matches.filter(m => m.result === 'win').length} icon={<Zap className="text-amber-500" />} />
+                                <StatCard label="Матчей" value={profileMatchesCount} icon={<Trophy className="text-blue-500" />} />
+                                <StatCard label="Побед" value={profileWinsCount} icon={<Zap className="text-amber-500" />} />
                 <StatCard label="Возраст" value={user.age || "N/A"} icon={<Calendar className="text-purple-500" />} />
               </div>
           </div>
         </div>
         
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-            <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold flex items-center gap-2"><BarChart2 className="text-lime-600"/> Аналитика игры</h3>
-                <Button size="sm" onClick={() => setShowAddStatsModal(true)} className="gap-2"><Plus size={16}/> Внести матч</Button>
-            </div>
-
-            {matches.length > 0 ? (
-                <div className="space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div>
-                            <div className="text-sm font-bold text-slate-500 uppercase mb-4">Процент 1-й подачи</div>
-                            <ProgressChart matches={matches} type="serve" />
-                        </div>
-                        <div>
-                            <div className="text-sm font-bold text-slate-500 uppercase mb-4">Невынужденные ошибки</div>
-                            <ProgressChart matches={matches} type="errors" />
-                        </div>
-                    </div>
-                </div>
-            ) : (
-                <div className="text-center py-8 text-slate-400 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
-                    <Activity size={32} className="mx-auto mb-2 opacity-50"/>
-                    <p>Нет данных. Добавьте статистику первого матча, чтобы увидеть графики.</p>
-                </div>
-            )}
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-          <div className="flex justify-between items-center mb-6">
-             <h3 className="text-xl font-bold">История матчей</h3>
-          </div>
-          {loadingMatches ? (
-              <div className="flex justify-center py-4"><Loader2 className="animate-spin text-slate-400"/></div>
-          ) : matchesError ? (
-              <div className="text-center py-6 text-red-400 text-sm">Ошибка загрузки матчей. Проверьте подключение.</div>
-          ) : matches.length > 0 ? (
-              <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                {matches.map((m) => (
-                  <div 
-                    key={m.id} 
-                    onClick={() => setExpandedMatchId(expandedMatchId === m.id ? null : m.id)}
-                    className={`flex flex-col p-4 rounded-2xl border transition-all cursor-pointer group ${expandedMatchId === m.id ? 'bg-white border-lime-400 shadow-md ring-1 ring-lime-400' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'}`}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center gap-4">
-                        <div className={`w-2 h-12 rounded-full ${m.result === 'win' ? 'bg-lime-500' : 'bg-red-500'}`}></div>
-                        <div>
-                            <div className="font-bold text-lg group-hover:text-lime-600 transition-colors">{m.score}</div>
-                            <div className="text-sm text-slate-500">vs. {m.opponentName} • {m.surface === 'clay' ? 'Грунт' : m.surface === 'hard' ? 'Хард' : 'Трава'}</div>
-                        </div>
-                        </div>
-                        <div className="text-right">
-                        <div className="font-bold text-slate-900">{new Date(m.date).toLocaleDateString()}</div>
-                        {!expandedMatchId && m.stats && <div className="text-xs text-slate-400 font-medium">UE: {m.stats.unforcedErrors} | Wins: {m.stats.winners}</div>}
-                        <ChevronDown size={16} className={`ml-auto mt-1 text-slate-400 transition-transform duration-300 ${expandedMatchId === m.id ? 'rotate-180' : ''}`}/>
-                        </div>
-                    </div>
-
-                    {expandedMatchId === m.id && m.stats && (
-                        <div className="mt-4 pt-4 border-t border-slate-100 animate-fade-in-up cursor-default" onClick={e => e.stopPropagation()}>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <div className="p-3 rounded-xl border border-slate-100 bg-white text-center">
-                                    <div className="text-[10px] uppercase font-bold text-slate-400 mb-1">Эйсы</div>
-                                    <div className="font-bold text-slate-900">{m.stats.aces}</div>
-                                </div>
-                                <div className="p-3 rounded-xl border border-slate-100 bg-white text-center">
-                                    <div className="text-[10px] uppercase font-bold text-slate-400 mb-1">Двойные</div>
-                                    <div className="font-bold text-slate-900">{m.stats.doubleFaults}</div>
-                                </div>
-                                <div className="p-3 rounded-xl border border-slate-100 bg-white text-center">
-                                    <div className="text-[10px] uppercase font-bold text-slate-400 mb-1">1-я подача</div>
-                                    <div className="font-bold text-slate-900">{m.stats.firstServePercent}%</div>
-                                </div>
-                                <div className="p-3 rounded-xl border border-slate-100 bg-white text-center">
-                                    <div className="text-[10px] uppercase font-bold text-slate-400 mb-1">Брейк-поинты</div>
-                                    <div className="font-bold text-slate-900">{m.stats.breakPointsWon} / {m.stats.totalBreakPoints}</div>
-                                </div>
-                                <div className="p-3 rounded-xl border border-lime-100 bg-lime-50 text-center">
-                                    <div className="text-[10px] uppercase font-bold text-lime-700 mb-1">Winners</div>
-                                    <div className="font-bold text-lime-900">{m.stats.winners}</div>
-                                </div>
-                                <div className="p-3 rounded-xl border border-red-100 bg-red-50 text-center">
-                                    <div className="text-[10px] uppercase font-bold text-red-700 mb-1">Unforced Errors</div>
-                                    <div className="font-bold text-red-900">{m.stats.unforcedErrors}</div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-          ) : (
-              <p className="text-slate-400 text-sm">Пока нет сыгранных матчей.</p>
-          )}
-        </div>
-
         {/* RTT Matches Widget — только для игроков с RНИ */}
         {user.rni && (
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
@@ -513,7 +417,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
                 </button>
               </div>
             </div>
-            <RttMatchesWidget userId={user.id} rni={user.rni} />
+                        <RttMatchesWidget matches={rttMatches} loading={loadingRttMatches} error={rttMatchesError} />
           </div>
         )}
       </div>
@@ -546,72 +450,6 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
         </div>
       </div>
     </div>
-
-    <Modal isOpen={showAddStatsModal} onClose={() => setShowAddStatsModal(false)} title="Добавить матч">
-        <div className="space-y-4">
-            <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase">Соперник</label>
-                <input 
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" 
-                    value={newMatchStats.opponentName} 
-                    onChange={e => setNewMatchStats({...newMatchStats, opponentName: e.target.value})}
-                />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-                 <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">Счет</label>
-                    <input 
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" 
-                        value={newMatchStats.score} 
-                        onChange={e => setNewMatchStats({...newMatchStats, score: e.target.value})}
-                        placeholder="6:3, 6:4"
-                    />
-                </div>
-                 <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">Покрытие</label>
-                    <select 
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none" 
-                        value={newMatchStats.surface} 
-                        onChange={e => setNewMatchStats({...newMatchStats, surface: e.target.value as any})}
-                    >
-                        <option value="hard">Хард</option>
-                        <option value="clay">Грунт</option>
-                        <option value="grass">Трава</option>
-                    </select>
-                </div>
-            </div>
-            <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase">Результат</label>
-                <div className="flex gap-2">
-                    <button 
-                        className={`flex-1 py-2 rounded-xl font-bold text-sm transition-colors ${newMatchStats.result === 'win' ? 'bg-lime-400 text-slate-900' : 'bg-slate-100 text-slate-500'}`}
-                        onClick={() => setNewMatchStats({...newMatchStats, result: 'win'})}
-                    >Победа</button>
-                    <button 
-                         className={`flex-1 py-2 rounded-xl font-bold text-sm transition-colors ${newMatchStats.result === 'loss' ? 'bg-red-400 text-white' : 'bg-slate-100 text-slate-500'}`}
-                         onClick={() => setNewMatchStats({...newMatchStats, result: 'loss'})}
-                    >Поражение</button>
-                </div>
-            </div>
-            
-            <div className="pt-2 border-t border-slate-100">
-                <div className="text-xs font-bold text-slate-900 uppercase mb-3">Статистика (опционально)</div>
-                <div className="grid grid-cols-2 gap-3">
-                    <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase">1-я подача (%)</label>
-                        <input type="number" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm" value={newMatchStats.stats.firstServePercent} onChange={e => setNewMatchStats({...newMatchStats, stats: {...newMatchStats.stats, firstServePercent: Number(e.target.value)}})} />
-                    </div>
-                    <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase">Невынужденные</label>
-                        <input type="number" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm" value={newMatchStats.stats.unforcedErrors} onChange={e => setNewMatchStats({...newMatchStats, stats: {...newMatchStats.stats, unforcedErrors: Number(e.target.value)}})} />
-                    </div>
-                </div>
-            </div>
-
-            <Button className="w-full mt-4" onClick={handleSaveMatch}>Сохранить результат</Button>
-        </div>
-    </Modal>
-
     <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Редактировать профиль">
         <div className="space-y-4">
             <div className="space-y-1">

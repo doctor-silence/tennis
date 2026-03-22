@@ -639,6 +639,151 @@ const buildTournamentStageMessage = ({ tournamentName, groupName, stageStatus })
     return `Турнир «${tournamentName}»: ${stageStatus}${groupSuffix}`;
 };
 
+const normalizeComparableText = (value = '') => String(value || '')
+    .toLowerCase()
+    .replace(/[«»"']/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const extractCleanPlayerName = (rawName = '') => {
+    let name = String(rawName || '').replace(/\s+/g, ' ').trim();
+    name = name.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+    name = name.replace(/\s+\d+\s*лет.*$/i, '').trim();
+    name = name.replace(/\s*,.*$/g, '').trim();
+    return name.replace(/\s+/g, ' ').trim();
+};
+
+const parseRuDateToTimestamp = (value = '') => {
+    const matched = String(value || '').match(/(\d{2})\.(\d{2})\.(\d{4})/);
+    if (!matched) return 0;
+    return new Date(`${matched[3]}-${matched[2]}-${matched[1]}T00:00:00Z`).getTime();
+};
+
+const pickTournamentWinner = (participants = []) => {
+    const winnerRow = participants.find((participant) => /^1([.)]|$)/.test(String(participant.place || '').trim()));
+    return winnerRow ? extractCleanPlayerName(winnerRow.name) : '';
+};
+
+const findRelevantFinalMatch = ({ tournament, detailsTournament, recentMatches, winnerName }) => {
+    const tournamentNameNeedle = normalizeComparableText(detailsTournament?.name || tournament.name || '');
+    const cityNeedle = normalizeComparableText(detailsTournament?.city || tournament.city || '');
+    const ageGroupNeedle = normalizeComparableText(detailsTournament?.ageGroup || tournament.age_group || tournament.ageGroup || '');
+
+    const filteredMatches = (recentMatches || [])
+        .filter((match) => {
+            const matchTournament = normalizeComparableText(match.tournament || '');
+            const matchCity = normalizeComparableText(match.city || '');
+            const matchAgeGroup = normalizeComparableText(match.ageGroup || '');
+
+            const tournamentMatches = tournamentNameNeedle && matchTournament.includes(tournamentNameNeedle);
+            const cityMatches = !cityNeedle || !matchCity || matchCity.includes(cityNeedle) || cityNeedle.includes(matchCity);
+            const ageGroupMatches = !ageGroupNeedle || !matchAgeGroup || matchAgeGroup.includes(ageGroupNeedle) || ageGroupNeedle.includes(matchAgeGroup);
+
+            return tournamentMatches && cityMatches && ageGroupMatches;
+        })
+        .sort((left, right) => parseRuDateToTimestamp(right.date) - parseRuDateToTimestamp(left.date));
+
+    if (!filteredMatches.length) return null;
+
+    if (winnerName) {
+        const normalizedWinner = normalizeComparableText(winnerName);
+        const byWinner = filteredMatches.find((match) => {
+            return normalizeComparableText(match.player1Name) === normalizedWinner || normalizeComparableText(match.player2Name) === normalizedWinner;
+        });
+        if (byWinner) return byWinner;
+    }
+
+    return filteredMatches[0];
+};
+
+const hasTournamentPost = async (client, tournamentId, type) => {
+    const existingPost = await client.query(
+        `SELECT 1
+         FROM posts
+         WHERE type = $1
+           AND content ->> 'tournamentId' = $2
+         LIMIT 1`,
+        [type, String(tournamentId)]
+    );
+
+    return existingPost.rows.length > 0;
+};
+
+const publishTournamentCompletionPosts = async (client, tournament, completionData) => {
+    if (!tournament.target_group_id || !/^\d+$/.test(String(tournament.target_group_id))) {
+        return { published: 0 };
+    }
+
+    const numericGroupId = parseInt(String(tournament.target_group_id), 10);
+    const groupName = tournament.group_name || tournament.groupName || null;
+    const authorLabel = 'Администрация';
+    let publishedCount = 0;
+
+    if (completionData.finalMatch && !(await hasTournamentPost(client, tournament.id, 'match_result'))) {
+        await client.query(
+            `INSERT INTO posts (user_id, group_id, type, content)
+             VALUES ($1, $2, $3, $4::jsonb)`,
+            [
+                tournament.user_id,
+                numericGroupId,
+                'match_result',
+                JSON.stringify({
+                    tournamentId: String(tournament.id),
+                    tournamentName: tournament.name,
+                    groupName,
+                    round: 'Финал',
+                    player1Name: completionData.finalMatch.player1Name,
+                    player2Name: completionData.finalMatch.player2Name,
+                    score: completionData.finalMatch.score,
+                    winnerName: completionData.finalWinnerName,
+                    note: 'Результат финала автоматически загружен из РТТ',
+                    authorLabel,
+                    rttLink: tournament.rtt_link || null
+                })
+            ]
+        );
+        publishedCount += 1;
+    }
+
+    if (completionData.finalWinnerName && !(await hasTournamentPost(client, tournament.id, 'tournament_result'))) {
+        await client.query(
+            `INSERT INTO posts (user_id, group_id, type, content)
+             VALUES ($1, $2, $3, $4::jsonb)`,
+            [
+                tournament.user_id,
+                numericGroupId,
+                'tournament_result',
+                JSON.stringify({
+                    tournamentId: String(tournament.id),
+                    tournamentName: tournament.name,
+                    groupName,
+                    winnerName: completionData.finalWinnerName,
+                    winnerAvatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(completionData.finalWinnerName)}&background=f59e0b&color=fff`,
+                    note: 'Победитель автоматически определён по данным РТТ',
+                    authorLabel,
+                    rttLink: tournament.rtt_link || null
+                })
+            ]
+        );
+        publishedCount += 1;
+    }
+
+    if (publishedCount > 0) {
+        const message = `Турнир «${tournament.name}» завершён. Результаты финала опубликованы автоматически.`;
+        await client.query(
+            `INSERT INTO notifications (user_id, type, message, reference_id)
+             SELECT gm.user_id, $1, $2, $3
+             FROM group_members gm
+             JOIN users u ON u.id = gm.user_id
+             WHERE gm.group_id = $4
+               AND COALESCE(u.notifications_enabled, TRUE) = TRUE`,
+            ['tournament_result', message, String(tournament.id), numericGroupId]
+        );
+    }
+
+    return { published: publishedCount };
+};
+
 const publishTournamentStageUpdate = async (client, tournament, stageStatus) => {
     if (!tournament.target_group_id || !/^\d+$/.test(String(tournament.target_group_id))) {
         return;
@@ -691,6 +836,9 @@ const syncTrackedTournamentStages = async () => {
     isTournamentStageSyncRunning = true;
 
     try {
+        const recentMatchesResult = await rttParser.getRecentMatches(250);
+        const recentMatches = recentMatchesResult?.success ? recentMatchesResult.data : [];
+
         const trackedTournaments = await pool.query(
             `SELECT t.id, t.user_id, t.name, t.group_name, t.target_group_id, t.rtt_link, t.stage_status,
                     COALESCE(g.name, t.group_name) AS "groupName"
@@ -708,6 +856,7 @@ const syncTrackedTournamentStages = async () => {
         );
 
         let publishedCount = 0;
+        let completionPublishedCount = 0;
 
         for (const tournament of trackedTournaments.rows) {
             try {
@@ -716,23 +865,58 @@ const syncTrackedTournamentStages = async () => {
                     continue;
                 }
 
-                const detectedStageStatus = normalizeTournamentStageStatus(details.tournament?.stageStatus || '');
+                const detailsTournament = details.tournament || {};
+                const detectedStageStatus = normalizeTournamentStageStatus(detailsTournament.stageStatus || '');
                 const previousStageStatus = normalizeTournamentStageStatus(tournament.stage_status || '');
+                const winnerName = pickTournamentWinner(detailsTournament.participants || []);
+                const finalMatch = findRelevantFinalMatch({
+                    tournament,
+                    detailsTournament,
+                    recentMatches,
+                    winnerName
+                });
 
-                if (!detectedStageStatus || detectedStageStatus === previousStageStatus) {
+                let finalWinnerName = winnerName;
+                if (!finalWinnerName && finalMatch?.score) {
+                    finalWinnerName = rttParser.determineMatchResult(finalMatch.score)
+                        ? finalMatch.player1Name
+                        : finalMatch.player2Name;
+                }
+
+                const tournamentCompleted = Boolean(finalWinnerName || finalMatch);
+
+                if (!tournamentCompleted && (!detectedStageStatus || detectedStageStatus === previousStageStatus)) {
                     continue;
                 }
 
                 const client = await pool.connect();
                 try {
                     await client.query('BEGIN');
-                    await client.query(
-                        'UPDATE tournaments SET stage_status = $1 WHERE id = $2',
-                        [detectedStageStatus, tournament.id]
-                    );
-                    await publishTournamentStageUpdate(client, tournament, detectedStageStatus);
+
+                    if (tournamentCompleted) {
+                        await client.query(
+                            `UPDATE tournaments
+                             SET status = 'finished',
+                                 stage_status = $1
+                             WHERE id = $2`,
+                            ['Турнир завершен', tournament.id]
+                        );
+
+                        const completionResult = await publishTournamentCompletionPosts(client, tournament, {
+                            finalMatch,
+                            finalWinnerName
+                        });
+                        completionPublishedCount += completionResult.published;
+                    } else if (detectedStageStatus && detectedStageStatus !== previousStageStatus) {
+                        await client.query(
+                            'UPDATE tournaments SET stage_status = $1 WHERE id = $2',
+                            [detectedStageStatus, tournament.id]
+                        );
+                        await publishTournamentStageUpdate(client, tournament, detectedStageStatus);
+                        publishedCount += 1;
+                    }
+
                     await client.query('COMMIT');
-                    publishedCount += 1;
                 } catch (syncErr) {
                     await client.query('ROLLBACK');
                     console.error(`Tournament stage sync failed for ${tournament.id}:`, syncErr.message);
@@ -746,6 +930,9 @@ const syncTrackedTournamentStages = async () => {
 
         if (publishedCount > 0) {
             await logSystemEvent('info', `RTT stage sync published ${publishedCount} tournament updates`, 'RTT');
+        }
+        if (completionPublishedCount > 0) {
+            await logSystemEvent('info', `RTT auto-published ${completionPublishedCount} tournament result posts`, 'RTT');
         }
     } catch (err) {
         console.error('RTT tracked tournaments sync error:', err.message);
@@ -1110,14 +1297,12 @@ app.get('/api/rtt/stats/:rni', async (req, res) => {
             return res.status(400).json({ error: 'РНИ обязателен' });
         }
 
-        // Получаем базовые данные игрока
         const playerData = await rttParser.getPlayerByRNI(rni);
         
         if (!playerData.success) {
             return res.status(404).json(playerData);
         }
 
-        // Получаем турниры и матчи
         const statsData = await rttParser.getPlayerTournamentsAndMatches(rni);
 
         res.json({
@@ -1130,7 +1315,7 @@ app.get('/api/rtt/stats/:rni', async (req, res) => {
         });
 
     } catch (err) {
-        console.error("❌ RTT Stats Error:", err);
+        console.error('❌ RTT Stats Error:', err);
         res.status(500).json({ 
             success: false,
             error: 'Ошибка при получении статистики: ' + err.message 
@@ -1150,18 +1335,17 @@ app.get('/api/rtt/tournament', async (req, res) => {
             });
         }
 
-        // SSRF защита: разрешаем только rttstat.ru
         let parsedUrl;
         try { parsedUrl = new URL(url); } catch { return res.status(400).json({ success: false, error: 'Некорректный URL' }); }
         if (!['rttstat.ru', 'www.rttstat.ru'].includes(parsedUrl.hostname)) {
             return res.status(400).json({ success: false, error: 'Недопустимый домен' });
         }
 
-        console.log("🎾 Запрос детальной информации о турнире:", url);
+        console.log('🎾 Запрос детальной информации о турнире:', url);
         const result = await rttParser.getTournamentDetails(url);
         res.json(result);
     } catch (err) {
-        console.error("❌ RTT Tournament Error:", err);
+        console.error('❌ RTT Tournament Error:', err);
         res.status(500).json({ 
             success: false,
             error: 'Ошибка при получении информации о турнире: ' + err.message 
@@ -1171,12 +1355,11 @@ app.get('/api/rtt/tournament', async (req, res) => {
 
 // Get tournaments list with filters
 app.get('/api/rtt/tournaments', async (req, res) => {
-    // Жёсткий таймаут должен быть больше, чем timeout у RTT parser
     const timeout = setTimeout(() => {
         if (!res.headersSent) {
             res.json({ success: true, data: { tournaments: [], filters: {} } });
         }
-    }, 18000);
+    }, 20000);
 
     try {
         const { age, g, l1, l2, l3 } = req.query;
@@ -1185,7 +1368,7 @@ app.get('/api/rtt/tournaments', async (req, res) => {
         if (!res.headersSent) res.json(result);
     } catch (err) {
         clearTimeout(timeout);
-        console.error("❌ RTT Tournaments List Error:", err.message);
+        console.error('❌ RTT Tournaments List Error:', err.message);
         if (!res.headersSent) res.json({ success: true, data: { tournaments: [], filters: {} } });
     }
 });
@@ -1544,12 +1727,13 @@ app.get('/api/admin/logs', requireAdmin, async (req, res) => {
 
 app.get('/api/admin/users', requireAdmin, async (req, res) => {
     try {
-        const result = await pool.query('SELECT id, name, email, role, city, avatar, rating, level, age, rtt_rank, rtt_category, xp FROM users ORDER BY id DESC');
+        const result = await pool.query('SELECT id, name, email, role, city, avatar, rating, level, age, rtt_rank, rtt_category, rni, xp FROM users ORDER BY id DESC');
         res.json(result.rows.map(u => ({
             ...u, 
             id: u.id.toString(),
             rttRank: u.rtt_rank,
-            rttCategory: u.rtt_category
+            rttCategory: u.rtt_category,
+            rni: u.rni
         })));
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -1557,7 +1741,7 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
 });
 
 app.post('/api/admin/users', requireAdmin, async (req, res) => {
-    const { name, email, password, role, city, age, rating, level, rttRank, rttCategory } = req.body;
+    const { name, email, password, role, city, age, rating, level, rttRank, rttCategory, rni } = req.body;
     try {
         const emailValidation = validateEmailAddress(email);
         if (!emailValidation.isValid) {
@@ -1576,9 +1760,9 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
         const defaultAvatar = `https://ui-avatars.com/api/?name=${name.replace(' ', '+')}&background=random&color=fff`;
         
         const result = await pool.query(
-            `INSERT INTO users (name, email, password, city, avatar, role, rating, age, level, rtt_rank, rtt_category, xp) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0) 
-             RETURNING id, name, email, role, city, avatar, rating, age, level, rtt_rank, rtt_category, xp`,
+            `INSERT INTO users (name, email, password, city, avatar, role, rating, age, level, rtt_rank, rtt_category, rni, xp) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 0) 
+             RETURNING id, name, email, role, city, avatar, rating, age, level, rtt_rank, rtt_category, rni, xp`,
             [
                 name, 
                 normalizedEmail, 
@@ -1590,12 +1774,13 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
                 age || null, 
                 level || '', 
                 rttRank || 0, 
-                rttCategory || null
+                rttCategory || null,
+                rni || null
             ]
         );
         const user = result.rows[0];
         await logAdminAction(req, 'info', 'создал', 'пользователя', name || normalizedEmail, `Email: ${normalizedEmail}, роль: ${role || 'amateur'}`);
-        res.json({ ...user, id: user.id.toString(), rttRank: user.rtt_rank, rttCategory: user.rtt_category });
+        res.json({ ...user, id: user.id.toString(), rttRank: user.rtt_rank, rttCategory: user.rtt_category, rni: user.rni });
     } catch (err) {
         console.error("Admin Create User Error:", err);
         res.status(500).json({ error: err.message });
@@ -1605,7 +1790,7 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
 
 app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
-    const { name, email, role, city, rating, level, rttRank, rttCategory, age, xp, avatar, is_private, notifications_enabled } = req.body;
+    const { name, email, role, city, rating, level, rttRank, rttCategory, rni, age, xp, avatar, is_private, notifications_enabled } = req.body;
 
     const client = await pool.connect();
     try {
@@ -1634,6 +1819,7 @@ app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
         if (level !== undefined) await client.query('UPDATE users SET level = $1 WHERE id = $2', [level, id]);
         if (rttRank !== undefined) await client.query('UPDATE users SET rtt_rank = $1 WHERE id = $2', [rttRank, id]);
         if (rttCategory !== undefined) await client.query('UPDATE users SET rtt_category = $1 WHERE id = $2', [rttCategory, id]);
+        if (rni !== undefined) await client.query('UPDATE users SET rni = $1 WHERE id = $2', [rni || null, id]);
         if (age !== undefined) await client.query('UPDATE users SET age = $1 WHERE id = $2', [age, id]);
         if (xp !== undefined) await client.query('UPDATE users SET xp = $1 WHERE id = $2', [xp, id]);
         if (avatar !== undefined) await client.query('UPDATE users SET avatar = $1 WHERE id = $2', [avatar, id]);
@@ -2474,13 +2660,13 @@ app.post('/api/ladder/challenges/:challengeId/result', async (req, res) => {
         const loserData = await client.query('SELECT name FROM users WHERE id = $1', [loserId]);
 
         await client.query(
-            `INSERT INTO matches (user_id, opponent_name, score, result, surface)
-             VALUES ($1, $2, $3, 'win', 'hard')`, // Assuming hard court for now
+            `INSERT INTO matches (user_id, opponent_name, score, result, surface, date)
+             VALUES ($1, $2, $3, 'win', 'hard', CURRENT_DATE)`,
             [parsedWinnerId, loserData.rows[0].name, score]
         );
          await client.query(
-            `INSERT INTO matches (user_id, opponent_name, score, result, surface)
-             VALUES ($1, $2, $3, 'loss', 'hard')`,
+            `INSERT INTO matches (user_id, opponent_name, score, result, surface, date)
+             VALUES ($1, $2, $3, 'loss', 'hard', CURRENT_DATE)`,
             [loserId, winnerData.rows[0].name, score]
         );
 
@@ -2617,7 +2803,7 @@ app.get('/api/ladder/player/:userId', async (req, res) => {
     try {
         const userResult = await pool.query(
             `SELECT 
-                id, name, avatar, xp as points, role, level, rating, rtt_rank, rtt_category, created_at as join_date
+                id, name, avatar, xp as points, role, level, rating, rtt_rank, rtt_category, rni, created_at as join_date
              FROM users 
              WHERE id = $1`,
             [userId]
@@ -2801,39 +2987,6 @@ app.delete('/api/posts/:id', async (req, res) => {
     if (!userId) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
-
-    try {
-        const postRes = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
-        if (postRes.rows.length === 0) {
-            return res.status(404).json({ error: 'Post not found' });
-        }
-
-        const authorId = postRes.rows[0].user_id;
-
-        if (authorId.toString() !== userId.toString()) {
-            return res.status(403).json({ error: 'You are not authorized to delete this post' });
-        }
-
-        // Before deleting post, delete related likes and comments
-        await pool.query('DELETE FROM post_likes WHERE post_id = $1', [id]);
-        await pool.query('DELETE FROM post_comments WHERE post_id = $1', [id]);
-        await pool.query('DELETE FROM posts WHERE id = $1', [id]);
-        
-        res.json({ success: true });
-    } catch (err) {
-        console.error('Delete Post Error:', err);
-        res.status(500).json({ error: 'Failed to delete post' });
-    }
-});
-
-app.delete('/api/posts/:id', async (req, res) => {
-    const { id } = req.params;
-    const { userId } = req.body; 
-
-    if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-    }
-
     try {
         const postRes = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
         if (postRes.rows.length === 0) {
@@ -3793,14 +3946,21 @@ app.get('/api/matches', async (req, res) => {
 });
 
 app.post('/api/matches', async (req, res) => {
-    const { userId, opponentName, score, result, surface, stats } = req.body;
+    const { userId, opponentName, score, result, surface, stats, date } = req.body;
+
+    const normalizedDate = (() => {
+        if (!date) return null;
+        const parsedDate = new Date(date);
+        if (Number.isNaN(parsedDate.getTime())) return null;
+        return parsedDate.toISOString().split('T')[0];
+    })();
 
     try {
         const insert = await pool.query(
-            `INSERT INTO matches (user_id, opponent_name, score, result, surface, stats)
-             VALUES ($1, $2, $3, $4, $5, $6)
+            `INSERT INTO matches (user_id, opponent_name, score, result, surface, date, stats)
+             VALUES ($1, $2, $3, $4, $5, COALESCE($6::date, CURRENT_DATE), $7)
              RETURNING *`,
-            [userId, opponentName, score, result, surface, stats]
+            [userId, opponentName, score, result, surface, normalizedDate, stats]
         );
         await logSystemEvent('info', `Match added for user ${userId} vs ${opponentName}`, 'Stats');
         const row = insert.rows[0];

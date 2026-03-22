@@ -24,6 +24,28 @@ class RTTParser {
     this._tourCacheTTL = 5 * 60 * 1000; // 5 минут
   }
 
+  normalizeComparableText(value = '') {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/[«»"']/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  extractCleanPlayerName(rawName = '') {
+    let name = String(rawName || '').replace(/\s+/g, ' ').trim();
+    name = name.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+    name = name.replace(/\s+\d+\s*лет.*$/i, '').trim();
+    name = name.replace(/\s*,.*$/g, '').trim();
+    return name.replace(/\s+/g, ' ').trim();
+  }
+
+  extractTournamentCity(tournamentLabel = '') {
+    const normalized = String(tournamentLabel || '').trim();
+    if (!normalized.includes('.')) return '';
+    return normalized.split('.')[0].trim();
+  }
+
   extractLabeledValue(text, labels, stopLabels = []) {
     const escapedLabels = labels.map(label => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
     const stopPattern = stopLabels.length
@@ -410,6 +432,60 @@ class RTTParser {
     });
     
     return wins > losses;
+  }
+
+  async getRecentMatches(limit = 200) {
+    try {
+      const response = await this.axios.get('/');
+      const $ = cheerio.load(response.data);
+      const matches = [];
+
+      $('table').each((tableIndex, table) => {
+        if (matches.length >= limit) return false;
+
+        $(table).find('tr').each((rowIndex, row) => {
+          if (matches.length >= limit) return false;
+
+          const cells = $(row).find('td');
+          if (cells.length < 6) return;
+
+          const rawPlayer1 = cells.eq(0).text().trim();
+          const rawPlayer2 = cells.eq(1).text().trim();
+          const score = cells.eq(2).text().trim();
+          const date = cells.eq(3).text().trim();
+          const ageGroup = cells.eq(4).text().trim();
+          const tournament = cells.eq(5).text().trim();
+
+          if (!rawPlayer1 || !rawPlayer2 || !score || !date || !tournament) return;
+          if (!/(\d+[:\-–]\d+|\[\d+[-–:]\d+\])/.test(score) || !/\d{2}\.\d{2}\.\d{4}/.test(date)) return;
+
+          matches.push({
+            id: `${tableIndex}-${rowIndex}`,
+            player1Raw: rawPlayer1,
+            player2Raw: rawPlayer2,
+            player1Name: this.extractCleanPlayerName(rawPlayer1),
+            player2Name: this.extractCleanPlayerName(rawPlayer2),
+            score,
+            date,
+            ageGroup,
+            tournament,
+            city: this.extractTournamentCity(tournament)
+          });
+        });
+      });
+
+      return {
+        success: true,
+        data: matches.slice(0, limit)
+      };
+    } catch (error) {
+      console.error('Ошибка при получении последних матчей RTT:', error.message);
+      return {
+        success: false,
+        error: error.message,
+        data: []
+      };
+    }
   }
 
   /**

@@ -582,6 +582,7 @@ const TournamentMatchResultPost = ({ post }: { post: any }) => {
     const c = post.content || {};
     const isFullResult = !c.player1Name;
     if (isFullResult) return <TournamentResultPost post={post} />;
+    const authorLabel = c.authorLabel || (post.author?.role === 'admin' ? 'Администрация' : post.author?.name);
 
     const isFinal = c.round === 'Финал';
     const isSemi = c.round === 'Полуфинал';
@@ -605,7 +606,7 @@ const TournamentMatchResultPost = ({ post }: { post: any }) => {
                             <p className={`text-[10px] font-black uppercase tracking-widest ${isFinal ? 'text-amber-400' : 'text-slate-400'}`}>
                                 {c.tournamentName}
                             </p>
-                            <p className="text-[10px] text-slate-500">{post.author?.role === 'admin' ? 'Администрация' : post.author?.name} · {new Date(post.created_at).toLocaleDateString('ru-RU')}</p>
+                            <p className="text-[10px] text-slate-500">{authorLabel} · {new Date(post.created_at).toLocaleDateString('ru-RU')}</p>
                         </div>
                     </div>
                     {/* Round badge */}
@@ -665,7 +666,10 @@ const TournamentMatchResultPost = ({ post }: { post: any }) => {
     );
 };
 
-const TournamentResultPost = ({ post }: { post: any }) => (
+const TournamentResultPost = ({ post }: { post: any }) => {
+    const authorLabel = post.content?.authorLabel || (post.author?.role === 'admin' ? 'Администрация' : post.author?.name);
+
+    return (
     <div className="bg-gradient-to-br from-amber-50 to-white p-4 rounded-2xl shadow-lg border-2 border-amber-200/80 relative overflow-hidden">
         <div className="absolute -top-4 -right-4 w-16 h-16 text-amber-200/50">
             <Trophy size={64} strokeWidth={1}/>
@@ -678,7 +682,7 @@ const TournamentResultPost = ({ post }: { post: any }) => (
                     </div>
                     <div>
                         <p className="font-bold text-amber-900 text-sm">ТУРНИР ЗАВЕРШЕН</p>
-                        <p className="text-xs text-amber-700/80">Опубликовал: {post.author?.role === 'admin' ? 'Администрация' : post.author?.name}</p>
+                        <p className="text-xs text-amber-700/80">Опубликовал: {authorLabel}</p>
                     </div>
                 </div>
             </div>
@@ -695,7 +699,8 @@ const TournamentResultPost = ({ post }: { post: any }) => (
             </div>
         </div>
     </div>
-);
+    );
+};
 
 const TournamentStageUpdatePost = ({ post }: { post: any }) => {
     const content = post.content || {};
