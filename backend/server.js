@@ -142,6 +142,62 @@ const logAdminAction = async (req, level, actionText, entityText, targetText, de
     await logSystemEvent(level, `${actorLabel} ${actionText} ${entityText}${targetLabel}${detailsSuffix}`, 'Admin');
 };
 
+const VALID_GENERIC_TLDS = new Set(
+    `academy app art ai biz blog club com dev edu email expert info io me mobi name net online org page pro ru shop site space store team tech top tv website xyz xn--p1ai рф`.split(' ')
+);
+
+const VALID_COUNTRY_CODE_TLDS = new Set(
+    `ac ad ae af ag ai al am ao aq ar as at au aw ax az ba bb bd be bf bg bh bi bj bm bn bo bq br bs bt bv bw by bz ca cc cd cf cg ch ci ck cl cm cn co cr cu cv cw cx cy cz de dj dk dm do dz ec ee eg eh er es et eu fi fj fk fm fo fr ga gb gd ge gf gg gh gi gl gm gn gp gq gr gs gt gu gw gy hk hm hn hr ht hu id ie il im in io iq ir is it je jm jo jp ke kg kh ki km kn kp kr kw ky kz la lb lc li lk lr ls lt lu lv ly ma mc md me mf mg mh mk ml mm mn mo mp mq mr ms mt mu mv mw mx my mz na nc ne nf ng ni nl no np nr nu nz om pa pe pf pg ph pk pl pm pn pr ps pt pw py qa re ro rs ru rw sa sb sc sd se sg sh si sj sk sl sm sn so sr ss st sv sx sy sz tc td tf tg th tj tk tl tm tn to tr tt tv tw tz ua ug uk um us uy uz va vc ve vg vi vn vu wf ws ye yt za zm zw`.split(' ')
+);
+
+const normalizeEmail = (value = '') => String(value).trim().toLowerCase();
+
+const isValidDomainLabel = (label = '') => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label);
+
+const validateEmailAddress = (value) => {
+    const normalized = normalizeEmail(value);
+
+    if (!normalized) {
+        return { isValid: false, normalized, error: 'Введите email' };
+    }
+
+    if (normalized.length > 254) {
+        return { isValid: false, normalized, error: 'Email слишком длинный' };
+    }
+
+    const parts = normalized.split('@');
+    if (parts.length !== 2) {
+        return { isValid: false, normalized, error: 'Введите корректный email' };
+    }
+
+    const [localPart, domain] = parts;
+    if (!localPart || !domain) {
+        return { isValid: false, normalized, error: 'Введите корректный email' };
+    }
+
+    if (localPart.length > 64 || /\s/.test(localPart) || localPart.startsWith('.') || localPart.endsWith('.') || localPart.includes('..')) {
+        return { isValid: false, normalized, error: 'Введите корректный email' };
+    }
+
+    const domainParts = domain.split('.');
+    if (domainParts.length < 2 || domainParts.some((part) => !part)) {
+        return { isValid: false, normalized, error: 'Введите корректный email' };
+    }
+
+    const tld = domainParts[domainParts.length - 1];
+    const hasValidTld = VALID_GENERIC_TLDS.has(tld) || VALID_COUNTRY_CODE_TLDS.has(tld);
+    if (!hasValidTld) {
+        return { isValid: false, normalized, error: 'Проверьте домен email — такое окончание не поддерживается' };
+    }
+
+    const domainIsValid = domainParts.every((part, index) => (index === domainParts.length - 1 && part === 'рф') || isValidDomainLabel(part));
+    if (!domainIsValid) {
+        return { isValid: false, normalized, error: 'Введите корректный email' };
+    }
+
+    return { isValid: true, normalized, error: '' };
+};
+
 const extractFirstNumericMatch = (text, regexp) => {
     const matched = String(text || '').match(regexp);
     if (!matched) return null;
@@ -722,12 +778,19 @@ app.post('/api/auth/register', async (req, res) => {
             return res.status(400).json({ error: 'Пароль должен содержать минимум 6 символов' });
         }
 
+        const emailValidation = validateEmailAddress(email);
+        if (!emailValidation.isValid) {
+            return res.status(400).json({ error: emailValidation.error });
+        }
+
+        const normalizedEmail = emailValidation.normalized;
+
         const ageNum = age !== undefined && age !== null ? parseInt(age) : null;
         if (ageNum !== null && (isNaN(ageNum) || ageNum < 5 || ageNum > 99)) {
             return res.status(400).json({ error: 'Укажите корректный возраст (5–99 лет)' });
         }
 
-        const userCheck = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        const userCheck = await pool.query('SELECT * FROM users WHERE email = $1', [normalizedEmail]);
         if (userCheck.rows.length > 0) {
             return res.status(400).json({ error: 'Пользователь с таким email уже существует' });
         }
@@ -741,7 +804,7 @@ app.post('/api/auth/register', async (req, res) => {
              RETURNING id, name, email, role, city, avatar, rating, age, level, rtt_rank, rtt_category, rni, xp`,
             [
                 name, 
-                email, 
+                normalizedEmail, 
                 hashedPassword, 
                 city, 
                 defaultAvatar, 
@@ -756,7 +819,7 @@ app.post('/api/auth/register', async (req, res) => {
         );
 
         const user = result.rows[0];
-        await logSystemEvent('info', `New user registered: ${email}`, 'Auth');
+        await logSystemEvent('info', `New user registered: ${normalizedEmail}`, 'Auth');
         
         res.json( 
             { 
@@ -778,7 +841,8 @@ app.post('/api/auth/login', async (req, res) => {
     const { email, password, totpCode } = req.body;
 
     try {
-        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        const normalizedEmail = normalizeEmail(email);
+        const result = await pool.query('SELECT * FROM users WHERE email = $1', [normalizedEmail]);
         
         const authError = 'Неверный логин или пароль';
 
@@ -795,7 +859,7 @@ app.post('/api/auth/login', async (req, res) => {
         const isValidPassword = await bcrypt.compare(password, user.password);
 
         if (!isValidPassword) {
-            await logSystemEvent('warning', `Failed login attempt for ${email}`, 'Auth');
+            await logSystemEvent('warning', `Failed login attempt for ${normalizedEmail}`, 'Auth');
             return res.status(401).json({ error: authError });
         }
 
@@ -811,12 +875,12 @@ app.post('/api/auth/login', async (req, res) => {
                 window: 1
             });
             if (!valid) {
-                await logSystemEvent('warning', `Invalid 2FA code for ${email}`, 'Auth');
+                await logSystemEvent('warning', `Invalid 2FA code for ${normalizedEmail}`, 'Auth');
                 return res.status(401).json({ error: 'Неверный код 2FA' });
             }
         }
 
-        await logSystemEvent('info', `User logged in: ${email}`, 'Auth');
+        await logSystemEvent('info', `User logged in: ${normalizedEmail}`, 'Auth');
 
         // Обновляем время последнего входа
         await pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
@@ -1495,7 +1559,14 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
 app.post('/api/admin/users', requireAdmin, async (req, res) => {
     const { name, email, password, role, city, age, rating, level, rttRank, rttCategory } = req.body;
     try {
-        const userCheck = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+        const emailValidation = validateEmailAddress(email);
+        if (!emailValidation.isValid) {
+            return res.status(400).json({ error: emailValidation.error });
+        }
+
+        const normalizedEmail = emailValidation.normalized;
+
+        const userCheck = await pool.query('SELECT id FROM users WHERE email = $1', [normalizedEmail]);
         if (userCheck.rows.length > 0) {
             return res.status(400).json({ error: 'Email already exists' });
         }
@@ -1510,7 +1581,7 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
              RETURNING id, name, email, role, city, avatar, rating, age, level, rtt_rank, rtt_category, xp`,
             [
                 name, 
-                email, 
+                normalizedEmail, 
                 hashedPassword, 
                 city || 'Москва', 
                 defaultAvatar, 
@@ -1523,7 +1594,7 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
             ]
         );
         const user = result.rows[0];
-        await logAdminAction(req, 'info', 'создал', 'пользователя', name || email, `Email: ${email}, роль: ${role || 'amateur'}`);
+        await logAdminAction(req, 'info', 'создал', 'пользователя', name || normalizedEmail, `Email: ${normalizedEmail}, роль: ${role || 'amateur'}`);
         res.json({ ...user, id: user.id.toString(), rttRank: user.rtt_rank, rttCategory: user.rtt_category });
     } catch (err) {
         console.error("Admin Create User Error:", err);
@@ -1534,11 +1605,27 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
 
 app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
-    const { name, role, city, rating, level, rttRank, rttCategory, age, xp, avatar, is_private, notifications_enabled } = req.body;
+    const { name, email, role, city, rating, level, rttRank, rttCategory, age, xp, avatar, is_private, notifications_enabled } = req.body;
 
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+
+        if (email !== undefined) {
+            const emailValidation = validateEmailAddress(email);
+            if (!emailValidation.isValid) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ error: emailValidation.error });
+            }
+
+            const duplicateUser = await client.query('SELECT id FROM users WHERE email = $1 AND id != $2', [emailValidation.normalized, id]);
+            if (duplicateUser.rows.length > 0) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ error: 'Email already exists' });
+            }
+
+            await client.query('UPDATE users SET email = $1 WHERE id = $2', [emailValidation.normalized, id]);
+        }
 
         if (name !== undefined) await client.query('UPDATE users SET name = $1 WHERE id = $2', [name, id]);
         if (role !== undefined) await client.query('UPDATE users SET role = $1 WHERE id = $2', [role, id]);

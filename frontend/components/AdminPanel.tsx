@@ -41,6 +41,7 @@ import AdminSupportChat from './dashboard/AdminSupportChat';
 import Button from './Button';
 import { User, Product, SystemLog, Court, Group, Tournament, NewsArticle } from '../types';
 import { api } from '../services/api';
+import { normalizeEmail, validateEmailAddress } from '../utils/emailValidation';
 
 interface AdminPanelProps {
     user: User;
@@ -746,8 +747,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout, onImpersonateUs
         e.preventDefault();
         if (editingUser) {
             try {
-                if (editingUser.id) await api.admin.updateUser(editingUser.id, editingUser);
-                else await api.admin.createUser(editingUser);
+                let userPayload = editingUser;
+
+                if (!editingUser.id) {
+                    const emailValidation = validateEmailAddress(editingUser.email || '');
+                    if (!emailValidation.isValid) {
+                        toast(emailValidation.error, 'error');
+                        return;
+                    }
+
+                    userPayload = { ...editingUser, email: emailValidation.normalized };
+                }
+
+                if (editingUser.id) await api.admin.updateUser(editingUser.id, userPayload);
+                else await api.admin.createUser(userPayload);
                 await loadData();
                 setIsUserModalOpen(false);
                 setEditingUser(null);
@@ -2290,11 +2303,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout, onImpersonateUs
                          <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
                             <input 
+                                type="email"
                                 disabled={!!editingUser.id} 
                                 className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none ${!!editingUser.id ? 'text-slate-500 bg-slate-100' : ''}`}
                                 value={editingUser.email} 
+                                placeholder="player@example.com"
+                                onBlur={e => setEditingUser({...editingUser, email: normalizeEmail(e.target.value)})}
                                 onChange={e => setEditingUser({...editingUser, email: e.target.value})}
                             />
+                            {!editingUser.id && editingUser.email && !validateEmailAddress(editingUser.email).isValid && (
+                                <p className="text-xs text-red-500 mt-1">{validateEmailAddress(editingUser.email).error}</p>
+                            )}
                         </div>
                         {!editingUser.id && (
                             <div className="space-y-1">

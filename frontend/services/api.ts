@@ -1180,11 +1180,14 @@ export const api = {
                     headers: api.admin._headers(),
                     body: JSON.stringify(data)
                 });
-                if (!res.ok) throw new Error('Failed to create user');
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.error || 'Failed to create user');
+                }
                 return await res.json();
             } catch (e) {
                 console.error(e);
-                return null;
+                throw e;
             }
         },
         updateUser: async (id: string, data: Partial<User>): Promise<void> => {

@@ -8,6 +8,7 @@ import SupportChatWidget from './components/SupportChatWidget'; // Import the ne
 import TrainerCRMPage from './components/TrainerCRMPage';
 import Tooltip from './components/Tooltip';
 import { api } from './services/api';
+import { normalizeEmail, validateEmailAddress } from './utils/emailValidation';
 import { 
   ArrowRight, 
   Trophy, 
@@ -1911,6 +1912,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [consentGiven, setConsentGiven] = useState(false);
+  const registerEmailValidation = authMode === 'register' && registerStep === 1 && email ? validateEmailAddress(email) : null;
 
   const ntrpLevels = [
       "NTRP 2.0 (Новичок)", 
@@ -1935,7 +1937,9 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
     setError('');
     setLoading(true);
     try {
-        const result = await api.auth.login({ email, password, totpCode: requires2fa ? totpCode : undefined });
+        const normalizedEmail = normalizeEmail(email);
+        setEmail(normalizedEmail);
+        const result = await api.auth.login({ email: normalizedEmail, password, totpCode: requires2fa ? totpCode : undefined });
         if ('requires2fa' in result && result.requires2fa) {
             setRequires2fa(true);
             setLoading(false);
@@ -1986,10 +1990,16 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
 
   const handleRegisterStep1 = (e: React.FormEvent) => {
       e.preventDefault();
+      const emailValidation = validateEmailAddress(email);
+      if (!emailValidation.isValid) {
+        setError(emailValidation.error);
+        return;
+      }
       if(password.length < 6) {
           setError('Пароль должен быть не менее 6 символов');
           return;
       }
+      setEmail(emailValidation.normalized);
       setError('');
       setRegisterStep(2);
   };
@@ -2002,6 +2012,8 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
     try {
         // Validation
         if (!name || !city || !age) throw new Error("Заполните основные данные профиля");
+      const emailValidation = validateEmailAddress(email);
+      if (!emailValidation.isValid) throw new Error(emailValidation.error);
         const ageNum = parseInt(age);
         if (isNaN(ageNum) || ageNum < 5 || ageNum > 99) throw new Error("Укажите корректный возраст (5–99 лет)");
         if (role === 'rtt_pro') {
@@ -2012,7 +2024,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
 
         const payload = {
             name, 
-            email, 
+          email: emailValidation.normalized, 
             password,
             city,
             age: ageNum,
@@ -2075,7 +2087,8 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
                     type="email" 
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-lime-400 focus:border-transparent outline-none transition-all placeholder:text-slate-600" 
+                    onBlur={(e) => setEmail(normalizeEmail(e.target.value))}
+              className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-lime-400 focus:border-transparent outline-none transition-all placeholder:text-slate-600"
                     placeholder="ace@tennis.pro" 
                     required
                     />
@@ -2146,10 +2159,12 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
                     type="email" 
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-lime-400 focus:border-transparent outline-none transition-all placeholder:text-slate-600" 
+              onBlur={(e) => setEmail(normalizeEmail(e.target.value))}
+              className={`w-full bg-slate-800/50 border rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-lime-400 focus:border-transparent outline-none transition-all placeholder:text-slate-600 ${registerEmailValidation?.error ? 'border-red-500/60' : 'border-slate-700'}`}
                     placeholder="ace@tennis.pro" 
                     required
                     />
+              {registerEmailValidation?.error && <p className="text-xs text-red-400 mt-1">{registerEmailValidation.error}</p>}
                 </div>
                 <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Придумайте пароль</label>
