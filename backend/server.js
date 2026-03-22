@@ -790,7 +790,7 @@ app.post('/api/auth/register', async (req, res) => {
             return res.status(400).json({ error: 'Укажите корректный возраст (5–99 лет)' });
         }
 
-        const userCheck = await pool.query('SELECT * FROM users WHERE email = $1', [normalizedEmail]);
+        const userCheck = await pool.query('SELECT * FROM users WHERE LOWER(BTRIM(email)) = $1', [normalizedEmail]);
         if (userCheck.rows.length > 0) {
             return res.status(400).json({ error: 'Пользователь с таким email уже существует' });
         }
@@ -842,7 +842,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     try {
         const normalizedEmail = normalizeEmail(email);
-        const result = await pool.query('SELECT * FROM users WHERE email = $1', [normalizedEmail]);
+        const result = await pool.query('SELECT * FROM users WHERE LOWER(BTRIM(email)) = $1 LIMIT 1', [normalizedEmail]);
         
         const authError = 'Неверный логин или пароль';
 
@@ -1566,7 +1566,7 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
 
         const normalizedEmail = emailValidation.normalized;
 
-        const userCheck = await pool.query('SELECT id FROM users WHERE email = $1', [normalizedEmail]);
+        const userCheck = await pool.query('SELECT id FROM users WHERE LOWER(BTRIM(email)) = $1', [normalizedEmail]);
         if (userCheck.rows.length > 0) {
             return res.status(400).json({ error: 'Email already exists' });
         }
@@ -1618,7 +1618,7 @@ app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
                 return res.status(400).json({ error: emailValidation.error });
             }
 
-            const duplicateUser = await client.query('SELECT id FROM users WHERE email = $1 AND id != $2', [emailValidation.normalized, id]);
+            const duplicateUser = await client.query('SELECT id FROM users WHERE LOWER(BTRIM(email)) = $1 AND id != $2', [emailValidation.normalized, id]);
             if (duplicateUser.rows.length > 0) {
                 await client.query('ROLLBACK');
                 return res.status(400).json({ error: 'Email already exists' });
