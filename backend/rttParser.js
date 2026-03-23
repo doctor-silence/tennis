@@ -257,6 +257,16 @@ class RTTParser {
     };
   }
 
+  normalizeTournamentTableHeader(value = '') {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/\*/g, '')
+      .replace(/\(new\)/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   detectTournamentStageStatus(text = '') {
     const normalizedText = text.toLowerCase();
     const stageDefinitions = [
@@ -1121,33 +1131,71 @@ class RTTParser {
       });
 
       // Парсим строки таблицы .tours-table
-      $('table.tours-table tr').each((i, row) => {
-        if (i === 0) return; // пропускаем заголовок
+      const $toursTable = $('table.tours-table').first();
+      const headerMap = new Map();
 
+      $toursTable.find('thead tr').first().find('td, th').each((index, cell) => {
+        const header = this.normalizeTournamentTableHeader($(cell).text());
+        if (header) {
+          headerMap.set(header, index);
+        }
+      });
+
+      const getCellTextByHeader = (cells, ...headerVariants) => {
+        for (const variant of headerVariants) {
+          const normalizedHeader = this.normalizeTournamentTableHeader(variant);
+          const cellIndex = headerMap.get(normalizedHeader);
+          if (cellIndex === undefined) {
+            continue;
+          }
+
+          const cell = cells.eq(cellIndex);
+          if (!cell.length) {
+            continue;
+          }
+
+          const text = cell.text().replace(/\s+/g, ' ').trim();
+          if (text) {
+            return text;
+          }
+        }
+
+        return '';
+      };
+
+      $toursTable.find('tr').slice(1).each((i, row) => {
         const cells = $(row).find('td');
         if (cells.length < 10) return;
 
-        // td[0] = звёздочка, td[1] = город, td[2] = тип, td[3] = возраст,
-        // td[4] = категория, td[5] = начало, td[6] = корты, td[7] = заявок,
-        // td[8] = средний рейтинг, td[9] = статус, td[10] = название
-        const city        = cells.eq(1).text().trim();
-        const type        = cells.eq(2).text().trim();
-        const ageGroup    = cells.eq(3).text().trim();
-        const category    = cells.eq(4).text().trim();
-        const startDate   = cells.eq(5).text().trim();
-        const surface     = cells.eq(6).text().trim();
-        const applications= cells.eq(7).text().trim();
-        const avgRating   = cells.eq(8).text().trim();
-        const status      = cells.eq(9).text().trim();
-        const nameCell    = cells.eq(10);
-        const name        = nameCell.text().trim();
-        const link        = nameCell.find('a').attr('href');
+        const city = getCellTextByHeader(cells, 'Город');
+        const type = getCellTextByHeader(cells, 'Тип');
+        const ageGroup = getCellTextByHeader(cells, 'Возраст');
+        const category = getCellTextByHeader(cells, 'Категория');
+        const startDate = getCellTextByHeader(cells, 'Начало');
+        const endDate = getCellTextByHeader(cells, 'До');
+        const surface = getCellTextByHeader(cells, 'Корты');
+        const applications = getCellTextByHeader(cells, 'Заявок');
+        const avgRating = getCellTextByHeader(cells, 'Средний рейтинг');
+        const status = getCellTextByHeader(cells, 'Статус');
+        const nameCellIndex = headerMap.get(this.normalizeTournamentTableHeader('Название'));
+        const nameCell = nameCellIndex === undefined ? $() : cells.eq(nameCellIndex);
+        const name = nameCell.text().replace(/\s+/g, ' ').trim();
+        const link = nameCell.find('a').attr('href');
 
         if (city && name && name.length > 2) {
           tournaments.push({
             id: tournaments.length,
-            city, type, ageGroup, category, startDate,
-            surface, applications, avgRating, status, name,
+            city,
+            type,
+            ageGroup,
+            category,
+            startDate,
+            endDate,
+            surface,
+            applications,
+            avgRating,
+            status,
+            name,
             link: link ? (link.startsWith('http') ? link : `https://rttstat.ru${link}`) : null
           });
         }
