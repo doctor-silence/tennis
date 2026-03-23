@@ -1420,7 +1420,11 @@ app.get('/api/rtt/tournament', async (req, res) => {
 app.get('/api/rtt/tournaments', async (req, res) => {
     const timeout = setTimeout(() => {
         if (!res.headersSent) {
-            res.json({ success: true, data: { tournaments: [], filters: {} } });
+            res.status(504).json({
+                success: false,
+                error: 'RTT не ответил вовремя при загрузке турниров',
+                data: { tournaments: [], filters: {} }
+            });
         }
     }, 20000);
 
@@ -1432,7 +1436,13 @@ app.get('/api/rtt/tournaments', async (req, res) => {
     } catch (err) {
         clearTimeout(timeout);
         console.error('❌ RTT Tournaments List Error:', err.message);
-        if (!res.headersSent) res.json({ success: true, data: { tournaments: [], filters: {} } });
+        if (!res.headersSent) {
+            res.status(500).json({
+                success: false,
+                error: 'Ошибка при получении списка турниров РТТ',
+                data: { tournaments: [], filters: {} }
+            });
+        }
     }
 });
 
