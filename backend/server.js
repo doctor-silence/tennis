@@ -2900,7 +2900,7 @@ app.get('/api/ladder/player/:userId', async (req, res) => {
                 status: 'idle',
                 role: ghostRow.role,
                 joinDate: new Date().toISOString(),
-                bio: 'Для демо-игрока доступна только карточка рейтинга.',
+                bio: 'Статистика доступна только по матчам внутри системы.',
                 rni: null,
                 isRttProfile: false,
                 profileSource: 'ghost',

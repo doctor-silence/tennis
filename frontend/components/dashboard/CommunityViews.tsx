@@ -636,6 +636,7 @@ export const LadderView = ({ user, challenges, setChallenges, onChallengeCreated
     const [selectedOpponent, setSelectedOpponent] = useState<LadderPlayer | null>(null);
     const [showChallengeModal, setShowChallengeModal] = useState(false);
     const [selectedProfile, setSelectedProfile] = useState<PlayerProfile | null>(null);
+    const [selectedProfileAnchorY, setSelectedProfileAnchorY] = useState<number | null>(null);
     const [isProfileLoading, setIsProfileLoading] = useState(false);
     const [showEnterScoreModal, setShowEnterScoreModal] = useState(false);
     const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
@@ -670,11 +671,15 @@ export const LadderView = ({ user, challenges, setChallenges, onChallengeCreated
         setShowChallengeModal(true);
     };
 
-    const handlePlayerClick = async (player: LadderPlayer) => {
+    const handlePlayerClick = async (player: LadderPlayer, event: React.MouseEvent<HTMLTableRowElement>) => {
+        const rowRect = event.currentTarget.getBoundingClientRect();
+        setSelectedProfileAnchorY(rowRect.top);
         setIsProfileLoading(true);
         const profile = await api.ladder.getPlayerProfile(player.userId);
         if (profile) {
             setSelectedProfile({ ...profile, rank: player.rank, status: player.status });
+        } else {
+            setSelectedProfileAnchorY(null);
         }
         setIsProfileLoading(false);
     };
@@ -771,7 +776,16 @@ export const LadderView = ({ user, challenges, setChallenges, onChallengeCreated
         <div className="space-y-6">
             <LadderOnboarding isActive={isActive} />
             <div id="ladder-banner"><LadderBanner leaderName={ranking[0]?.name} /></div>
-            {selectedProfile && <PlayerProfileFlyout profile={selectedProfile} onClose={() => setSelectedProfile(null)} />}
+            {selectedProfile && (
+                <PlayerProfileFlyout
+                    profile={selectedProfile}
+                    anchorY={selectedProfileAnchorY}
+                    onClose={() => {
+                        setSelectedProfile(null);
+                        setSelectedProfileAnchorY(null);
+                    }}
+                />
+            )}
 
             {/* Header / Tabs */}
             <div className="flex flex-wrap items-center gap-4">
@@ -866,7 +880,7 @@ export const LadderView = ({ user, challenges, setChallenges, onChallengeCreated
                                 {ranking.map((p, i) => (
                                     <tr 
                                         key={p.id} 
-                                        onClick={() => handlePlayerClick(p)}
+                                        onClick={(event) => handlePlayerClick(p, event)}
                                         className={`transition-colors cursor-pointer ${p.userId === user.id ? (ladderType === 'club_elo' ? 'bg-lime-50/50 hover:bg-lime-50' : 'bg-orange-50/50 hover:bg-orange-50') : 'hover:bg-slate-50'}`}
                                     >
                                         <td className="px-6 py-4">
