@@ -222,6 +222,9 @@ export interface RankHistoryItem {
 export interface PlayerProfile extends LadderPlayer {
     joinDate: string;
     bio: string;
+  rni?: string | null;
+  isRttProfile?: boolean;
+  profileSource?: 'rtt' | 'internal' | 'ghost';
     stats: {
         wins: number;
         losses: number;

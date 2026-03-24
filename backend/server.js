@@ -2874,6 +2874,42 @@ app.post('/api/notifications/mark-read/:notificationId', async (req, res) => {
 app.get('/api/ladder/player/:userId', async (req, res) => {
     const { userId } = req.params;
     try {
+        if (String(userId).startsWith('ghost_')) {
+            const ghostId = String(userId).replace('ghost_', '');
+            const ghostResult = await pool.query(
+                `SELECT id, name, avatar, xp, role, level, rating, rtt_rank
+                 FROM ghost_users
+                 WHERE id = $1`,
+                [ghostId]
+            );
+
+            if (ghostResult.rows.length === 0) {
+                return res.status(404).json({ error: 'Player not found' });
+            }
+
+            const ghostRow = ghostResult.rows[0];
+            return res.json({
+                id: `ghost_${ghostRow.id}`,
+                userId: `ghost_${ghostRow.id}`,
+                name: ghostRow.name,
+                avatar: ghostRow.avatar,
+                points: ghostRow.rating || ghostRow.xp || 0,
+                rank: ghostRow.rtt_rank || 0,
+                matches: 0,
+                winRate: 0,
+                status: 'idle',
+                role: ghostRow.role,
+                joinDate: new Date().toISOString(),
+                bio: 'Для демо-игрока доступна только карточка рейтинга.',
+                rni: null,
+                isRttProfile: false,
+                profileSource: 'ghost',
+                stats: { wins: 0, losses: 0, bestRank: ghostRow.rtt_rank || 0, currentStreak: 0 },
+                rankHistory: [],
+                recentMatches: []
+            });
+        }
+
         const userResult = await pool.query(
             `SELECT 
                 id, name, avatar, xp as points, role, level, rating, rtt_rank, rtt_category, rni, created_at as join_date
@@ -2887,6 +2923,89 @@ app.get('/api/ladder/player/:userId', async (req, res) => {
         }
 
         const userRow = userResult.rows[0];
+
+        const isRttProfile = Boolean(userRow.rni && userRow.role === 'rtt_pro');
+
+        if (isRttProfile) {
+            const [playerData, statsData] = await Promise.all([
+                rttParser.getPlayerByRNI(userRow.rni),
+                rttParser.getPlayerTournamentsAndMatches(userRow.rni)
+            ]);
+
+            if (playerData?.success && statsData?.success) {
+                const cleanedMatches = (statsData.data?.matches || [])
+                    .map((match, index) => ({
+                        id: `rtt-${userRow.id}-${index}`,
+                        opponentName: extractCleanPlayerName(match.opponent || ''),
+                        score: String(match.score || '').trim(),
+                        date: String(match.date || '').trim(),
+                        result: match.result,
+                        surface: match.surface || 'unknown'
+                    }))
+                    .filter((match) => {
+                        if (!match.opponentName || match.opponentName.length < 3) return false;
+                        if (/^(partner|партнер|партнёр|город|соперник)$/i.test(match.opponentName)) return false;
+                        if (!/\d{2}\.\d{2}\.\d{4}/.test(match.date)) return false;
+                        if (!match.score || !/\d/.test(match.score)) return false;
+                        return match.result === 'win' || match.result === 'loss';
+                    })
+                    .sort((left, right) => parseRuDateToTimestamp(right.date) - parseRuDateToTimestamp(left.date));
+
+                const wins = cleanedMatches.filter(match => match.result === 'win').length;
+                const losses = cleanedMatches.filter(match => match.result === 'loss').length;
+
+                let currentStreak = 0;
+                if (cleanedMatches.length > 0) {
+                    const lastResult = cleanedMatches[0].result;
+                    let streak = 0;
+                    for (const match of cleanedMatches) {
+                        if (match.result === lastResult) {
+                            streak += 1;
+                        } else {
+                            break;
+                        }
+                    }
+                    currentStreak = lastResult === 'win' ? streak : -streak;
+                }
+
+                const bestRank = Number(userRow.rtt_rank || playerData.data?.rank || 0) || 0;
+                const rankHistory = (statsData.data?.rankHistory || []).filter(item => item && item.rank > 0);
+
+                return res.json({
+                    id: userRow.id.toString(),
+                    userId: userRow.id.toString(),
+                    name: userRow.name,
+                    avatar: userRow.avatar,
+                    points: userRow.rating,
+                    rank: bestRank,
+                    matches: cleanedMatches.length,
+                    winRate: cleanedMatches.length > 0 ? Math.round((wins / cleanedMatches.length) * 100) : 0,
+                    status: 'idle',
+                    role: userRow.role,
+                    joinDate: userRow.join_date,
+                    bio: [playerData.data?.city, playerData.data?.category].filter(Boolean).join(' • ') || 'Профиль игрока РТТ',
+                    rni: userRow.rni,
+                    isRttProfile: true,
+                    profileSource: 'rtt',
+                    stats: {
+                        wins,
+                        losses,
+                        bestRank,
+                        currentStreak
+                    },
+                    rankHistory,
+                    recentMatches: cleanedMatches.slice(0, 5).map((match) => ({
+                        id: match.id,
+                        userId: userRow.id.toString(),
+                        opponentName: match.opponentName,
+                        score: match.score,
+                        date: match.date,
+                        result: match.result,
+                        surface: match.surface
+                    }))
+                });
+            }
+        }
 
         // Fetch user's matches to calculate win/loss stats
         const matchesResult = await pool.query(
@@ -2937,9 +3056,12 @@ app.get('/api/ladder/player/:userId', async (req, res) => {
             status: 'idle', // This will be dynamically set by the frontend
             role: userRow.role,
             joinDate: userRow.join_date,
-            bio: 'Нет дополнительной информации об этом игроке.', // Placeholder
+            bio: 'Статистика доступна только по матчам внутри системы.',
+            rni: userRow.rni || null,
+            isRttProfile: false,
+            profileSource: 'internal',
             stats: { wins, losses, bestRank: userRow.rtt_rank || 0, currentStreak: currentStreak },
-            rankHistory: [], // Placeholder
+            rankHistory: [],
             recentMatches: recentMatches
         };
 

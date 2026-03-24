@@ -964,8 +964,7 @@ class RTTParser {
                 return;
               }
 
-              const participantName = this.extractParticipantName(cells, rowLinkTexts);
-
+                const participantName = this.extractParticipantName(cells, rowLinkTexts);
               const participant = {
                 place: cells[0] || '',
                 name: participantName,
