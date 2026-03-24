@@ -75,6 +75,84 @@ const logSystemEvent = async (level, message, moduleName) => {
     }
 };
 
+const isGhostIdentifier = (value) => /^ghost_\d+$/.test(String(value || ''));
+
+const extractGhostNumericId = (value) => {
+    const matched = String(value || '').match(/^ghost_(\d+)$/);
+    return matched ? Number(matched[1]) : null;
+};
+
+const ensureGhostCommunityTables = async () => {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS ghost_posts (
+            id SERIAL PRIMARY KEY,
+            ghost_user_id INTEGER NOT NULL REFERENCES ghost_users(id) ON DELETE CASCADE,
+            group_id INTEGER REFERENCES groups(id) ON DELETE CASCADE,
+            type VARCHAR(50) NOT NULL,
+            content JSONB NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    `);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS ghost_post_comments (
+            id SERIAL PRIMARY KEY,
+            ghost_post_id INTEGER NOT NULL REFERENCES ghost_posts(id) ON DELETE CASCADE,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            ghost_user_id INTEGER REFERENCES ghost_users(id) ON DELETE CASCADE,
+            text TEXT NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    `);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS ghost_post_likes (
+            id SERIAL PRIMARY KEY,
+            ghost_post_id INTEGER NOT NULL REFERENCES ghost_posts(id) ON DELETE CASCADE,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            ghost_user_id INTEGER REFERENCES ghost_users(id) ON DELETE CASCADE,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            CHECK (user_id IS NOT NULL OR ghost_user_id IS NOT NULL)
+        )
+    `);
+
+    await pool.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_ghost_post_likes_user_unique
+        ON ghost_post_likes (ghost_post_id, user_id)
+        WHERE user_id IS NOT NULL
+    `);
+
+    await pool.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_ghost_post_likes_ghost_unique
+        ON ghost_post_likes (ghost_post_id, ghost_user_id)
+        WHERE ghost_user_id IS NOT NULL
+    `);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS ghost_conversations (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            ghost_user_id INTEGER NOT NULL REFERENCES ghost_users(id) ON DELETE CASCADE,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE (user_id, ghost_user_id)
+        )
+    `);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS ghost_messages (
+            id SERIAL PRIMARY KEY,
+            conversation_id INTEGER NOT NULL REFERENCES ghost_conversations(id) ON DELETE CASCADE,
+            sender_type VARCHAR(20) NOT NULL CHECK (sender_type IN ('user', 'ghost')),
+            sender_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            sender_ghost_user_id INTEGER REFERENCES ghost_users(id) ON DELETE CASCADE,
+            text TEXT NOT NULL,
+            is_read BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    `);
+};
+
 const getLogLevelLabel = (level) => {
     switch (level) {
         case 'info':
@@ -3078,20 +3156,20 @@ app.get('/api/posts', async (req, res) => {
     const { userId } = req.query; // Get userId from query params
 
     try {
-        const result = await pool.query(`
+        const realPostsResult = await pool.query(`
             SELECT 
                 p.id,
                 p.type,
                 p.content,
                 p.created_at,
-                json_build_object('id', u.id, 'name', u.name, 'avatar', u.avatar, 'role', u.role) as author,
+                json_build_object('id', u.id::text, 'name', u.name, 'avatar', u.avatar, 'role', u.role, 'city', u.city) as author,
                 (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes_count,
                 EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $1) as liked_by_user,
                 (SELECT json_agg(json_build_object(
                     'id', c.id, 
                     'text', c.text, 
                     'created_at', c.created_at,
-                    'author', json_build_object('id', cu.id, 'name', cu.name, 'avatar', cu.avatar)
+                    'author', json_build_object('id', cu.id::text, 'name', cu.name, 'avatar', cu.avatar)
                 ) ORDER BY c.created_at ASC) FROM post_comments c JOIN users cu ON c.user_id = cu.id WHERE c.post_id = p.id) as comments
             FROM posts p
             JOIN users u ON p.user_id = u.id
@@ -3099,7 +3177,52 @@ app.get('/api/posts', async (req, res) => {
             ORDER BY p.created_at DESC
             LIMIT 50
         `, [userId || null]);
-        res.json(result.rows);
+
+        const ghostPostsResult = await pool.query(`
+            SELECT
+                CONCAT('ghost_', gp.id::text) as id,
+                gp.type,
+                gp.content,
+                gp.created_at,
+                json_build_object(
+                    'id', CONCAT('ghost_', gu.id::text),
+                    'name', gu.name,
+                    'avatar', gu.avatar,
+                    'role', gu.role,
+                    'city', gu.city
+                ) as author,
+                (SELECT COUNT(*) FROM ghost_post_likes WHERE ghost_post_id = gp.id) as likes_count,
+                EXISTS(SELECT 1 FROM ghost_post_likes WHERE ghost_post_id = gp.id AND user_id = $1) as liked_by_user,
+                (
+                    SELECT json_agg(
+                        json_build_object(
+                            'id', gc.id,
+                            'text', gc.text,
+                            'created_at', gc.created_at,
+                            'author', json_build_object(
+                                'id', CASE WHEN gcu.id IS NOT NULL THEN gcu.id::text ELSE CONCAT('ghost_', gcgu.id::text) END,
+                                'name', COALESCE(gcu.name, gcgu.name),
+                                'avatar', COALESCE(gcu.avatar, gcgu.avatar)
+                            )
+                        ) ORDER BY gc.created_at ASC
+                    )
+                    FROM ghost_post_comments gc
+                    LEFT JOIN users gcu ON gc.user_id = gcu.id
+                    LEFT JOIN ghost_users gcgu ON gc.ghost_user_id = gcgu.id
+                    WHERE gc.ghost_post_id = gp.id
+                ) as comments
+            FROM ghost_posts gp
+            JOIN ghost_users gu ON gp.ghost_user_id = gu.id
+            WHERE (gp.type = 'match' AND gp.group_id IS NOT NULL AND gp.group_id IN (SELECT group_id FROM group_members WHERE user_id = $1)) OR (gp.type != 'match' AND (gp.group_id IS NULL OR gp.group_id IN (SELECT group_id FROM group_members WHERE user_id = $1)))
+            ORDER BY gp.created_at DESC
+            LIMIT 50
+        `, [userId || null]);
+
+        const posts = [...realPostsResult.rows, ...ghostPostsResult.rows]
+            .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())
+            .slice(0, 50);
+
+        res.json(posts);
     } catch (err) {
         console.error("Fetch Posts Error:", err);
         res.status(500).json({ error: 'Failed to fetch posts' });
@@ -3129,6 +3252,29 @@ app.post('/api/posts/:id/like', async (req, res) => {
     const { userId } = req.body;
 
     try {
+        if (isGhostIdentifier(id)) {
+            const ghostPostId = extractGhostNumericId(id);
+
+            const likeCheck = await pool.query(
+                'SELECT id FROM ghost_post_likes WHERE ghost_post_id = $1 AND user_id = $2',
+                [ghostPostId, userId]
+            );
+
+            if (likeCheck.rows.length > 0) {
+                await pool.query(
+                    'DELETE FROM ghost_post_likes WHERE ghost_post_id = $1 AND user_id = $2',
+                    [ghostPostId, userId]
+                );
+                return res.json({ success: true, action: 'unliked' });
+            }
+
+            await pool.query(
+                'INSERT INTO ghost_post_likes (ghost_post_id, user_id) VALUES ($1, $2)',
+                [ghostPostId, userId]
+            );
+            return res.json({ success: true, action: 'liked' });
+        }
+
         const likeCheck = await pool.query(
             'SELECT * FROM post_likes WHERE post_id = $1 AND user_id = $2',
             [id, userId]
@@ -3164,6 +3310,17 @@ app.post('/api/posts/:id/comments', async (req, res) => {
     }
 
     try {
+        if (isGhostIdentifier(id)) {
+            const ghostPostId = extractGhostNumericId(id);
+            const result = await pool.query(
+                `INSERT INTO ghost_post_comments (ghost_post_id, user_id, text)
+                 VALUES ($1, $2, $3)
+                 RETURNING *`,
+                [ghostPostId, userId, text]
+            );
+            return res.status(201).json(result.rows[0]);
+        }
+
         const result = await pool.query(
             'INSERT INTO post_comments (post_id, user_id, text) VALUES ($1, $2, $3) RETURNING *',
             [id, userId, text]
@@ -3182,6 +3339,11 @@ app.delete('/api/posts/:id', async (req, res) => {
     if (!userId) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
+
+    if (isGhostIdentifier(id)) {
+        return res.status(403).json({ error: 'Ghost posts cannot be deleted by users' });
+    }
+
     try {
         const postRes = await pool.query('SELECT user_id FROM posts WHERE id = $1', [id]);
         if (postRes.rows.length === 0) {
@@ -4326,15 +4488,54 @@ app.get('/api/conversations', async (req, res) => {
               AND (c.user1_id != $2 AND c.user2_id != $2)
             ORDER BY c.updated_at DESC
         `, [userId, SUPPORT_ADMIN_ID]);
-        
-        res.json(result.rows.map(r => ({ 
+
+        const ghostResult = await pool.query(`
+            SELECT
+                CONCAT('ghost_', gc.id::text) as id,
+                gc.updated_at,
+                CONCAT('ghost_', gu.id::text) as "partnerId",
+                gu.name as "partnerName",
+                gu.avatar as "partnerAvatar",
+                gu.role as "partnerRole",
+                gu.rating as "partnerRating",
+                gu.rtt_rank as "partnerRttRank",
+                (
+                    SELECT text
+                    FROM ghost_messages gm
+                    WHERE gm.conversation_id = gc.id
+                    ORDER BY gm.created_at DESC
+                    LIMIT 1
+                ) as "lastMessage",
+                (
+                    SELECT COUNT(*)
+                    FROM ghost_messages gm
+                    WHERE gm.conversation_id = gc.id
+                      AND gm.is_read = FALSE
+                      AND gm.sender_type = 'ghost'
+                ) as "unread"
+            FROM ghost_conversations gc
+            JOIN ghost_users gu ON gu.id = gc.ghost_user_id
+            WHERE gc.user_id = $1
+            ORDER BY gc.updated_at DESC
+        `, [userId]);
+
+        const conversations = result.rows.map(r => ({ 
             ...r, 
             id: r.id.toString(), 
             partnerId: r.partnerId.toString(), 
             unread: parseInt(r.unread),
             partnerRating: r.partnerRating || 0,
             partnerRttRank: r.partnerRttRank || null
-        })));
+        }));
+
+        const ghostConversations = ghostResult.rows.map(r => ({
+            ...r,
+            unread: parseInt(r.unread),
+            partnerRating: r.partnerRating || 0,
+            partnerRttRank: r.partnerRttRank || null
+        }));
+
+        res.json([...conversations, ...ghostConversations].sort((a, b) => new Date(b.updated_at || b.timestamp || 0).getTime() - new Date(a.updated_at || a.timestamp || 0).getTime()));
     } catch (err) {
         console.error("Fetch Conversations Error:", err);
         res.status(500).json({ error: 'Failed to fetch conversations' });
@@ -4349,6 +4550,34 @@ app.get('/api/messages', async (req, res) => {
     }
 
     try {
+        if (isGhostIdentifier(conversationId)) {
+            const ghostConversationId = extractGhostNumericId(conversationId);
+
+            await pool.query(
+                `UPDATE ghost_messages
+                 SET is_read = TRUE
+                 WHERE conversation_id = $1 AND sender_type = 'ghost'`,
+                [ghostConversationId]
+            );
+
+            const result = await pool.query(
+                `SELECT
+                    gm.id,
+                    gm.text,
+                    gm.created_at,
+                    CASE WHEN gm.sender_type = 'user' THEN 'user' ELSE 'partner' END as role
+                 FROM ghost_messages gm
+                 WHERE gm.conversation_id = $1
+                 ORDER BY gm.created_at ASC`,
+                [ghostConversationId]
+            );
+
+            return res.json(result.rows.map(row => ({
+                ...row,
+                id: `ghost_message_${row.id}`
+            })));
+        }
+
         // Mark messages as read
         await pool.query(
             'UPDATE messages SET is_read = TRUE WHERE conversation_id = $1 AND sender_id != $2',
@@ -4383,6 +4612,41 @@ app.post('/api/messages', async (req, res) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+
+        if (isGhostIdentifier(partnerId)) {
+            const ghostUserId = extractGhostNumericId(partnerId);
+            let conversationResult = await client.query(
+                `SELECT id FROM ghost_conversations WHERE user_id = $1 AND ghost_user_id = $2`,
+                [senderId, ghostUserId]
+            );
+
+            let conversationId;
+            if (conversationResult.rows.length > 0) {
+                conversationId = conversationResult.rows[0].id;
+                await client.query('UPDATE ghost_conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [conversationId]);
+            } else {
+                const newConversationResult = await client.query(
+                    'INSERT INTO ghost_conversations (user_id, ghost_user_id) VALUES ($1, $2) RETURNING id',
+                    [senderId, ghostUserId]
+                );
+                conversationId = newConversationResult.rows[0].id;
+            }
+
+            const messageResult = await client.query(
+                `INSERT INTO ghost_messages (conversation_id, sender_type, sender_user_id, text)
+                 VALUES ($1, 'user', $2, $3)
+                 RETURNING id, text, created_at`,
+                [conversationId, senderId, text]
+            );
+
+            await client.query('COMMIT');
+
+            return res.status(201).json({
+                ...messageResult.rows[0],
+                id: `ghost_message_${messageResult.rows[0].id}`,
+                role: 'user'
+            });
+        }
 
         // Find or create conversation
         let conversationResult = await client.query(
@@ -4440,6 +4704,70 @@ app.post('/api/conversations', async (req, res) => {
 
     const client = await pool.connect();
     try {
+        if (isGhostIdentifier(partnerId)) {
+            const ghostUserId = extractGhostNumericId(partnerId);
+            let conversationResult = await client.query(
+                `SELECT
+                    gc.id,
+                    gc.updated_at,
+                    CONCAT('ghost_', gu.id::text) as "partnerId",
+                    gu.name as "partnerName",
+                    gu.avatar as "partnerAvatar",
+                    gu.role as "partnerRole",
+                    gu.rating as "partnerRating",
+                    gu.rtt_rank as "partnerRttRank",
+                    (
+                        SELECT text
+                        FROM ghost_messages gm
+                        WHERE gm.conversation_id = gc.id
+                        ORDER BY gm.created_at DESC
+                        LIMIT 1
+                    ) as "lastMessage",
+                    (
+                        SELECT COUNT(*)
+                        FROM ghost_messages gm
+                        WHERE gm.conversation_id = gc.id
+                          AND gm.is_read = FALSE
+                          AND gm.sender_type = 'ghost'
+                    ) as "unread"
+                 FROM ghost_conversations gc
+                 JOIN ghost_users gu ON gu.id = gc.ghost_user_id
+                 WHERE gc.user_id = $1 AND gc.ghost_user_id = $2`,
+                [userId, ghostUserId]
+            );
+
+            let conversation;
+            if (conversationResult.rows.length > 0) {
+                conversation = conversationResult.rows[0];
+            } else {
+                const newConversationResult = await client.query(
+                    'INSERT INTO ghost_conversations (user_id, ghost_user_id) VALUES ($1, $2) RETURNING id, updated_at',
+                    [userId, ghostUserId]
+                );
+                const partnerInfo = await client.query('SELECT id, name, avatar, role, rating, rtt_rank FROM ghost_users WHERE id = $1', [ghostUserId]);
+
+                conversation = {
+                    id: `ghost_${newConversationResult.rows[0].id}`,
+                    updated_at: newConversationResult.rows[0].updated_at,
+                    partnerId: `ghost_${partnerInfo.rows[0].id}`,
+                    partnerName: partnerInfo.rows[0].name,
+                    partnerAvatar: partnerInfo.rows[0].avatar,
+                    partnerRole: partnerInfo.rows[0].role,
+                    partnerRating: partnerInfo.rows[0].rating,
+                    partnerRttRank: partnerInfo.rows[0].rtt_rank,
+                    lastMessage: '',
+                    unread: 0
+                };
+            }
+
+            return res.json({
+                ...conversation,
+                id: String(conversation.id),
+                unread: Number(conversation.unread || 0),
+                isPro: ['rtt_pro', 'coach'].includes(String(conversation.partnerRole || ''))
+            });
+        }
+
         // Find or create conversation
         let conversationResult = await client.query(
             `SELECT c.id, 
@@ -4644,6 +4972,8 @@ server.listen(PORT, async () => {
         console.log('✅ System logs table ready');
         await ensureNewsTable();
         console.log('✅ News table ready');
+        await ensureGhostCommunityTables();
+        console.log('✅ Ghost community tables ready');
         setTimeout(() => {
             syncTrackedTournamentStages().catch(err => console.error('Initial RTT tournament sync failed:', err.message));
         }, 15000);

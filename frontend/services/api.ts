@@ -1660,7 +1660,9 @@ export const api = {
     posts: {
         getAll: async (userId: string): Promise<any[]> => {
             try {
-                const res = await fetch(`${API_URL}/posts?userId=${userId}`);
+                const res = await fetch(`${API_URL}/posts?userId=${userId}&_t=${Date.now()}`, {
+                    cache: 'no-store'
+                });
                 if (!res.ok) throw new Error('Failed to fetch posts');
                 return await res.json();
             } catch (e) {

@@ -387,6 +387,78 @@ const initDb = async () => {
       );
     `);
     console.log('✅ "post_comments" table created or already exists.');
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ghost_posts (
+        id SERIAL PRIMARY KEY,
+        ghost_user_id INTEGER NOT NULL REFERENCES ghost_users(id) ON DELETE CASCADE,
+        group_id INTEGER REFERENCES groups(id) ON DELETE CASCADE,
+        type VARCHAR(50) NOT NULL,
+        content JSONB NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    console.log('✅ "ghost_posts" table created or already exists.');
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ghost_post_comments (
+        id SERIAL PRIMARY KEY,
+        ghost_post_id INTEGER NOT NULL REFERENCES ghost_posts(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        ghost_user_id INTEGER REFERENCES ghost_users(id) ON DELETE CASCADE,
+        text TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    console.log('✅ "ghost_post_comments" table created or already exists.');
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ghost_post_likes (
+        id SERIAL PRIMARY KEY,
+        ghost_post_id INTEGER NOT NULL REFERENCES ghost_posts(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        ghost_user_id INTEGER REFERENCES ghost_users(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        CHECK (user_id IS NOT NULL OR ghost_user_id IS NOT NULL)
+      );
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_ghost_post_likes_user_unique
+      ON ghost_post_likes (ghost_post_id, user_id)
+      WHERE user_id IS NOT NULL;
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_ghost_post_likes_ghost_unique
+      ON ghost_post_likes (ghost_post_id, ghost_user_id)
+      WHERE ghost_user_id IS NOT NULL;
+    `);
+    console.log('✅ "ghost_post_likes" table created or already exists.');
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ghost_conversations (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        ghost_user_id INTEGER NOT NULL REFERENCES ghost_users(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (user_id, ghost_user_id)
+      );
+    `);
+    console.log('✅ "ghost_conversations" table created or already exists.');
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ghost_messages (
+        id SERIAL PRIMARY KEY,
+        conversation_id INTEGER NOT NULL REFERENCES ghost_conversations(id) ON DELETE CASCADE,
+        sender_type VARCHAR(20) NOT NULL CHECK (sender_type IN ('user', 'ghost')),
+        sender_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        sender_ghost_user_id INTEGER REFERENCES ghost_users(id) ON DELETE CASCADE,
+        text TEXT NOT NULL,
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    console.log('✅ "ghost_messages" table created or already exists.');
     
     // Create group_members table
     await client.query(`

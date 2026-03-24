@@ -81,6 +81,17 @@ const GHOST_USERS = [
   { name: 'Леонид Шаров',       city: 'Нижний Новгород', level: '4.0', age: 36, role: 'player', rating: 1400, xp: 730  },
 ];
 
+const CUSTOM_GHOST_AVATARS = {
+  'Анастасия Морозова': 'https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=1200&auto=format&fit=crop',
+  'Екатерина Лебедева': '/ghost-avatars/ekaterina-lebedeva.jpg',
+  'Дмитрий Новиков': '/ghost-avatars/dmitriy-novikov.jpg'
+};
+
+const getGhostAvatar = (name) => (
+  CUSTOM_GHOST_AVATARS[name]
+  || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff&size=128`
+);
+
 async function main() {
   const client = await pool.connect();
   try {
@@ -110,7 +121,7 @@ async function main() {
 
     // 3. Вставляем 50 призраков
     for (const u of GHOST_USERS) {
-      const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&background=random&color=fff&size=128`;
+      const avatar = getGhostAvatar(u.name);
       await client.query(
         `INSERT INTO ghost_users (name, city, level, age, role, rating, xp, rtt_rank, rtt_category, avatar)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,

@@ -25,6 +25,16 @@ const getTournamentMetaLabel = (value?: string | null) => {
     return { label: 'Призовой фонд', value: normalizedValue };
 };
 
+const getAvatarFallbackUrl = (name?: string | null, background = '94a3b8') => {
+    const safeName = encodeURIComponent((name || 'Игрок').trim() || 'Игрок');
+    return `https://ui-avatars.com/api/?name=${safeName}&background=${background}&color=fff`;
+};
+
+const withAvatarFallback = (event: React.SyntheticEvent<HTMLImageElement>, name?: string | null, background = '94a3b8') => {
+    event.currentTarget.onerror = null;
+    event.currentTarget.src = getAvatarFallbackUrl(name, background);
+};
+
 // --- Modal Component ---
 // --- Modal Component ---
 const ImageModal = ({ images, startIndex, onClose }: { images: string[], startIndex: number, onClose: () => void }) => {
@@ -125,7 +135,7 @@ const TextPost = ({ post, user, onUpdate }: { post: any, user: User, onUpdate: (
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-3">
-                    <img src={post.author.avatar} alt={post.author.name} className="w-10 h-10 rounded-full" />
+                    <img src={post.author.avatar} alt={post.author.name} className="w-10 h-10 rounded-full" onError={(event) => withAvatarFallback(event, post.author?.name)} />
                     <div>
                         <p className="font-bold">{post.author.name}</p>
                         <p className="text-xs text-slate-400">{new Date(post.created_at).toLocaleString()}</p>
@@ -160,7 +170,7 @@ const TextPost = ({ post, user, onUpdate }: { post: any, user: User, onUpdate: (
                         <div className="mt-4 space-y-3 pt-3 border-t border-slate-100">
                             {comments.map((comment: any) => (
                                 <div key={comment.id} className="flex gap-2 text-xs text-slate-600">
-                                    <img src={comment.author.avatar} alt={comment.author.name} className="w-5 h-5 rounded-full" />
+                                    <img src={comment.author.avatar} alt={comment.author.name} className="w-5 h-5 rounded-full" onError={(event) => withAvatarFallback(event, comment.author?.name)} />
                                     <div>
                                         <span className="font-bold">{comment.author.name}</span>
                                         <p className="text-slate-500">{comment.text}</p>
@@ -180,7 +190,7 @@ const PartnerSearchPost = ({ post }: { post: any }) => (
     <div className="bg-white p-6 rounded-2xl shadow-sm border border-lime-200">
         <div className="flex justify-between items-start">
             <div className="flex gap-3">
-                <img src={post.author.avatar} alt={post.author.name} className="w-10 h-10 rounded-full" />
+                <img src={post.author.avatar} alt={post.author.name} className="w-10 h-10 rounded-full" onError={(event) => withAvatarFallback(event, post.author?.name)} />
                 <div>
                     <p className="font-bold">{post.author.name}</p>
                     <p className="text-xs text-slate-400">{new Date(post.created_at).toLocaleString()}・NTRP {post.content.details.ntrp}</p>
@@ -310,7 +320,7 @@ const TournamentMatchPost = ({ post, user, onUpdate }: { post: any, user: User, 
                         <div className="mt-4 space-y-3 pt-3 border-t border-slate-100">
                             {comments.map((comment: any) => (
                                 <div key={comment.id} className="flex gap-2 text-xs text-slate-600">
-                                    <img src={comment.author?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.author?.name || 'User')}&background=94a3b8&color=fff`} alt={comment.author?.name || 'User'} className="w-5 h-5 rounded-full" />
+                                    <img src={comment.author?.avatar || getAvatarFallbackUrl(comment.author?.name || 'User')} alt={comment.author?.name || 'User'} className="w-5 h-5 rounded-full" onError={(event) => withAvatarFallback(event, comment.author?.name)} />
                                     <div>
                                         <span className="font-bold">{comment.author?.name || 'Пользователь'}</span>
                                         <p className="text-slate-500">{comment.text}</p>
@@ -441,7 +451,7 @@ const MatchResultPost = ({ post, user, onUpdate }: { post: any, user: User, onUp
                         <div className="mt-4 space-y-3 pt-3 border-t border-slate-100">
                             {comments.map((comment: any) => (
                                 <div key={comment.id} className="flex gap-2 text-xs text-slate-600">
-                                    <img src={comment.author?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.author?.name || 'User')}&background=94a3b8&color=fff`} alt={comment.author?.name || 'User'} className="w-5 h-5 rounded-full" />
+                                    <img src={comment.author?.avatar || getAvatarFallbackUrl(comment.author?.name || 'User')} alt={comment.author?.name || 'User'} className="w-5 h-5 rounded-full" onError={(event) => withAvatarFallback(event, comment.author?.name)} />
                                     <div>
                                         <span className="font-bold">{comment.author?.name || 'Пользователь'}</span>
                                         <p className="text-slate-500">{comment.text}</p>
@@ -517,7 +527,7 @@ const MarketplacePost = ({ post, user, onStartConversation, onUpdate }: { post: 
                         <p className="text-sm text-slate-600 mb-4">{post.content.description}</p>
                         <div className="flex items-center justify-between mt-4">
                             <div className="flex items-center gap-2">
-                                <img src={post.author.avatar} alt={post.author.name} className="w-8 h-8 rounded-full" />
+                                <img src={post.author.avatar} alt={post.author.name} className="w-8 h-8 rounded-full" onError={(event) => withAvatarFallback(event, post.author?.name)} />
                                 <div>
                                     <div className="text-sm font-bold text-slate-700">{post.author.name}</div>
                                 </div>
@@ -525,7 +535,7 @@ const MarketplacePost = ({ post, user, onStartConversation, onUpdate }: { post: 
                             {isAuthor ? (
                                 <Button variant="danger_outline" size="sm" onClick={handleDelete}>Удалить</Button>
                             ) : (
-                                <Button onClick={() => onStartConversation(post.author.id)}>Написать продавцу</Button>
+                                <Button onClick={() => onStartConversation(post.author.id)}>Написать</Button>
                             )}
                         </div>
                     </div>
