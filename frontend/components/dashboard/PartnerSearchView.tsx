@@ -58,13 +58,15 @@ const PartnerSearchView = ({ user, onNavigate, onStartConversation, onCreateChal
     }, []);
 
     const renderPartnerAvatar = (partner: Partner) => (
-        <div className="w-24 h-24 rounded-full bg-slate-100 border border-slate-200 mb-4 relative overflow-hidden flex items-center justify-center">
-            {partner.image ? (
-                <img src={partner.image} className="w-full h-full object-cover rounded-full" alt={partner.name} />
-            ) : null}
+        <div className="w-24 h-24 mb-4 relative flex items-center justify-center">
+            <div className="w-full h-full rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
+                {partner.image ? (
+                    <img src={partner.image} className="w-full h-full object-cover rounded-full" alt={partner.name} />
+                ) : null}
+            </div>
             {partner.role === 'rtt_pro' && (
-                <div className="absolute bottom-0 right-0">
-                    <CheckCircle2 className="text-blue-500 fill-blue-100" size={26} strokeWidth={2} />
+                <div className="absolute bottom-0 right-0 z-10 translate-x-1 translate-y-1">
+                    <CheckCircle2 className="text-blue-500 fill-blue-100 drop-shadow-sm" size={26} strokeWidth={2} />
                 </div>
             )}
         </div>
