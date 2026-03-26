@@ -94,6 +94,27 @@ export interface SkillSet {
   tactics: number;
 }
 
+export interface PlayerProgressSkills {
+  serve: number;
+  forehand: number;
+  backhand: number;
+  stamina: number;
+  psychology: number;
+}
+
+export interface PlayerProgressGoal {
+  title: string;
+  targetDate: string;
+  targetPoints: number;
+  targetRank: number | null;
+}
+
+export interface PlayerProgressProfile {
+  version: number;
+  skills: PlayerProgressSkills;
+  goal: PlayerProgressGoal;
+}
+
 export interface PlayerGoal {
     id: string;
     text: string;

@@ -1,13 +1,222 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { 
   MapPin, CheckCircle2, Activity, Zap, Trophy, Calendar, 
-    Loader2, Upload
+    Loader2, Upload, Target, TrendingUp
 } from 'lucide-react';
-import { User, Match, Tournament } from '../../types';
+import { User, Match, Tournament, PlayerProgressGoal, PlayerProgressProfile, PlayerProgressSkills } from '../../types';
 import Button from '../Button';
 import { StatCard, Modal } from '../Shared';
 import { api, API_URL } from '../../services/api';
+
+type SkillMetricKey = 'serve' | 'forehand' | 'backhand' | 'stamina' | 'psychology';
+
+type SkillRadarValues = PlayerProgressSkills;
+type ProfileGoalState = PlayerProgressGoal;
+type PlayerProgressState = PlayerProgressProfile;
+
+const PLAYER_PROGRESS_SCHEMA_VERSION = 3;
+const EMPTY_SKILL_VALUES: PlayerProgressSkills = {
+    serve: 0,
+    forehand: 0,
+    backhand: 0,
+    stamina: 0,
+    psychology: 0
+};
+
+const skillMetricConfig: Array<{ key: SkillMetricKey; label: string; color: string }> = [
+    { key: 'serve', label: 'Подача', color: 'text-lime-600' },
+    { key: 'forehand', label: 'Форхенд', color: 'text-blue-600' },
+    { key: 'backhand', label: 'Бэкхенд', color: 'text-violet-600' },
+    { key: 'stamina', label: 'Выносливость', color: 'text-amber-600' },
+    { key: 'psychology', label: 'Психология', color: 'text-rose-600' }
+];
+
+const clampSkillValue = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
+
+const resolveTournamentDate = (tournament: Tournament) => tournament.start_date || tournament.startDate || '';
+
+const resolveTournamentParticipants = (tournament: Tournament) => tournament.participants_count || tournament.participantsCount || 8;
+
+const getYearEndDate = () => `${new Date().getFullYear()}-12-31`;
+
+const average = (values: number[]) => values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+
+const safeRatio = (value: number, maxValue: number) => maxValue > 0 ? value / maxValue : 0;
+
+const getMatchesWithDetailedStats = (matches: Match[]) => matches.filter((match) => match.stats);
+
+const estimatePointsForTargetRank = (currentPoints: number, currentRank?: number, targetRank?: number | null) => {
+    if (!targetRank || !currentRank) return Math.max(currentPoints + 80, 120);
+    if (targetRank >= currentRank) return Math.max(currentPoints, 0);
+
+    const rankGap = currentRank - targetRank;
+    const projectedGain = Math.max(60, Math.round(Math.sqrt(rankGap) * 3.2));
+    return currentPoints + projectedGain;
+};
+
+const parseGoalIntent = (title: string) => {
+    const normalizedTitle = title.toLowerCase();
+    const topMatch = normalizedTitle.match(/топ[-\s]?(\d+)/i);
+    const pointsMatch = normalizedTitle.match(/(\d+)\s*(?:очк|очков|points?)/i);
+
+    return {
+        targetRank: topMatch ? Math.max(1, Number(topMatch[1])) : null,
+        targetPoints: pointsMatch ? Math.max(0, Number(pointsMatch[1])) : null,
+        mentionsRtt: normalizedTitle.includes('ртт')
+    };
+};
+
+const buildDefaultSkills = (_user: User, matches: Match[]): SkillRadarValues => {
+    const matchesWithStats = getMatchesWithDetailedStats(matches);
+    if (matchesWithStats.length === 0) {
+        return EMPTY_SKILL_VALUES;
+    }
+
+    const wins = matches.filter(match => match.result === 'win').length;
+    const winRate = matches.length > 0 ? wins / matches.length : 0.5;
+    const serveAverage = average(matchesWithStats.map((match) => match.stats?.firstServePercent || 0));
+    const errorsAverage = average(matchesWithStats.map((match) => match.stats?.unforcedErrors || 0));
+    const acesAverage = average(matchesWithStats.map((match) => match.stats?.aces || 0));
+    const doubleFaultsAverage = average(matchesWithStats.map((match) => match.stats?.doubleFaults || 0));
+    const winnersAverage = average(matchesWithStats.map((match) => match.stats?.winners || 0));
+    const breakPointConversion = average(matchesWithStats.map((match) => safeRatio(match.stats?.breakPointsWon || 0, match.stats?.totalBreakPoints || 0)));
+    const consistencyScore = Math.max(0, 1 - Math.min(errorsAverage, 24) / 24);
+    const sampleConfidence = Math.min(matchesWithStats.length / 6, 1);
+
+    const serveScore =
+        serveAverage * 0.5 +
+        Math.min(acesAverage / 6, 1) * 20 +
+        Math.max(0, 1 - Math.min(doubleFaultsAverage, 7) / 7) * 25;
+    const forehandScore =
+        Math.min(winnersAverage / 14, 1) * 45 +
+        winRate * 20 +
+        consistencyScore * 25 +
+        sampleConfidence * 10;
+    const backhandScore =
+        Math.min(winnersAverage / 14, 1) * 28 +
+        breakPointConversion * 32 +
+        consistencyScore * 30 +
+        Math.max(0, 1 - Math.min(doubleFaultsAverage, 7) / 7) * 10;
+    const staminaScore =
+        consistencyScore * 30 +
+        breakPointConversion * 25 +
+        sampleConfidence * 20 +
+        Math.max(0, 1 - Math.min(errorsAverage, 24) / 24) * 15;
+    const psychologyScore =
+        winRate * 30 +
+        breakPointConversion * 35 +
+        Math.max(0, 1 - Math.min(doubleFaultsAverage, 7) / 7) * 15 +
+        consistencyScore * 10;
+
+    return {
+        serve: clampSkillValue(serveScore),
+        forehand: clampSkillValue(forehandScore),
+        backhand: clampSkillValue(backhandScore),
+        stamina: clampSkillValue(staminaScore),
+        psychology: clampSkillValue(psychologyScore)
+    };
+};
+
+const buildDefaultGoal = (user: User): ProfileGoalState => {
+    const currentPoints = Number(user.rating || 0);
+    const defaultTargetPoints = currentPoints > 0 ? currentPoints + Math.max(80, Math.round(currentPoints * 0.18)) : 180;
+    const defaultTargetRank = user.rttRank ? Math.max(1, Math.min(50, user.rttRank - 25)) : 50;
+
+    return {
+        title: user.role === 'rtt_pro' ? 'Войти в топ-50 РТТ до конца года' : 'Поднять игровой рейтинг до конца года',
+        targetDate: getYearEndDate(),
+        targetPoints: defaultTargetPoints,
+        targetRank: defaultTargetRank
+    };
+};
+
+const estimateTournamentPoints = (tournament: Tournament) => {
+    const participants = resolveTournamentParticipants(tournament);
+    const category = (tournament.category || '').toLowerCase();
+    const format = tournament.tournament_type || tournament.tournamentType;
+    let points = 30 + Math.min(28, participants * 1.8);
+
+    if (category.includes('1') || category.includes('всероссий')) points += 34;
+    else if (category.includes('2') || category.includes('регион')) points += 24;
+    else if (category.includes('3') || category.includes('город')) points += 16;
+    else if (category.includes('люб')) points += 10;
+
+    if (format === 'Одиночный') points += 8;
+    if (tournament.creator_role === 'admin') points += 4;
+
+    return Math.max(25, Math.round(points));
+};
+
+const SkillRadarChart: React.FC<{ skills: SkillRadarValues }> = ({ skills }) => {
+    const size = 240;
+    const center = size / 2;
+    const radius = 78;
+    const rings = [20, 40, 60, 80, 100];
+    const angleStep = (Math.PI * 2) / skillMetricConfig.length;
+
+    const getPoint = (index: number, value: number, extraRadius = 0) => {
+        const angle = -Math.PI / 2 + index * angleStep;
+        const scaledRadius = ((radius + extraRadius) * value) / 100;
+        return {
+            x: center + Math.cos(angle) * scaledRadius,
+            y: center + Math.sin(angle) * scaledRadius
+        };
+    };
+
+    const shapePoints = skillMetricConfig
+        .map((metric, index) => {
+            const point = getPoint(index, skills[metric.key]);
+            return `${point.x},${point.y}`;
+        })
+        .join(' ');
+
+    return (
+        <div className="flex flex-col items-center justify-center">
+            <svg viewBox={`0 0 ${size} ${size}`} className="w-full max-w-[240px] overflow-visible">
+                {rings.map((ring) => {
+                    const ringPoints = skillMetricConfig
+                        .map((_, index) => {
+                            const point = getPoint(index, ring);
+                            return `${point.x},${point.y}`;
+                        })
+                        .join(' ');
+
+                    return <polygon key={ring} points={ringPoints} fill="none" stroke="#dbe4ee" strokeWidth="1" />;
+                })}
+
+                {skillMetricConfig.map((_, index) => {
+                    const edgePoint = getPoint(index, 100);
+                    return <line key={index} x1={center} y1={center} x2={edgePoint.x} y2={edgePoint.y} stroke="#dbe4ee" strokeWidth="1" />;
+                })}
+
+                <polygon points={shapePoints} fill="rgba(163, 230, 53, 0.22)" stroke="#65a30d" strokeWidth="2.5" />
+
+                {skillMetricConfig.map((metric, index) => {
+                    const point = getPoint(index, skills[metric.key]);
+                    const labelPoint = getPoint(index, 100, 18);
+                    return (
+                        <g key={metric.key}>
+                            <circle cx={point.x} cy={point.y} r="4.5" fill="#84cc16" stroke="white" strokeWidth="2" />
+                            <text x={labelPoint.x} y={labelPoint.y} textAnchor="middle" dominantBaseline="middle" fontSize="11" fill="#475569" fontWeight="700">
+                                {metric.label}
+                            </text>
+                        </g>
+                    );
+                })}
+            </svg>
+
+            <div className="mt-4 grid grid-cols-2 gap-2 w-full">
+                {skillMetricConfig.map((metric) => (
+                    <div key={metric.key} className="rounded-2xl bg-white border border-slate-200 px-3 py-2">
+                        <div className={`text-[11px] font-bold uppercase tracking-wider ${metric.color}`}>{metric.label}</div>
+                        <div className="text-lg font-bold text-slate-900">{skills[metric.key]}</div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
 
 const trainings = [
     {
@@ -145,6 +354,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showTournamentsModal, setShowTournamentsModal] = useState(false);
   const [showTrainingModal, setShowTrainingModal] = useState(false);
+    const [showProgressModal, setShowProgressModal] = useState(false);
   const [isTrainingCompleted, setIsTrainingCompleted] = useState(false);
   const [currentTrainingIndex, setCurrentTrainingIndex] = useState(0);
   
@@ -198,6 +408,16 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
   
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [nearestTournament, setNearestTournament] = useState<Tournament | null>(null);
+    const isPlayerProfile = user.role === 'amateur' || user.role === 'rtt_pro';
+    const isRttPlayer = user.role === 'rtt_pro';
+    const isAmateurPlayer = user.role === 'amateur';
+        const [playerProgress, setPlayerProgress] = useState<PlayerProgressState>(() => ({
+            version: PLAYER_PROGRESS_SCHEMA_VERSION,
+            skills: buildDefaultSkills(user, []),
+            goal: buildDefaultGoal(user)
+    }));
+    const [isProgressReady, setIsProgressReady] = useState(false);
+        const progressSaveTimeoutRef = useRef<number | null>(null);
 
   const [editFormData, setEditFormData] = useState({
       name: user.name,
@@ -246,6 +466,84 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
       };
       fetchMatches();
   }, [user.id]);
+
+  useEffect(() => {
+      if (!isPlayerProfile) {
+          setIsProgressReady(false);
+          return;
+      }
+
+      let isCancelled = false;
+
+      const fallbackState: PlayerProgressState = {
+          version: PLAYER_PROGRESS_SCHEMA_VERSION,
+          skills: buildDefaultSkills(user, matches),
+          goal: buildDefaultGoal(user)
+      };
+
+      const loadPlayerProgress = async () => {
+          setIsProgressReady(false);
+          try {
+              const savedProgress = await api.playerProgress.get(String(user.id));
+              if (isCancelled) return;
+
+              if (!savedProgress || savedProgress.version !== PLAYER_PROGRESS_SCHEMA_VERSION) {
+                  setPlayerProgress(fallbackState);
+                  return;
+              }
+
+              setPlayerProgress({
+                  version: PLAYER_PROGRESS_SCHEMA_VERSION,
+                  skills: {
+                      ...fallbackState.skills,
+                      ...(savedProgress.skills || {})
+                  },
+                  goal: {
+                      ...fallbackState.goal,
+                      ...(savedProgress.goal || {})
+                  }
+              });
+          } catch {
+              if (!isCancelled) {
+                  setPlayerProgress(fallbackState);
+              }
+          } finally {
+              if (!isCancelled) {
+                  setIsProgressReady(true);
+              }
+          }
+      };
+
+      loadPlayerProgress();
+
+      return () => {
+          isCancelled = true;
+      };
+  }, [isPlayerProfile, matches, user]);
+
+  useEffect(() => {
+      if (!isPlayerProfile || !isProgressReady) return;
+
+      if (progressSaveTimeoutRef.current) {
+          window.clearTimeout(progressSaveTimeoutRef.current);
+      }
+
+      progressSaveTimeoutRef.current = window.setTimeout(() => {
+          api.playerProgress.save(String(user.id), {
+              ...playerProgress,
+              version: PLAYER_PROGRESS_SCHEMA_VERSION
+          }).catch((error) => {
+              console.error('Failed to save player progress', error);
+          });
+      }, 350);
+
+      return () => {
+          if (progressSaveTimeoutRef.current) {
+              window.clearTimeout(progressSaveTimeoutRef.current);
+              progressSaveTimeoutRef.current = null;
+          }
+      };
+  }, [isPlayerProfile, isProgressReady, playerProgress, user.id]);
 
   useEffect(() => {
       const fetchRttMatches = async () => {
@@ -321,6 +619,318 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
   };
 
   const currentTraining = trainings[currentTrainingIndex];
+  const currentRatingPoints = Number(user.rating || 0);
+    const pointsLabel = user.role === 'rtt_pro' ? 'Очки РТТ' : 'Индекс прогресса';
+
+  const upcomingTournamentSuggestions = useMemo(() => {
+      if (!isRttPlayer) return [];
+
+      return tournaments
+          .filter((tournament) => {
+              const startDate = resolveTournamentDate(tournament);
+              return Boolean(startDate) && new Date(startDate) > new Date();
+          })
+          .map((tournament) => {
+              const estimatedPoints = estimateTournamentPoints(tournament);
+              const date = resolveTournamentDate(tournament);
+              const daysUntilStart = date ? Math.max(0, Math.ceil((new Date(date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 365;
+              const fitScore = estimatedPoints - Math.min(daysUntilStart, 45) * 0.35;
+              return { tournament, estimatedPoints, fitScore };
+          })
+          .sort((left, right) => right.fitScore - left.fitScore)
+          .slice(0, 3);
+    }, [isRttPlayer, tournaments]);
+
+  const pointsRemaining = Math.max(playerProgress.goal.targetPoints - currentRatingPoints, 0);
+  const rankGap = user.rttRank && playerProgress.goal.targetRank
+      ? Math.max(user.rttRank - playerProgress.goal.targetRank, 0)
+      : null;
+  const averagePotentialPoints = upcomingTournamentSuggestions.length > 0
+      ? Math.round(upcomingTournamentSuggestions.reduce((sum, item) => sum + item.estimatedPoints, 0) / upcomingTournamentSuggestions.length)
+      : 45;
+  const tournamentsNeeded = pointsRemaining > 0 ? Math.ceil(pointsRemaining / Math.max(averagePotentialPoints, 1)) : 0;
+  const goalProgressPercent = playerProgress.goal.targetPoints > 0
+      ? Math.min(100, Math.round((currentRatingPoints / playerProgress.goal.targetPoints) * 100))
+      : 0;
+  const detailedSkillMatches = useMemo(() => getMatchesWithDetailedStats(matches), [matches]);
+  const hasDetailedSkillData = detailedSkillMatches.length > 0;
+  const hasAnySkillValues = Object.values(playerProgress.skills).some((value) => value > 0);
+  const showSkillDataPlaceholder = !hasDetailedSkillData && !hasAnySkillValues;
+  const sortedSkillMetrics = useMemo(
+      () => [...skillMetricConfig].sort((left, right) => playerProgress.skills[right.key] - playerProgress.skills[left.key]),
+      [playerProgress.skills]
+  );
+  const strongestSkill = sortedSkillMetrics[0]?.label || 'Подача';
+  const secondStrongestSkill = sortedSkillMetrics[1]?.label || 'Форхенд';
+  const growthSkill = sortedSkillMetrics[sortedSkillMetrics.length - 1]?.label || 'Психология';
+
+  const updateSkill = (key: SkillMetricKey, value: number) => {
+      setPlayerProgress((prev) => ({
+          ...prev,
+          skills: {
+              ...prev.skills,
+              [key]: clampSkillValue(value)
+          }
+      }));
+  };
+
+  const updateGoal = (patch: Partial<ProfileGoalState>) => {
+      setPlayerProgress((prev) => ({
+          ...prev,
+          goal: {
+              ...prev.goal,
+              ...patch
+          }
+      }));
+  };
+
+  const handleGoalTitleChange = (title: string) => {
+      const intent = parseGoalIntent(title);
+      const syncedPatch: Partial<ProfileGoalState> = { title };
+
+      if (intent.targetRank && intent.mentionsRtt) {
+          syncedPatch.targetRank = intent.targetRank;
+          syncedPatch.targetPoints = estimatePointsForTargetRank(currentRatingPoints, user.rttRank, intent.targetRank);
+      }
+
+      if (intent.targetPoints !== null) {
+          syncedPatch.targetPoints = intent.targetPoints;
+      }
+
+      updateGoal(syncedPatch);
+  };
+
+  const resetProgressFromStats = () => {
+      setPlayerProgress((prev) => ({
+          ...prev,
+          skills: buildDefaultSkills(user, matches)
+      }));
+  };
+
+  const progressHighlightText = pointsRemaining > 0
+      ? `До цели не хватает ${pointsRemaining} ${pointsLabel.toLowerCase()}`
+      : 'Цель по очкам уже достигнута';
+  const progressSkillHighlightText = showSkillDataPlaceholder
+      ? 'Навыки появятся после первых матчей со статистикой'
+      : `Сильные стороны: ${strongestSkill} и ${secondStrongestSkill}`;
+  const goalIntentHint = useMemo(() => {
+      const intent = parseGoalIntent(playerProgress.goal.title);
+      if (intent.targetRank && intent.mentionsRtt) {
+          return `По тексту цели распознан ориентир: топ-${intent.targetRank} РТТ.`;
+      }
+      if (intent.targetPoints !== null) {
+          return `По тексту цели распознан целевой уровень: ${intent.targetPoints} ${pointsLabel.toLowerCase()}.`;
+      }
+      return isRttPlayer
+          ? 'Подсказка: фразы вроде «топ-50 РТТ» или «150 очков» автоматически обновляют расчёт.'
+          : 'Подсказка: для любителя цель лучше формулировать через стабильность, победы и регулярность выступлений.';
+  }, [isRttPlayer, playerProgress.goal.title, pointsLabel]);
+
+  const playerProgressContent = (
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+              <div className="flex items-center justify-between gap-3 mb-5">
+                  <div>
+                      <h4 className="font-bold text-slate-900">Skill-Radar</h4>
+                      <p className="text-sm text-slate-500">Пять ключевых зон, которые влияют на стабильность результатов.</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={resetProgressFromStats}>Пересчитать</Button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)] gap-6 items-start">
+                  <SkillRadarChart skills={playerProgress.skills} />
+
+                  <div className="space-y-4">
+                      {showSkillDataPlaceholder && (
+                          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
+                              Пока нет достаточной матчевой статистики, поэтому `Skill-Radar` не заполняется автоматически. После матчей с подробными метриками или ручного ввода тренером/игроком значения появятся здесь.
+                          </div>
+                      )}
+
+                      {skillMetricConfig.map((metric) => (
+                          <div key={metric.key}>
+                              <div className="flex items-center justify-between mb-2">
+                                  <label className="text-sm font-bold text-slate-700">{metric.label}</label>
+                                  <span className={`text-sm font-bold ${metric.color}`}>{playerProgress.skills[metric.key]}/100</span>
+                              </div>
+                              <input
+                                  type="range"
+                                  min="0"
+                                  max="100"
+                                  step="1"
+                                  value={playerProgress.skills[metric.key]}
+                                  onChange={(event) => updateSkill(metric.key, Number(event.target.value))}
+                                  className="w-full accent-lime-500"
+                              />
+                          </div>
+                      ))}
+
+                      {!showSkillDataPlaceholder && (
+                          <div className="rounded-2xl bg-white border border-slate-200 p-4 text-sm text-slate-600">
+                              Сейчас сильнее всего выглядят <span className="font-bold text-slate-900">{strongestSkill}</span> и <span className="font-bold text-slate-900">{secondStrongestSkill}</span>. Зона роста — <span className="font-bold text-slate-900">{growthSkill}</span>.
+                          </div>
+                      )}
+                  </div>
+              </div>
+          </div>
+
+          <div className="rounded-[28px] bg-slate-900 text-white p-5">
+              <div className="flex items-start justify-between gap-3 mb-5">
+                  <div>
+                      <h4 className="font-bold text-white flex items-center gap-2"><Target size={18} className="text-lime-400" /> {isRttPlayer ? 'Путь к цели' : 'Путь к игровому уровню'}</h4>
+                      <p className="text-sm text-slate-300 mt-1">{isRttPlayer ? 'Следите, сколько очков не хватает до цели, и выбирайте турниры с наибольшим потенциалом.' : 'Следите за личным прогрессом и фокусируйтесь на регулярной матчевой практике и любительских соревнованиях.'}</p>
+                  </div>
+                  <div className="text-right">
+                      <div className="text-xs uppercase tracking-widest text-slate-400">{isRttPlayer ? 'Текущий уровень' : 'Текущий прогресс'}</div>
+                      <div className="text-lg font-bold text-lime-400">{currentRatingPoints} {user.role === 'rtt_pro' ? 'очк.' : 'балл.'}</div>
+                  </div>
+              </div>
+
+              <div className="space-y-4">
+                  <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Цель</label>
+                      <input
+                          className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                          value={playerProgress.goal.title}
+                          onChange={(event) => handleGoalTitleChange(event.target.value)}
+                          placeholder={isRttPlayer ? 'Например: Войти в топ-50 РТТ до конца года' : 'Например: стабильно доходить до полуфиналов к концу сезона'}
+                      />
+                      <p className="text-xs text-slate-400 mt-2">{goalIntentHint}</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">{pointsLabel}</label>
+                          <input
+                              type="number"
+                              min="0"
+                              className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none"
+                              value={playerProgress.goal.targetPoints}
+                              onChange={(event) => updateGoal({ targetPoints: Math.max(0, Number(event.target.value) || 0) })}
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">{isRttPlayer ? 'Целевой ранг' : 'Ориентир'}</label>
+                          <input
+                              type="number"
+                              min="1"
+                              className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none"
+                              value={playerProgress.goal.targetRank ?? ''}
+                              onChange={(event) => updateGoal({ targetRank: event.target.value ? Math.max(1, Number(event.target.value)) : null })}
+                              placeholder={isRttPlayer ? '50' : '10'}
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Дедлайн</label>
+                          <input
+                              type="date"
+                              className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none"
+                              value={playerProgress.goal.targetDate}
+                              onChange={(event) => updateGoal({ targetDate: event.target.value })}
+                          />
+                      </div>
+                  </div>
+
+                  <div className="rounded-3xl bg-white/6 border border-white/10 p-4">
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                          <span className="text-sm text-slate-300">Прогресс к цели</span>
+                          <span className="text-sm font-bold text-white">{goalProgressPercent}%</span>
+                      </div>
+                      <div className="h-3 rounded-full bg-white/10 overflow-hidden">
+                          <div className="h-full rounded-full bg-lime-400" style={{ width: `${goalProgressPercent}%` }} />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+                          <div className="rounded-2xl bg-black/20 px-4 py-3">
+                              <div className="text-xs uppercase tracking-wider text-slate-400">Не хватает</div>
+                              <div className="text-xl font-bold text-white">{pointsRemaining}</div>
+                              <div className="text-xs text-slate-400">{pointsLabel.toLowerCase()}</div>
+                          </div>
+                          <div className="rounded-2xl bg-black/20 px-4 py-3">
+                              <div className="text-xs uppercase tracking-wider text-slate-400">{isRttPlayer ? 'Оценка пути' : 'План практики'}</div>
+                              <div className="text-xl font-bold text-white">{tournamentsNeeded}</div>
+                              <div className="text-xs text-slate-400">{isRttPlayer ? 'турнира в среднем темпе' : 'соревнований в ближайшем цикле'}</div>
+                          </div>
+                          <div className="rounded-2xl bg-black/20 px-4 py-3">
+                              <div className="text-xs uppercase tracking-wider text-slate-400">{isRttPlayer ? 'По рангу' : 'До ориентира'}</div>
+                              <div className="text-xl font-bold text-white">{rankGap ?? '—'}</div>
+                              <div className="text-xs text-slate-400">{isRttPlayer ? 'позиций до цели' : 'условных шагов до цели'}</div>
+                          </div>
+                      </div>
+                  </div>
+
+                  <div>
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                          <div>
+                              <h5 className="font-bold text-white">{isRttPlayer ? 'Где добрать очки' : 'Как расти любителю'}</h5>
+                              <p className="text-xs text-slate-400">
+                                  {isRttPlayer
+                                      ? 'Рекомендуем турниры с лучшим соотношением близости и потенциальных очков.'
+                                      : 'Любителям лучше набирать игровой опыт через любительские турниры, клубные матчи, weekend-серии и внутренние соревнования.'}
+                              </p>
+                          </div>
+                          {isRttPlayer && nearestTournament && (
+                              <div className="text-right text-xs text-slate-400">
+                                  Ближайший шанс<br />
+                                  <span className="font-bold text-slate-200">{nearestTournament.name}</span>
+                              </div>
+                          )}
+                      </div>
+
+                      {isRttPlayer ? (
+                          <div className="space-y-3">
+                              {upcomingTournamentSuggestions.map(({ tournament, estimatedPoints }) => (
+                                  <div key={tournament.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                      <div className="flex items-start justify-between gap-3">
+                                          <div>
+                                              <div className="font-bold text-white">{tournament.name}</div>
+                                              <div className="text-xs text-slate-400 mt-1">
+                                                  {[resolveTournamentDate(tournament), tournament.category, tournament.groupName || tournament.group_name || 'без группы'].filter(Boolean).join(' • ')}
+                                              </div>
+                                          </div>
+                                          <div className="text-right">
+                                              <div className="text-lg font-bold text-lime-400">+{estimatedPoints}</div>
+                                              <div className="text-[11px] uppercase tracking-wider text-slate-400">потенциал</div>
+                                          </div>
+                                      </div>
+                                  </div>
+                              ))}
+
+                              {upcomingTournamentSuggestions.length === 0 && (
+                                  <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-sm text-slate-400">
+                                      Пока нет будущих турниров в базе. Когда они появятся, блок сам покажет, где быстрее всего можно добрать очки.
+                                  </div>
+                              )}
+                          </div>
+                      ) : (
+                          <div className="space-y-3">
+                              <div className="rounded-2xl border border-lime-400/20 bg-lime-400/10 p-4 text-sm text-slate-200">
+                                  Чтобы прогрессировать как любитель, важнее регулярно играть в <span className="font-bold text-white">любительских турнирах, клубных матчах и внутренних соревнованиях</span>. Это даёт игровую практику, устойчивость под счётом и понятную динамику роста.
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                      <div className="text-xs uppercase tracking-wider text-slate-400">Шаг 1</div>
+                                      <div className="font-bold text-white mt-2">Играть регулярно</div>
+                                      <div className="text-sm text-slate-300 mt-2">1–2 соревновательных матча в неделю обычно дают лучший рост, чем редкие одиночные старты.</div>
+                                  </div>
+                                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                      <div className="text-xs uppercase tracking-wider text-slate-400">Шаг 2</div>
+                                      <div className="font-bold text-white mt-2">Выбирать любительские старты</div>
+                                      <div className="text-sm text-slate-300 mt-2">Подойдут клубные турниры, weekend-серии, локальные лиги и парные встречи внутри сообщества.</div>
+                                  </div>
+                                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                      <div className="text-xs uppercase tracking-wider text-slate-400">Шаг 3</div>
+                                      <div className="font-bold text-white mt-2">Следить за стабильностью</div>
+                                      <div className="text-sm text-slate-300 mt-2">Оценивайте не только победы, но и подачу, выносливость и психологию после каждого матча.</div>
+                                  </div>
+                              </div>
+                          </div>
+                      )}
+                  </div>
+              </div>
+          </div>
+      </div>
+  );
   
     const formatDate = (isoDate: string | undefined) => {
         if (!isoDate) return { month: '', day: '', dayOfWeek: '' };
@@ -394,6 +1004,38 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
               </div>
           </div>
         </div>
+
+                {isPlayerProfile && isProgressReady && (
+                    <button
+                        type="button"
+                        onClick={() => setShowProgressModal(true)}
+                        className="w-full bg-white rounded-3xl shadow-sm border border-slate-200 p-6 text-left transition-all hover:shadow-md hover:border-lime-200"
+                    >
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                            <div>
+                                <h3 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
+                                    <TrendingUp className="text-lime-600" size={20} /> Интерактивная карта прогресса
+                                </h3>
+                                <p className="text-sm sm:text-base text-slate-500 mt-3 max-w-3xl">Обновляйте навыки после матчей или вместе с тренером — изменения сохраняются автоматически.</p>
+                            </div>
+                            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-100 text-slate-600 text-xs sm:text-sm font-bold uppercase tracking-wider self-start">
+                                <Activity size={14} /> Живая динамика игрока
+                            </div>
+                        </div>
+
+                        <div className="mt-5 flex flex-wrap items-center gap-3 text-xs sm:text-sm">
+                            <div className="px-3 py-2 rounded-2xl bg-lime-50 text-lime-700 font-bold border border-lime-100">
+                                {progressSkillHighlightText}
+                            </div>
+                            <div className="px-3 py-2 rounded-2xl bg-slate-50 text-slate-600 font-bold border border-slate-100">
+                                {progressHighlightText}
+                            </div>
+                            <div className="px-3 py-2 rounded-2xl bg-amber-50 text-amber-700 font-bold border border-amber-100">
+                                Нажмите, чтобы открыть детали
+                            </div>
+                        </div>
+                    </button>
+                )}
         
         {/* RTT Matches Widget — только для игроков с RНИ */}
         {user.rni && (
@@ -604,6 +1246,23 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
                     <Zap size={20} className="fill-lime-400"/> +10 XP
                 </div>
                 <Button className="w-full" onClick={resetTrainingModal}>Закрыть</Button>
+            </div>
+        )}
+    </Modal>
+
+    <Modal isOpen={showProgressModal} onClose={() => setShowProgressModal(false)} title="Интерактивная карта прогресса" maxWidth="max-w-6xl" bodyClassName="max-h-[78vh]">
+        {isPlayerProfile && isProgressReady && (
+            <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div>
+                        <h3 className="text-xl font-bold text-slate-900">Живая динамика игрока</h3>
+                        <p className="text-sm text-slate-500 mt-1">Здесь собраны обе фичи: карта навыков и трекер пути к цели.</p>
+                    </div>
+                    <div className="px-3 py-2 rounded-2xl bg-lime-50 text-lime-700 font-bold border border-lime-100 text-sm self-start">
+                        {progressHighlightText}
+                    </div>
+                </div>
+                {playerProgressContent}
             </div>
         )}
     </Modal>

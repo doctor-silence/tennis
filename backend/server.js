@@ -691,6 +691,59 @@ const ensureSystemLogsTable = async () => {
     `);
 };
 
+const PLAYER_PROGRESS_VERSION = 3;
+const EMPTY_PLAYER_PROGRESS_SKILLS = Object.freeze({
+    serve: 0,
+    forehand: 0,
+    backhand: 0,
+    stamina: 0,
+    psychology: 0
+});
+
+const ensurePlayerProgressTable = async () => {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS player_progress_profiles (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+            version INTEGER NOT NULL DEFAULT ${PLAYER_PROGRESS_VERSION},
+            skills JSONB NOT NULL DEFAULT '{}'::jsonb,
+            goal JSONB NOT NULL DEFAULT '{}'::jsonb,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    `);
+};
+
+const clampProgressMetric = (value) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return 0;
+    return Math.max(0, Math.min(100, Math.round(numeric)));
+};
+
+const normalizeProgressGoal = (goal = {}) => {
+    const targetPoints = Number(goal.targetPoints);
+    const targetRank = Number(goal.targetRank);
+
+    return {
+        title: typeof goal.title === 'string' ? goal.title.trim().slice(0, 200) : '',
+        targetDate: typeof goal.targetDate === 'string' ? goal.targetDate.slice(0, 20) : '',
+        targetPoints: Number.isFinite(targetPoints) ? Math.max(0, Math.round(targetPoints)) : 0,
+        targetRank: Number.isFinite(targetRank) ? Math.max(1, Math.round(targetRank)) : null
+    };
+};
+
+const normalizePlayerProgress = (payload = {}) => ({
+    version: Number.isFinite(Number(payload.version)) ? Math.max(1, Math.round(Number(payload.version))) : PLAYER_PROGRESS_VERSION,
+    skills: {
+        serve: clampProgressMetric(payload.skills?.serve),
+        forehand: clampProgressMetric(payload.skills?.forehand),
+        backhand: clampProgressMetric(payload.skills?.backhand),
+        stamina: clampProgressMetric(payload.skills?.stamina),
+        psychology: clampProgressMetric(payload.skills?.psychology)
+    },
+    goal: normalizeProgressGoal(payload.goal)
+});
+
 const TOURNAMENT_STAGE_DEFINITIONS = [
     {
         label: 'Расписание на основной этап турнира',
@@ -1766,6 +1819,72 @@ app.put('/api/users/:id/profile', async (req, res) => {
         res.status(500).json({ error: err.message });
     } finally {
         client.release();
+    }
+});
+
+app.get('/api/users/:id/progress', async (req, res) => {
+    const { id } = req.params;
+    const requestUserId = req.headers['x-user-id'];
+    if (!requestUserId || String(requestUserId) !== String(id)) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    try {
+        const result = await pool.query(
+            `SELECT version, skills, goal, updated_at
+             FROM player_progress_profiles
+             WHERE user_id = $1`,
+            [id]
+        );
+
+        if (result.rowCount === 0) {
+            return res.json({ progress: null });
+        }
+
+        const row = result.rows[0];
+        res.json({
+            progress: normalizePlayerProgress({
+                version: row.version,
+                skills: row.skills || EMPTY_PLAYER_PROGRESS_SKILLS,
+                goal: row.goal || {}
+            }),
+            updatedAt: row.updated_at
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/users/:id/progress', async (req, res) => {
+    const { id } = req.params;
+    const requestUserId = req.headers['x-user-id'];
+    if (!requestUserId || String(requestUserId) !== String(id)) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const normalizedProgress = normalizePlayerProgress(req.body || {});
+
+    try {
+        await pool.query(
+            `INSERT INTO player_progress_profiles (user_id, version, skills, goal, updated_at)
+             VALUES ($1, $2, $3::jsonb, $4::jsonb, NOW())
+             ON CONFLICT (user_id)
+             DO UPDATE SET
+                version = EXCLUDED.version,
+                skills = EXCLUDED.skills,
+                goal = EXCLUDED.goal,
+                updated_at = NOW()`,
+            [
+                id,
+                normalizedProgress.version,
+                JSON.stringify(normalizedProgress.skills),
+                JSON.stringify(normalizedProgress.goal)
+            ]
+        );
+
+        res.json({ success: true, progress: normalizedProgress });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 
@@ -4974,6 +5093,8 @@ server.listen(PORT, async () => {
         console.log('✅ News table ready');
         await ensureGhostCommunityTables();
         console.log('✅ Ghost community tables ready');
+        await ensurePlayerProgressTable();
+        console.log('✅ Player progress table ready');
         setTimeout(() => {
             syncTrackedTournamentStages().catch(err => console.error('Initial RTT tournament sync failed:', err.message));
         }, 15000);

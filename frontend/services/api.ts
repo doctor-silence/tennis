@@ -1,4 +1,4 @@
-import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Match, Product, PlayerProfile, Trajectory, Conversation, ChatMessage, MarketplaceItem, CrmStats, Skill, Lesson, Tournament, Group, NewsArticle } from '../types';
+import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Match, Product, PlayerProfile, Trajectory, Conversation, ChatMessage, MarketplaceItem, CrmStats, Skill, Lesson, Tournament, Group, NewsArticle, PlayerProgressProfile } from '../types';
 import * as THREE from 'three'; // Import THREE for Vector3 deserialization
 
 // Frontend API Service
@@ -70,6 +70,7 @@ let MOCK_STUDENTS: Student[] = [
 ];
 
 let MOCK_PARTNERS: Partner[] = [];
+const MOCK_PLAYER_PROGRESS: Record<string, PlayerProgressProfile> = {};
 
 let MOCK_PRODUCTS: Product[] = [
     { 
@@ -1043,6 +1044,44 @@ export const api = {
             const err = await res.json();
             throw new Error(err.error || 'Failed to update profile');
         }
+    },
+
+    playerProgress: {
+        get: async (userId: string | number): Promise<PlayerProgressProfile | null> => {
+            try {
+                const res = await fetch(`${API_URL}/users/${userId}/progress`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-user-id': String(userId),
+                    },
+                });
+                const data = await handleResponse(res);
+                return data.progress || null;
+            } catch (error) {
+                console.warn('playerProgress.get fallback:', error);
+                return MOCK_PLAYER_PROGRESS[String(userId)] || null;
+            }
+        },
+        save: async (userId: string | number, progress: PlayerProgressProfile): Promise<PlayerProgressProfile> => {
+            try {
+                const res = await fetch(`${API_URL}/users/${userId}/progress`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-user-id': String(userId),
+                    },
+                    body: JSON.stringify(progress),
+                });
+                const data = await handleResponse(res);
+                const saved = data.progress as PlayerProgressProfile;
+                MOCK_PLAYER_PROGRESS[String(userId)] = saved;
+                return saved;
+            } catch (error) {
+                console.warn('playerProgress.save fallback:', error);
+                MOCK_PLAYER_PROGRESS[String(userId)] = progress;
+                return progress;
+            }
+        },
     },
 
     rttSyncMatches: async (userId: string | number): Promise<{ added: number; total: number; message?: string }> => {
