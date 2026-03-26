@@ -46,6 +46,129 @@ import {
 } from 'lucide-react';
 
 const IMPERSONATION_ADMIN_STORAGE_KEY = 'impersonationAdminUser';
+const SITE_URL = 'https://onthecourt.ru';
+
+type SeoConfig = {
+  title: string;
+  description: string;
+  canonicalPath: string;
+};
+
+const DEFAULT_SEO: SeoConfig = {
+  title: 'НаКорте - Теннисная платформа для поиска партнёров и тренеров',
+  description: 'НаКорте — онлайн-платформа для теннисистов России. Найди партнёра для игры, запишись к тренеру, участвуй в турнирах РТТ и следи за рейтингом.',
+  canonicalPath: '/',
+};
+
+const SEO_BY_VIEW: Partial<Record<ViewState, SeoConfig>> = {
+  landing: DEFAULT_SEO,
+  auth: DEFAULT_SEO,
+  'find-partner': {
+    title: 'Поиск партнёра по теннису — НаКорте',
+    description: 'Найдите партнёра по теннису по уровню, городу и формату игры. НаКорте помогает быстро подобрать соперника или спарринг-партнёра для тренировки и матча.',
+    canonicalPath: '/find-partner/',
+  },
+  'find-courts': {
+    title: 'Бронирование теннисных кортов — НаКорте',
+    description: 'Ищите теннисные корты по городу, клубу, адресу и покрытию. Сравнивайте площадки по рейтингу и цене и переходите к удобному бронированию онлайн.',
+    canonicalPath: '/find-courts/',
+  },
+  'ai-coach-info': {
+    title: 'AI-тренер по теннису — НаКорте',
+    description: 'Используйте AI-тренера НаКорте для разбора тактики, техники и подготовки к матчам. Получайте персональные рекомендации и готовые тренировки в личном кабинете.',
+    canonicalPath: '/ai-coach/',
+  },
+  'amateur-tournaments': {
+    title: 'Любительские турниры по теннису — НаКорте',
+    description: 'Участвуйте в любительских теннисных турнирах, следите за сеткой, результатами и рейтингом игроков. НаКорте объединяет турнирную активность в одном сервисе.',
+    canonicalPath: '/amateur-tournaments/',
+  },
+  'community-info': {
+    title: 'Теннисное сообщество — НаКорте',
+    description: 'Теннисное сообщество НаКорте: публикации игроков, группы, результаты матчей, поиск игры и объявления. Общайтесь и находите новые возможности для игры.',
+    canonicalPath: '/community/',
+  },
+  'tactics-3d-info': {
+    title: '3D-тактика в теннисе — НаКорте',
+    description: 'Изучайте теннисную тактику в 3D: сценарии розыгрышей, направления ударов, выход к сетке и игровые схемы для подготовки к матчам и тренировкам.',
+    canonicalPath: '/3d-tactics/',
+  },
+  'tennis-diary-info': {
+    title: 'Теннисный дневник — НаКорте',
+    description: 'Ведите теннисный дневник тренировок и матчей, фиксируйте прогресс, заметки и игровые наблюдения. НаКорте помогает системно отслеживать развитие игрока.',
+    canonicalPath: '/tennis-diary/',
+  },
+  'crm-info': {
+    title: 'CRM для теннисных тренеров — НаКорте',
+    description: 'CRM для теннисных тренеров: управление учениками, расписанием, абонементами и прогрессом в одном сервисе.',
+    canonicalPath: '/trainer-crm/',
+  },
+  'rtt-info': {
+    title: 'Верификация РТТ — НаКорте',
+    description: 'Привяжите номер РТТ, получите верификацию профиля и откройте дополнительные возможности для статистики и рейтинга на НаКорте.',
+    canonicalPath: '/rtt/',
+  },
+  news: {
+    title: 'Новости тенниса — НаКорте',
+    description: 'Последние новости тенниса в России: турниры, результаты матчей, интервью с игроками, тренировочные советы и обзоры.',
+    canonicalPath: '/news/',
+  },
+  privacy: {
+    title: 'Политика конфиденциальности — НаКорте',
+    description: 'Политика конфиденциальности сервиса НаКорте. Как мы собираем, используем и защищаем ваши персональные данные.',
+    canonicalPath: '/privacy/',
+  },
+  terms: {
+    title: 'Условия обслуживания — НаКорте',
+    description: 'Условия обслуживания сервиса НаКорте. Правила использования платформы, регистрации и поведения пользователей.',
+    canonicalPath: '/terms/',
+  },
+  pro: {
+    title: 'НаКорте Premium — Раскрой свой потенциал',
+    description: 'Получи доступ к продвинутой аналитике, безлимитному AI-тренеру и эксклюзивным турнирам с подпиской НаКорте Premium.',
+    canonicalPath: '/pro/',
+  },
+  shop: {
+    title: 'Теннисный магазин — НаКорте',
+    description: 'Купить теннисные ракетки, кроссовки, мячи и аксессуары с доставкой по России. Подбор экипировки для тренировок и матчей.',
+    canonicalPath: '/shop/',
+  },
+};
+
+const ensureMetaTag = (attributeName: 'name' | 'property', attributeValue: string) => {
+  let element = document.head.querySelector(`meta[${attributeName}="${attributeValue}"]`) as HTMLMetaElement | null;
+
+  if (!element) {
+    element = document.createElement('meta');
+    element.setAttribute(attributeName, attributeValue);
+    document.head.appendChild(element);
+  }
+
+  return element;
+};
+
+const ensureCanonicalLink = () => {
+  let element = document.head.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+
+  if (!element) {
+    element = document.createElement('link');
+    element.setAttribute('rel', 'canonical');
+    document.head.appendChild(element);
+  }
+
+  return element;
+};
+
+const applySeoMetadata = ({ title, description, canonicalPath }: SeoConfig) => {
+  const canonicalUrl = new URL(canonicalPath, SITE_URL).toString();
+
+  document.title = title;
+  ensureMetaTag('name', 'description').setAttribute('content', description);
+  ensureMetaTag('property', 'og:title').setAttribute('content', title);
+  ensureMetaTag('property', 'og:description').setAttribute('content', description);
+  ensureMetaTag('property', 'og:url').setAttribute('content', canonicalUrl);
+  ensureCanonicalLink().setAttribute('href', canonicalUrl);
+};
 
 const App = () => {
   const [view, setView] = useState<ViewState>('landing');
@@ -239,6 +362,11 @@ const App = () => {
       window.removeEventListener('popstate', handlePopState);
     };
   }, [currentUser]);
+
+  useEffect(() => {
+    const seo = currentUser ? DEFAULT_SEO : (SEO_BY_VIEW[view] ?? DEFAULT_SEO);
+    applySeoMetadata(seo);
+  }, [currentUser, view]);
 
   const handleLoginSuccess = (user: User) => {
     setImpersonationAdmin(null);
