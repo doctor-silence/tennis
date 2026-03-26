@@ -187,11 +187,24 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
                 type: 'tournament_announcement',
                 groupId: returnedTournament.target_group_id,
                 content: {
+                    tournamentId: String(returnedTournament.id),
+                    announcementKind: 'started',
                     title: returnedTournament.name,
                     groupName: returnedTournament.groupName,
                     prizePool: returnedTournament.prize_pool,
                     date: returnedTournament.start_date,
                     authorName: user.role === 'admin' ? 'Администрация' : user.name,
+                    status: returnedTournament.status,
+                    stageStatus: returnedTournament.stage_status,
+                    category: returnedTournament.category,
+                    tournamentType: returnedTournament.tournament_type,
+                    gender: returnedTournament.gender,
+                    ageGroup: returnedTournament.age_group,
+                    system: returnedTournament.system,
+                    matchFormat: returnedTournament.match_format,
+                    participantsCount: returnedTournament.participants_count,
+                    startDate: returnedTournament.start_date,
+                    endDate: returnedTournament.end_date,
                 }
             });
             onTournamentUpdate();
@@ -297,9 +310,12 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
                     type: 'tournament_result',
                     groupId: selectedTournament.target_group_id,
                     content: {
+                        tournamentId: String(selectedTournament.id),
                         tournamentName: selectedTournament.name,
+                        groupName: selectedTournament.groupName,
                         winnerName: winner.name,
                         winnerAvatar: winner.avatar,
+                        authorLabel: user.role === 'admin' ? 'Администрация' : user.name,
                     }
                 });
                 onTournamentUpdate();

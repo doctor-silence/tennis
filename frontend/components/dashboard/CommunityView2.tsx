@@ -19,8 +19,38 @@ const isTournamentLive = (tournament: Tournament) => {
     return ['live', 'в игре', 'идут', 'started', 'in progress', 'in_progress'].some((value) => stageStatus.includes(value));
 };
 
+const isTournamentFinished = (tournament: Tournament) => {
+    const status = (tournament.status || '').toLowerCase();
+    const stageStatus = (tournament.stageStatus || tournament.stage_status || '').toLowerCase();
+
+    if (status === 'finished') {
+        return true;
+    }
+
+    return ['finished', 'завершен', 'завершён', 'турнир завершен', 'турнир завершён', 'completed'].some((value) => stageStatus.includes(value));
+};
+
+const isUpcomingAdminTournament = (tournament: Tournament) => {
+    if (tournament.creator_role !== 'admin') {
+        return false;
+    }
+
+    return !isTournamentLive(tournament) && !isTournamentFinished(tournament);
+};
+
 const getTournamentStartDate = (tournament: Tournament) => {
     const rawDate = tournament.start_date || tournament.startDate;
+
+    if (!rawDate) {
+        return null;
+    }
+
+    const parsedDate = new Date(rawDate);
+    return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+};
+
+const getTournamentEndDate = (tournament: Tournament) => {
+    const rawDate = tournament.end_date || tournament.endDate || tournament.start_date || tournament.startDate;
 
     if (!rawDate) {
         return null;
@@ -38,19 +68,139 @@ const getTournamentAnnouncementAuthorName = (tournament?: Partial<Tournament> | 
     return (fallbackAuthorName || '').trim() || 'Организатор';
 };
 
-const buildLiveTournamentAnnouncementPosts = (tournaments: Tournament[], posts: any[], user: User) => {
-    const existingAnnouncements = new Set(
-        posts
-            .filter((post) => post.type === 'tournament_announcement')
-            .map((post) => `${String(post.content?.title || '').trim().toLowerCase()}::${String(post.group_id || post.groupId || post.content?.groupId || '').trim()}`)
-    );
+const getTournamentStatusLabel = (status?: string | null) => {
+    const normalizedStatus = String(status || '').toLowerCase();
 
+    if (normalizedStatus === 'draft') return 'Набор';
+    if (normalizedStatus === 'open') return 'Регистрация';
+    if (normalizedStatus === 'live') return 'Идёт';
+    if (normalizedStatus === 'finished') return 'Завершён';
+
+    return status || 'Не указан';
+};
+
+const normalizeComparableValue = (value?: string | null) => String(value || '').trim().toLowerCase();
+
+const doesPostBelongToTournament = (post: any, tournament: Tournament) => {
+    const postContent = post?.content || {};
+    const postTournamentId = normalizeComparableValue(postContent.tournamentId);
+    const tournamentId = normalizeComparableValue(tournament.id);
+
+    if (postTournamentId && tournamentId && postTournamentId === tournamentId) {
+        return true;
+    }
+
+    const postTournamentName = normalizeComparableValue(postContent.tournamentName || postContent.title);
+    const tournamentName = normalizeComparableValue(tournament.name);
+
+    if (!postTournamentName || !tournamentName || postTournamentName !== tournamentName) {
+        return false;
+    }
+
+    const postGroupId = normalizeComparableValue(post.group_id || post.groupId || postContent.groupId);
+    const tournamentGroupId = normalizeComparableValue(tournament.target_group_id || tournament.targetGroupId);
+
+    if (postGroupId && tournamentGroupId) {
+        return postGroupId === tournamentGroupId;
+    }
+
+    const postGroupName = normalizeComparableValue(postContent.groupName);
+    const tournamentGroupName = normalizeComparableValue(tournament.groupName || tournament.group_name);
+
+    if (postGroupName && tournamentGroupName) {
+        return postGroupName === tournamentGroupName;
+    }
+
+    return true;
+};
+
+const doesAnnouncementKindMatch = (post: any, kind: 'upcoming' | 'started') => {
+    const postKind = post?.content?.announcementKind;
+
+    if (postKind) {
+        return postKind === kind;
+    }
+
+    return kind === 'started';
+};
+
+const getTournamentWinnerData = (tournament: Tournament) => {
+    const finalRound = tournament.rounds?.[tournament.rounds.length - 1];
+    const finalMatch = finalRound?.matches?.[0];
+
+    if (!finalMatch?.winnerId) {
+        return null;
+    }
+
+    const winner = finalMatch.player1?.id === finalMatch.winnerId
+        ? finalMatch.player1
+        : finalMatch.player2?.id === finalMatch.winnerId
+            ? finalMatch.player2
+            : null;
+
+    if (!winner?.name) {
+        return null;
+    }
+
+    return {
+        winnerName: winner.name,
+        winnerAvatar: winner.avatar || getAvatarFallbackUrl(winner.name, 'f59e0b'),
+    };
+};
+
+const buildTournamentAnnouncementContent = (tournament: Tournament, announcementKind: 'upcoming' | 'started', authorName: string, date: string) => ({
+    tournamentId: String(tournament.id),
+    announcementKind,
+    title: tournament.name,
+    groupName: tournament.groupName || tournament.group_name,
+    prizePool: tournament.prize_pool || tournament.prizePool,
+    date,
+    authorName,
+    groupId: tournament.target_group_id || tournament.targetGroupId,
+    status: tournament.status,
+    stageStatus: tournament.stageStatus || tournament.stage_status,
+    category: tournament.category,
+    tournamentType: tournament.tournament_type || tournament.tournamentType,
+    gender: tournament.gender,
+    ageGroup: tournament.age_group || tournament.ageGroup,
+    system: tournament.system,
+    matchFormat: tournament.match_format || tournament.matchFormat,
+    participantsCount: tournament.participants_count || tournament.participantsCount,
+    startDate: tournament.start_date || tournament.startDate,
+    endDate: tournament.end_date || tournament.endDate,
+    creatorRole: tournament.creator_role,
+});
+
+const buildUpcomingAdminTournamentAnnouncementPosts = (tournaments: Tournament[], posts: any[], user: User) => {
+    return tournaments
+        .filter((tournament) => isUpcomingAdminTournament(tournament))
+        .filter((tournament) => !posts.some((post) => post.type === 'tournament_announcement' && doesAnnouncementKindMatch(post, 'upcoming') && doesPostBelongToTournament(post, tournament)))
+        .map((tournament) => {
+            const announcementDate = (getTournamentStartDate(tournament) || new Date()).toISOString();
+            const authorName = getTournamentAnnouncementAuthorName(tournament);
+
+            return {
+                id: `derived-upcoming-tournament-announcement-${tournament.id}`,
+                type: 'tournament_announcement',
+                created_at: announcementDate,
+                liked_by_user: false,
+                likes_count: 0,
+                comments: [],
+                author: {
+                    id: tournament.userId || user.id,
+                    name: authorName,
+                    avatar: user.avatar,
+                    role: tournament.creator_role,
+                },
+                content: buildTournamentAnnouncementContent(tournament, 'upcoming', authorName, announcementDate),
+            };
+        });
+};
+
+const buildLiveTournamentAnnouncementPosts = (tournaments: Tournament[], posts: any[], user: User) => {
     return tournaments
         .filter((tournament) => isTournamentLive(tournament))
-        .filter((tournament) => {
-            const key = `${String(tournament.name || '').trim().toLowerCase()}::${String(tournament.target_group_id || tournament.targetGroupId || '').trim()}`;
-            return !existingAnnouncements.has(key);
-        })
+        .filter((tournament) => !posts.some((post) => post.type === 'tournament_announcement' && doesAnnouncementKindMatch(post, 'started') && doesPostBelongToTournament(post, tournament)))
         .map((tournament) => {
             const startDate = getTournamentStartDate(tournament);
             const authorName = getTournamentAnnouncementAuthorName(tournament);
@@ -66,13 +216,45 @@ const buildLiveTournamentAnnouncementPosts = (tournaments: Tournament[], posts: 
                     id: tournament.userId || user.id,
                     name: authorName,
                     avatar: user.avatar,
+                    role: tournament.creator_role,
+                },
+                content: buildTournamentAnnouncementContent(tournament, 'started', authorName, (startDate || new Date()).toISOString())
+            };
+        });
+};
+
+const buildFinishedTournamentResultPosts = (tournaments: Tournament[], posts: any[], user: User) => {
+    return tournaments
+        .filter((tournament) => isTournamentFinished(tournament))
+        .filter((tournament) => !posts.some((post) => post.type === 'tournament_result' && doesPostBelongToTournament(post, tournament)))
+        .map((tournament) => {
+            const endDate = getTournamentEndDate(tournament);
+            const authorLabel = getTournamentAnnouncementAuthorName(tournament);
+            const winnerData = getTournamentWinnerData(tournament);
+
+            return {
+                id: `derived-tournament-result-${tournament.id}`,
+                type: 'tournament_result',
+                created_at: (endDate || new Date()).toISOString(),
+                liked_by_user: false,
+                likes_count: 0,
+                comments: [],
+                author: {
+                    id: tournament.userId || user.id,
+                    name: authorLabel,
+                    avatar: user.avatar,
+                    role: tournament.creator_role,
                 },
                 content: {
-                    title: tournament.name,
+                    tournamentId: String(tournament.id),
+                    tournamentName: tournament.name,
                     groupName: tournament.groupName || tournament.group_name,
-                    prizePool: tournament.prize_pool || tournament.prizePool,
-                    date: (startDate || new Date()).toISOString(),
-                    authorName,
+                    winnerName: winnerData?.winnerName,
+                    winnerAvatar: winnerData?.winnerAvatar,
+                    authorLabel,
+                    note: winnerData?.winnerName
+                        ? 'Победитель определён по итогам турнирной сетки.'
+                        : 'Турнир завершён. Финальные результаты будут опубликованы после обновления данных.',
                     groupId: tournament.target_group_id || tournament.targetGroupId,
                 }
             };
@@ -85,6 +267,36 @@ const sortFeedItems = (items: any[]) => {
         const rightTime = new Date(right.created_at || 0).getTime();
         return rightTime - leftTime;
     });
+};
+
+const TournamentAnnouncementDetails = ({ content }: { content: any }) => {
+    const tournamentMeta = getTournamentMetaLabel(content?.prizePool);
+
+    return (
+        <div className="p-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <p className="text-slate-600"><strong>Группа:</strong> {content?.groupName || 'N/A'}</p>
+            <p className="text-slate-600"><strong>Статус:</strong> {getTournamentStatusLabel(content?.status)}</p>
+            <p className="text-slate-600 col-span-2"><strong>Категория:</strong> {content?.category || 'Не указана'}</p>
+            <p className="text-slate-600"><strong>Разряд:</strong> {content?.tournamentType || 'Не указан'}</p>
+            <p className="text-slate-600"><strong>Пол:</strong> {content?.gender || 'Не указан'}</p>
+            <p className="text-slate-600 col-span-2"><strong>Возраст:</strong> {content?.ageGroup || 'Не указана'}</p>
+            <p className="text-slate-600"><strong>Система:</strong> {content?.system || 'Не указана'}</p>
+            <p className="text-slate-600"><strong>Формат:</strong> {content?.matchFormat || 'Не указан'}</p>
+            <p className="text-slate-600 col-span-2"><strong>Участники:</strong> {content?.participantsCount || 'Не указано'}</p>
+            <p className="text-slate-600"><strong>Начало:</strong> {
+                content?.startDate && !isNaN(new Date(content.startDate).getTime())
+                    ? new Date(content.startDate).toLocaleDateString('ru-RU')
+                    : 'Не указана'
+            }</p>
+            <p className="text-slate-600"><strong>Окончание:</strong> {
+                content?.endDate && !isNaN(new Date(content.endDate).getTime())
+                    ? new Date(content.endDate).toLocaleDateString('ru-RU')
+                    : 'Не указана'
+            }</p>
+            <p className="text-slate-600 col-span-2"><strong>{tournamentMeta.label}:</strong> {tournamentMeta.value}</p>
+            {content?.stageStatus && <p className="text-slate-600 col-span-2"><strong>Этап:</strong> {content.stageStatus}</p>}
+        </div>
+    );
 };
 
 const getTournamentMetaLabel = (value?: string | null) => {
@@ -638,19 +850,24 @@ const MarketplacePost = ({ post, user, onStartConversation, onUpdate }: { post: 
     );
 };
 
-const TournamentAnnouncementPost = ({ post }: { post: any }) => (
-    <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-200">
+const TournamentAnnouncementPost = ({ post }: { post: any }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const isUpcoming = post.content?.announcementKind === 'upcoming';
+
+    return (
+    <>
+    <button onClick={() => setIsOpen(true)} className="bg-white p-6 rounded-2xl shadow-sm border border-blue-200 w-full text-left hover:shadow-md transition-shadow cursor-pointer">
         <div className="flex justify-between items-start mb-4">
             <div className="flex gap-3 items-center">
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                     <Trophy size={20} className="text-blue-500" />
                 </div>
                 <div>
-                    <p className="font-bold text-blue-600">Начался новый турнир!</p>
+                    <p className="font-bold text-blue-600">{isUpcoming ? 'Анонс турнира' : 'Начался новый турнир!'}</p>
                     <p className="text-xs text-slate-400">Опубликовал: {post.content.authorName || (post.author?.role === 'admin' ? 'Администрация' : post.author?.name) || 'Организатор'}</p>
                 </div>
             </div>
-            <div className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded">ТУРНИР</div>
+            <div className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded">{isUpcoming ? 'АНОНС' : 'ТУРНИР'}</div>
         </div>
         <h3 className="text-xl font-black text-slate-900 mb-2">{post.content.title}</h3>
         {(() => {
@@ -663,8 +880,14 @@ const TournamentAnnouncementPost = ({ post }: { post: any }) => (
         </div>
             );
         })()}
-    </div>
-);
+        <p className="text-xs text-blue-600 font-semibold mt-4">Нажмите, чтобы открыть детали турнира</p>
+    </button>
+    <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title={post.content?.title || 'Анонс турнира'}>
+        <TournamentAnnouncementDetails content={post.content} />
+    </Modal>
+    </>
+    );
+};
 
 // Результат матча в рамках турнира (публикует админ)
 const TournamentMatchResultPost = ({ post }: { post: any }) => {
@@ -757,6 +980,9 @@ const TournamentMatchResultPost = ({ post }: { post: any }) => {
 
 const TournamentResultPost = ({ post }: { post: any }) => {
     const authorLabel = post.content?.authorLabel || (post.author?.role === 'admin' ? 'Администрация' : post.author?.name);
+    const winnerName = post.content?.winnerName;
+    const winnerAvatar = post.content?.winnerAvatar || (winnerName ? getAvatarFallbackUrl(winnerName, 'f59e0b') : null);
+    const note = post.content?.note;
 
     return (
     <div className="bg-gradient-to-br from-amber-50 to-white p-4 rounded-2xl shadow-lg border-2 border-amber-200/80 relative overflow-hidden">
@@ -776,15 +1002,20 @@ const TournamentResultPost = ({ post }: { post: any }) => {
                 </div>
             </div>
             <div className="text-center my-4">
-                <p className="text-xs font-bold text-amber-800/80">Поздравляем победителя турнира</p>
+                <p className="text-xs font-bold text-amber-800/80">{winnerName ? 'Поздравляем победителя турнира' : 'Турнир завершён'}</p>
                 <h3 className="text-xl font-black text-slate-900 my-0.5">{post.content.tournamentName}</h3>
-                <div className="inline-flex items-center gap-2 mt-2 bg-white/50 px-3 py-1 rounded-full relative">
-                    <div className="relative">
-                        <img src={post.content.winnerAvatar} alt={post.content.winnerName} className="w-8 h-8 rounded-full" />
-                        <WinnerBadge />
+                {winnerName ? (
+                    <div className="inline-flex items-center gap-2 mt-2 bg-white/50 px-3 py-1 rounded-full relative">
+                        <div className="relative">
+                            <img src={winnerAvatar} alt={winnerName} className="w-8 h-8 rounded-full" onError={(event) => withAvatarFallback(event, winnerName, 'f59e0b')} />
+                            <WinnerBadge />
+                        </div>
+                        <span className="font-bold text-base text-slate-800">{winnerName}</span>
                     </div>
-                    <span className="font-bold text-base text-slate-800">{post.content.winnerName}</span>
-                </div>
+                ) : (
+                    <p className="text-sm text-amber-900 mt-2 font-semibold">Результаты финала скоро появятся в ленте.</p>
+                )}
+                {note && <p className="text-xs text-amber-700/80 mt-3">{note}</p>}
             </div>
         </div>
     </div>
@@ -1647,8 +1878,10 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated,
                 api.posts.getAll(user.id),
                 api.tournaments.getAll(user.id),
             ]);
+            const upcomingTournamentAnnouncements = buildUpcomingAdminTournamentAnnouncementPosts(tournaments, posts, user);
             const liveTournamentAnnouncements = buildLiveTournamentAnnouncementPosts(tournaments, posts, user);
-            setFeedItems(sortFeedItems([...posts, ...liveTournamentAnnouncements]));
+            const finishedTournamentResults = buildFinishedTournamentResultPosts(tournaments, posts, user);
+            setFeedItems(sortFeedItems([...posts, ...upcomingTournamentAnnouncements, ...liveTournamentAnnouncements, ...finishedTournamentResults]));
         } catch (error) {
             console.error("Failed to fetch feed", error);
         } finally {
