@@ -30,6 +30,14 @@ const getTournamentStartDate = (tournament: Tournament) => {
     return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
 };
 
+const getTournamentAnnouncementAuthorName = (tournament?: Partial<Tournament> | null, fallbackAuthorName?: string | null) => {
+    if (tournament?.creator_role === 'admin') {
+        return 'Администрация';
+    }
+
+    return (fallbackAuthorName || '').trim() || 'Организатор';
+};
+
 const buildLiveTournamentAnnouncementPosts = (tournaments: Tournament[], posts: any[], user: User) => {
     const existingAnnouncements = new Set(
         posts
@@ -45,6 +53,7 @@ const buildLiveTournamentAnnouncementPosts = (tournaments: Tournament[], posts: 
         })
         .map((tournament) => {
             const startDate = getTournamentStartDate(tournament);
+            const authorName = getTournamentAnnouncementAuthorName(tournament);
 
             return {
                 id: `derived-tournament-announcement-${tournament.id}`,
@@ -55,7 +64,7 @@ const buildLiveTournamentAnnouncementPosts = (tournaments: Tournament[], posts: 
                 comments: [],
                 author: {
                     id: tournament.userId || user.id,
-                    name: 'Система',
+                    name: authorName,
                     avatar: user.avatar,
                 },
                 content: {
@@ -63,7 +72,7 @@ const buildLiveTournamentAnnouncementPosts = (tournaments: Tournament[], posts: 
                     groupName: tournament.groupName || tournament.group_name,
                     prizePool: tournament.prize_pool || tournament.prizePool,
                     date: (startDate || new Date()).toISOString(),
-                    authorName: 'Система',
+                    authorName,
                     groupId: tournament.target_group_id || tournament.targetGroupId,
                 }
             };
@@ -638,7 +647,7 @@ const TournamentAnnouncementPost = ({ post }: { post: any }) => (
                 </div>
                 <div>
                     <p className="font-bold text-blue-600">Начался новый турнир!</p>
-                    <p className="text-xs text-slate-400">Опубликовал: {post.content.authorName}</p>
+                    <p className="text-xs text-slate-400">Опубликовал: {post.content.authorName || (post.author?.role === 'admin' ? 'Администрация' : post.author?.name) || 'Организатор'}</p>
                 </div>
             </div>
             <div className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded">ТУРНИР</div>

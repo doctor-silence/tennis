@@ -191,7 +191,7 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
                     groupName: returnedTournament.groupName,
                     prizePool: returnedTournament.prize_pool,
                     date: returnedTournament.start_date,
-                    authorName: user.name,
+                    authorName: user.role === 'admin' ? 'Администрация' : user.name,
                 }
             });
             onTournamentUpdate();
