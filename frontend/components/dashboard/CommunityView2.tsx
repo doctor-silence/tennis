@@ -274,7 +274,7 @@ const TournamentAnnouncementDetails = ({ content }: { content: any }) => {
 
     return (
         <div className="p-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <p className="text-slate-600"><strong>Группа:</strong> {content?.groupName || 'N/A'}</p>
+            <p className="text-slate-600"><strong>Группа:</strong> {content?.groupName || 'без группы'}</p>
             <p className="text-slate-600"><strong>Статус:</strong> {getTournamentStatusLabel(content?.status)}</p>
             <p className="text-slate-600 col-span-2"><strong>Категория:</strong> {content?.category || 'Не указана'}</p>
             <p className="text-slate-600"><strong>Разряд:</strong> {content?.tournamentType || 'Не указан'}</p>
@@ -1374,7 +1374,7 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
                 {selectedTournament && (
                     <>
                         <div className="p-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                            <p className="text-slate-600"><strong>Группа:</strong> {selectedTournament.groupName || 'N/A'}</p>
+                            <p className="text-slate-600"><strong>Группа:</strong> {selectedTournament.groupName || 'без группы'}</p>
                             <p className="text-slate-600"><strong>Статус:</strong> {
                                 selectedTournament.status === 'draft' ? 'Набор' :
                                 selectedTournament.status === 'open' ? 'Регистрация' :
