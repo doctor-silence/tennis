@@ -8,6 +8,76 @@ import Tooltip from '../Tooltip';
 import { MarketplaceItem, LadderPlayer, User, Group, Tournament } from '../../types';
 import { Modal } from '../Shared';
 
+const isTournamentLive = (tournament: Tournament) => {
+    const status = (tournament.status || '').toLowerCase();
+    const stageStatus = (tournament.stageStatus || tournament.stage_status || '').toLowerCase();
+
+    if (status === 'live') {
+        return true;
+    }
+
+    return ['live', 'в игре', 'идут', 'started', 'in progress', 'in_progress'].some((value) => stageStatus.includes(value));
+};
+
+const getTournamentStartDate = (tournament: Tournament) => {
+    const rawDate = tournament.start_date || tournament.startDate;
+
+    if (!rawDate) {
+        return null;
+    }
+
+    const parsedDate = new Date(rawDate);
+    return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+};
+
+const buildLiveTournamentAnnouncementPosts = (tournaments: Tournament[], posts: any[], user: User) => {
+    const existingAnnouncements = new Set(
+        posts
+            .filter((post) => post.type === 'tournament_announcement')
+            .map((post) => `${String(post.content?.title || '').trim().toLowerCase()}::${String(post.group_id || post.groupId || post.content?.groupId || '').trim()}`)
+    );
+
+    return tournaments
+        .filter((tournament) => isTournamentLive(tournament))
+        .filter((tournament) => {
+            const key = `${String(tournament.name || '').trim().toLowerCase()}::${String(tournament.target_group_id || tournament.targetGroupId || '').trim()}`;
+            return !existingAnnouncements.has(key);
+        })
+        .map((tournament) => {
+            const startDate = getTournamentStartDate(tournament);
+
+            return {
+                id: `derived-tournament-announcement-${tournament.id}`,
+                type: 'tournament_announcement',
+                created_at: (startDate || new Date()).toISOString(),
+                liked_by_user: false,
+                likes_count: 0,
+                comments: [],
+                author: {
+                    id: tournament.userId || user.id,
+                    name: 'Система',
+                    avatar: user.avatar,
+                },
+                content: {
+                    title: tournament.name,
+                    groupName: tournament.groupName || tournament.group_name,
+                    prizePool: tournament.prize_pool || tournament.prizePool,
+                    date: (startDate || new Date()).toISOString(),
+                    authorName: 'Система',
+                    groupId: tournament.target_group_id || tournament.targetGroupId,
+                }
+            };
+        });
+};
+
+const sortFeedItems = (items: any[]) => {
+    return [...items].sort((left, right) => {
+        const leftTime = new Date(left.created_at || 0).getTime();
+        const rightTime = new Date(right.created_at || 0).getTime();
+        return rightTime - leftTime;
+    });
+};
+
 const getTournamentMetaLabel = (value?: string | null) => {
     const normalizedValue = (value || '').trim();
 
@@ -1564,8 +1634,12 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated,
     const fetchFeed = async () => {
         try {
             setLoadingFeed(true);
-            const posts = await api.posts.getAll(user.id);
-            setFeedItems(posts);
+            const [posts, tournaments] = await Promise.all([
+                api.posts.getAll(user.id),
+                api.tournaments.getAll(user.id),
+            ]);
+            const liveTournamentAnnouncements = buildLiveTournamentAnnouncementPosts(tournaments, posts, user);
+            setFeedItems(sortFeedItems([...posts, ...liveTournamentAnnouncements]));
         } catch (error) {
             console.error("Failed to fetch feed", error);
         } finally {
