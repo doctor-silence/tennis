@@ -115,6 +115,66 @@ export interface PlayerProgressProfile {
   goal: PlayerProgressGoal;
 }
 
+export type WearableProvider = 'garmin' | 'samsung_watch';
+
+export type WearableConnectionStatus = 'disconnected' | 'pending' | 'connected' | 'bridge_required' | 'setup_required' | 'error';
+
+export interface WearableConnection {
+  provider: WearableProvider;
+  displayName: string;
+  status: WearableConnectionStatus;
+  externalUserId?: string | null;
+  connectedAt?: string | null;
+  lastSyncedAt?: string | null;
+  authConfigured?: boolean;
+  requiresMobileBridge?: boolean;
+  message?: string | null;
+  metadata?: Record<string, any>;
+}
+
+export interface WearableActivity {
+  id: number;
+  provider: WearableProvider;
+  externalActivityId: string;
+  activityType: string;
+  title?: string | null;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  durationSeconds?: number | null;
+  distanceKm?: number | null;
+  calories?: number | null;
+  averageHeartRate?: number | null;
+  maxHeartRate?: number | null;
+  steps?: number | null;
+  sourceDevice?: string | null;
+  metadata?: Record<string, any>;
+  createdAt?: string | null;
+}
+
+export interface WearableActivitySummary {
+  activityCount: number;
+  durationSeconds: number;
+  distanceKm: number;
+  calories: number;
+  latestActivityAt?: string | null;
+}
+
+export interface WearableActivitiesResponse {
+  activities: WearableActivity[];
+  summary: WearableActivitySummary;
+}
+
+export interface SamsungBridgeSetup {
+  success: boolean;
+  message: string;
+  bridgeToken: string;
+  bridgeTokenPreview: string;
+  expiresAt: string;
+  ingestUrl: string;
+  onboardingUrl: string;
+  qrCodeDataUrl: string;
+}
+
 export interface PlayerGoal {
     id: string;
     text: string;

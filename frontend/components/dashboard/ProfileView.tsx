@@ -2,9 +2,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { 
   MapPin, CheckCircle2, Activity, Zap, Trophy, Calendar, 
-    Loader2, Upload, Target, TrendingUp
+        Loader2, Upload, Target, TrendingUp, Watch, Link as LinkIcon, Unplug
 } from 'lucide-react';
-import { User, Match, Tournament, PlayerProgressGoal, PlayerProgressProfile, PlayerProgressSkills } from '../../types';
+import { User, Match, Tournament, PlayerProgressGoal, PlayerProgressProfile, PlayerProgressSkills, WearableConnection, WearableProvider, WearableActivity, WearableActivitySummary, SamsungBridgeSetup } from '../../types';
 import Button from '../Button';
 import { StatCard, Modal } from '../Shared';
 import { api, API_URL } from '../../services/api';
@@ -37,6 +37,23 @@ const clampSkillValue = (value: number) => Math.max(0, Math.min(100, Math.round(
 const resolveTournamentDate = (tournament: Tournament) => tournament.start_date || tournament.startDate || '';
 
 const resolveTournamentParticipants = (tournament: Tournament) => tournament.participants_count || tournament.participantsCount || 8;
+
+const formatWearableDuration = (durationSeconds?: number | null) => {
+    if (!durationSeconds) return '—';
+    const hours = Math.floor(durationSeconds / 3600);
+    const minutes = Math.round((durationSeconds % 3600) / 60);
+    if (hours > 0) return `${hours} ч ${minutes} мин`;
+    return `${minutes} мин`;
+};
+
+const formatWearableDate = (value?: string | null) => {
+    if (!value) return 'Дата не указана';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Дата не указана';
+    return date.toLocaleString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+};
+
+const getWearableProviderTitle = (provider: WearableProvider) => provider === 'garmin' ? 'Garmin' : 'Samsung Watch';
 
 const getYearEndDate = () => `${new Date().getFullYear()}-12-31`;
 
@@ -353,8 +370,10 @@ const RttMatchesWidget: React.FC<{ matches: any[]; loading: boolean; error: stri
 const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showTournamentsModal, setShowTournamentsModal] = useState(false);
+  const [showAppleWatchModal, setShowAppleWatchModal] = useState(false);
   const [showTrainingModal, setShowTrainingModal] = useState(false);
     const [showProgressModal, setShowProgressModal] = useState(false);
+    const [wearableModalProvider, setWearableModalProvider] = useState<WearableProvider | null>(null);
   const [isTrainingCompleted, setIsTrainingCompleted] = useState(false);
   const [currentTrainingIndex, setCurrentTrainingIndex] = useState(0);
   
@@ -364,6 +383,14 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
   const [rttMatchesError, setRttMatchesError] = useState<string | null>(null);
   const [syncingRtt, setSyncingRtt] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
+    const [wearableConnections, setWearableConnections] = useState<WearableConnection[]>([]);
+    const [wearablesLoading, setWearablesLoading] = useState(false);
+    const [wearablesMessage, setWearablesMessage] = useState<string | null>(null);
+    const [activeWearableProvider, setActiveWearableProvider] = useState<WearableProvider | null>(null);
+    const [wearableActivities, setWearableActivities] = useState<WearableActivity[]>([]);
+    const [wearableActivitySummary, setWearableActivitySummary] = useState<WearableActivitySummary>({ activityCount: 0, durationSeconds: 0, distanceKm: 0, calories: 0, latestActivityAt: null });
+    const [wearableActivitiesLoading, setWearableActivitiesLoading] = useState(false);
+    const [latestSamsungBridge, setLatestSamsungBridge] = useState<SamsungBridgeSetup | null>(null);
 
   const isRttProfile = Boolean(user.rni);
   const profileMatchesCount = isRttProfile
@@ -443,6 +470,61 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
         }
     };
     fetchTournaments();
+  }, [user.id]);
+
+  useEffect(() => {
+      let isCancelled = false;
+
+      const loadWearables = async () => {
+          setWearablesLoading(true);
+          setWearableActivitiesLoading(true);
+          try {
+              const [list, activityData] = await Promise.all([
+                  api.wearables.list(String(user.id)),
+                  api.wearables.listActivities(String(user.id), { limit: 6 })
+              ]);
+              if (!isCancelled) {
+                  setWearableConnections(list);
+                  setWearableActivities(activityData.activities || []);
+                  setWearableActivitySummary(activityData.summary);
+              }
+          } catch (error: any) {
+              if (!isCancelled) {
+                  setWearablesMessage(error.message || 'Не удалось загрузить подключения часов');
+              }
+          } finally {
+              if (!isCancelled) {
+                  setWearablesLoading(false);
+                  setWearableActivitiesLoading(false);
+              }
+          }
+      };
+
+      loadWearables();
+      return () => {
+          isCancelled = true;
+      };
+  }, [user.id]);
+
+  useEffect(() => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('integration') !== 'garmin') return;
+
+      const status = params.get('status');
+      const message = params.get('message');
+      setWearablesMessage(status === 'success' ? 'Garmin успешно подключён.' : (message || 'Ошибка подключения Garmin'));
+
+      api.wearables.list(String(user.id))
+          .then((list) => setWearableConnections(list))
+          .catch(() => undefined);
+
+      const nextParams = new URLSearchParams(window.location.search);
+      nextParams.delete('integration');
+      nextParams.delete('status');
+      nextParams.delete('message');
+      const nextQuery = nextParams.toString();
+      const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash}`;
+      window.history.replaceState({}, document.title, nextUrl);
   }, [user.id]);
 
   useEffect(() => {
@@ -725,6 +807,102 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
           ? 'Подсказка: фразы вроде «топ-50 РТТ» или «150 очков» автоматически обновляют расчёт.'
           : 'Подсказка: для любителя цель лучше формулировать через стабильность, победы и регулярность выступлений.';
   }, [isRttPlayer, playerProgress.goal.title, pointsLabel]);
+
+  const wearableConnectionMap = useMemo(
+      () => new Map(wearableConnections.map((connection) => [connection.provider, connection])),
+      [wearableConnections]
+  );
+  const garminConnection = wearableConnectionMap.get('garmin');
+  const samsungConnection = wearableConnectionMap.get('samsung_watch');
+    const activeWearableConnection = wearableModalProvider ? wearableConnectionMap.get(wearableModalProvider) : null;
+    const activeWearableTitle = wearableModalProvider ? getWearableProviderTitle(wearableModalProvider) : '';
+    const activeWearableBusy = wearableModalProvider ? activeWearableProvider === wearableModalProvider : false;
+    const activeWearableStatus = activeWearableConnection?.status || 'disconnected';
+    const activeBridgeTokenPreview = activeWearableConnection?.metadata?.bridgeTokenPreview || latestSamsungBridge?.bridgeTokenPreview;
+    const activeBridgeIngestUrl = activeWearableConnection?.metadata?.bridgeIngestUrl || latestSamsungBridge?.ingestUrl;
+    const activeBridgeTokenExpiresAt = activeWearableConnection?.metadata?.bridgeTokenExpiresAt || latestSamsungBridge?.expiresAt;
+    const activeBridgeToken = wearableModalProvider === 'samsung_watch' ? latestSamsungBridge?.bridgeToken : null;
+    const activeBridgeQrCode = wearableModalProvider === 'samsung_watch' ? latestSamsungBridge?.qrCodeDataUrl : null;
+    const activeOnboardingUrl = wearableModalProvider === 'samsung_watch' ? latestSamsungBridge?.onboardingUrl : null;
+
+  const reloadWearables = async () => {
+      const [list, activityData] = await Promise.all([
+          api.wearables.list(String(user.id)),
+          api.wearables.listActivities(String(user.id), { limit: 6 })
+      ]);
+      setWearableConnections(list);
+      setWearableActivities(activityData.activities || []);
+      setWearableActivitySummary(activityData.summary);
+  };
+
+  const handleGarminConnect = async () => {
+      setActiveWearableProvider('garmin');
+      setWearablesMessage(null);
+      try {
+          const { authUrl } = await api.wearables.startGarmin(String(user.id));
+          await reloadWearables();
+          window.location.href = authUrl;
+      } catch (error: any) {
+          setWearablesMessage(error.message || 'Не удалось начать подключение Garmin');
+          await reloadWearables();
+      } finally {
+          setActiveWearableProvider(null);
+      }
+  };
+
+  const handleSamsungConnect = async () => {
+      setActiveWearableProvider('samsung_watch');
+      setWearablesMessage(null);
+      try {
+          const response = await api.wearables.startSamsungWatch(String(user.id));
+          setWearablesMessage(response.message);
+          setLatestSamsungBridge(response);
+          await reloadWearables();
+      } catch (error: any) {
+          setWearablesMessage(error.message || 'Не удалось зарегистрировать Samsung Watch');
+      } finally {
+          setActiveWearableProvider(null);
+      }
+  };
+
+  const handleGarminSync = async () => {
+      setActiveWearableProvider('garmin');
+      setWearablesMessage(null);
+      try {
+          const response = await api.wearables.syncGarmin(String(user.id), { days: 30, limit: 25 });
+          setWearablesMessage(response.message);
+          await reloadWearables();
+      } catch (error: any) {
+          setWearablesMessage(error.message || 'Не удалось синхронизировать Garmin');
+      } finally {
+          setActiveWearableProvider(null);
+      }
+  };
+
+  const handleWearableDisconnect = async (provider: WearableProvider) => {
+      setActiveWearableProvider(provider);
+      setWearablesMessage(null);
+      try {
+          await api.wearables.disconnect(String(user.id), provider);
+          if (provider === 'samsung_watch') {
+              setLatestSamsungBridge(null);
+          }
+          await reloadWearables();
+      } catch (error: any) {
+          setWearablesMessage(error.message || 'Не удалось отключить устройство');
+      } finally {
+          setActiveWearableProvider(null);
+      }
+  };
+
+  const openWearableModal = (provider: WearableProvider) => {
+      setWearablesMessage(null);
+      setWearableModalProvider(provider);
+  };
+
+  const closeWearableModal = () => {
+      setWearableModalProvider(null);
+  };
 
   const playerProgressContent = (
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -1090,6 +1268,128 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
             <h3 className="font-bold mb-4 flex items-center gap-2"><Trophy className="text-amber-500" size={18}/> Ближайшие турниры</h3>
             <NearbyTournamentsWidget userId={user.id} city={user.city} />
         </div>
+
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
+            <div className="flex items-start justify-between gap-3 mb-4">
+                <div>
+                    <h3 className="font-bold flex items-center gap-2"><Watch className="text-slate-900" size={18} /> Мои устройства</h3>
+                </div>
+                {wearablesLoading && <Loader2 className="animate-spin text-slate-300" size={18} />}
+            </div>
+
+            <div className="space-y-3">
+                {[
+                    {
+                        provider: 'garmin' as WearableProvider,
+                        connection: garminConnection,
+                        title: 'Garmin',
+                    },
+                    {
+                        provider: 'samsung_watch' as WearableProvider,
+                        connection: samsungConnection,
+                        title: 'Samsung Watch',
+                    }
+                ].map(({ provider, connection, title }) => {
+                    const status = connection?.status || 'disconnected';
+                    const isBusy = activeWearableProvider === provider;
+                    const isConnected = status === 'connected';
+
+                    return (
+                        <div key={provider} className="rounded-2xl border border-slate-200 p-4 bg-slate-50">
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="font-bold text-slate-900">{title}</div>
+                                <Button
+                                    size="sm"
+                                    variant={isConnected ? 'outline' : 'secondary'}
+                                    onClick={() => openWearableModal(provider)}
+                                    disabled={isBusy}
+                                    className="shrink-0"
+                                >
+                                    {isBusy ? <Loader2 size={14} className="animate-spin mr-1.5" /> : <LinkIcon size={14} className="mr-1.5" />}
+                                    Подключить
+                                </Button>
+                            </div>
+                        </div>
+                    );
+                })}
+
+                {/* Apple Watch — в разработке */}
+                <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="font-bold text-slate-900">Apple Watch</div>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setShowAppleWatchModal(true)}
+                            className="shrink-0"
+                        >
+                            <LinkIcon size={14} className="mr-1.5" />
+                            Подключить
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
+            <div className="flex items-start justify-between gap-3 mb-4">
+                <div>
+                    <h3 className="font-bold flex items-center gap-2"><Activity className="text-lime-600" size={18} /> Активность с устройств</h3>
+                    <p className="text-sm text-slate-500 mt-1">Последние сессии и суммарная нагрузка за 30 дней.</p>
+                </div>
+                {wearableActivitiesLoading && <Loader2 className="animate-spin text-slate-300" size={18} />}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3">
+                    <div className="text-xs uppercase tracking-wider text-slate-400">Сессий</div>
+                    <div className="text-xl font-bold text-slate-900 mt-1">{wearableActivitySummary.activityCount}</div>
+                </div>
+                <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3">
+                    <div className="text-xs uppercase tracking-wider text-slate-400">Время</div>
+                    <div className="text-xl font-bold text-slate-900 mt-1">{formatWearableDuration(wearableActivitySummary.durationSeconds)}</div>
+                </div>
+                <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3">
+                    <div className="text-xs uppercase tracking-wider text-slate-400">Дистанция</div>
+                    <div className="text-xl font-bold text-slate-900 mt-1">{Number(wearableActivitySummary.distanceKm || 0).toFixed(1)} км</div>
+                </div>
+                <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3">
+                    <div className="text-xs uppercase tracking-wider text-slate-400">Калории</div>
+                    <div className="text-xl font-bold text-slate-900 mt-1">{wearableActivitySummary.calories}</div>
+                </div>
+            </div>
+
+            <div className="space-y-3">
+                {wearableActivities.map((activity) => (
+                    <div key={`${activity.provider}-${activity.externalActivityId}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                            <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <div className="font-bold text-slate-900">{activity.title || activity.activityType}</div>
+                                    <span className="rounded-full bg-white px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-500 border border-slate-200">
+                                        {getWearableProviderTitle(activity.provider)}
+                                    </span>
+                                </div>
+                                <div className="text-xs text-slate-500 mt-1">{formatWearableDate(activity.startedAt)}</div>
+                                <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
+                                    <span className="rounded-full bg-white px-2 py-1 border border-slate-200">{formatWearableDuration(activity.durationSeconds)}</span>
+                                    {activity.distanceKm !== null && activity.distanceKm !== undefined && <span className="rounded-full bg-white px-2 py-1 border border-slate-200">{activity.distanceKm.toFixed(1)} км</span>}
+                                    {activity.calories !== null && activity.calories !== undefined && <span className="rounded-full bg-white px-2 py-1 border border-slate-200">{activity.calories} ккал</span>}
+                                    {activity.averageHeartRate !== null && activity.averageHeartRate !== undefined && <span className="rounded-full bg-white px-2 py-1 border border-slate-200">пульс {activity.averageHeartRate}</span>}
+                                </div>
+                            </div>
+                            {activity.sourceDevice && <div className="text-right text-xs text-slate-400">{activity.sourceDevice}</div>}
+                        </div>
+                    </div>
+                ))}
+
+                {wearableActivities.length === 0 && (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                        После запуска мобильного приложения здесь появятся импортированные активности с часов и сводка по нагрузке.
+                    </div>
+                )}
+            </div>
+        </div>
       </div>
     </div>
     <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Редактировать профиль">
@@ -1263,6 +1563,50 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
                     </div>
                 </div>
                 {playerProgressContent}
+            </div>
+        )}
+    </Modal>
+
+    <Modal isOpen={showAppleWatchModal} onClose={() => setShowAppleWatchModal(false)} title="Apple Watch" maxWidth="max-w-md">
+        <div className="space-y-4">
+            <div className="flex flex-col items-center gap-3 py-4">
+                <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-3xl">⌚</div>
+                <div className="text-center">
+                    <div className="font-bold text-slate-900 text-lg">Функционал в разработке</div>
+                    <p className="text-sm text-slate-500 mt-1">Интеграция с Apple Watch появится вместе с мобильным приложением.</p>
+                </div>
+            </div>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Мы уже готовим поддержку Apple Watch. После релиза мобильного приложения данные о тренировках, пульсе и нагрузке будут синхронизироваться автоматически.
+            </div>
+            <button
+                onClick={() => setShowAppleWatchModal(false)}
+                className="w-full py-2.5 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-700 transition-colors"
+            >
+                Понятно
+            </button>
+        </div>
+    </Modal>
+
+    <Modal isOpen={Boolean(wearableModalProvider)} onClose={closeWearableModal} title={activeWearableTitle} maxWidth="max-w-md">
+        {wearableModalProvider && (
+            <div className="space-y-4">
+                <div className="flex flex-col items-center gap-3 py-4">
+                    <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-3xl">⌚</div>
+                    <div className="text-center">
+                        <div className="font-bold text-slate-900 text-lg">Функционал в разработке</div>
+                        <p className="text-sm text-slate-500 mt-1">Интеграция с {activeWearableTitle} появится вместе с мобильным приложением.</p>
+                    </div>
+                </div>
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    Мы уже готовим поддержку {activeWearableTitle}. После релиза мобильного приложения данные о тренировках, пульсе и нагрузке будут синхронизироваться автоматически.
+                </div>
+                <button
+                    onClick={closeWearableModal}
+                    className="w-full py-2.5 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-700 transition-colors"
+                >
+                    Понятно
+                </button>
             </div>
         )}
     </Modal>

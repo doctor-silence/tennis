@@ -12,6 +12,7 @@ const rttParser = require('./rttParser');
 const speakeasy = require('speakeasy');
 const QRCode = require('qrcode');
 const v8 = require('v8');
+const crypto = require('crypto');
 
 const app = express();
 const server = http.createServer(app);
@@ -712,6 +713,457 @@ const ensurePlayerProgressTable = async () => {
             updated_at TIMESTAMPTZ DEFAULT NOW()
         )
     `);
+};
+
+const WEARABLE_PROVIDER_LABELS = {
+    garmin: 'Garmin',
+    samsung_watch: 'Samsung Watch'
+};
+
+const WEARABLE_ALLOWED_PROVIDERS = Object.keys(WEARABLE_PROVIDER_LABELS);
+
+const ensureWearableConnectionsTable = async () => {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS wearable_connections (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            provider VARCHAR(50) NOT NULL,
+            status VARCHAR(50) NOT NULL DEFAULT 'disconnected',
+            external_user_id VARCHAR(255),
+            access_token TEXT,
+            refresh_token TEXT,
+            token_expires_at TIMESTAMPTZ,
+            metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+            last_synced_at TIMESTAMPTZ,
+            connected_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE (user_id, provider)
+        )
+    `);
+};
+
+const ensureWearableActivitiesTable = async () => {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS wearable_activities (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            provider VARCHAR(50) NOT NULL,
+            external_activity_id VARCHAR(255) NOT NULL,
+            activity_type VARCHAR(100) NOT NULL DEFAULT 'workout',
+            title VARCHAR(255),
+            started_at TIMESTAMPTZ,
+            ended_at TIMESTAMPTZ,
+            duration_seconds INTEGER,
+            distance_km NUMERIC(10, 2),
+            calories INTEGER,
+            average_heart_rate INTEGER,
+            max_heart_rate INTEGER,
+            steps INTEGER,
+            source_device VARCHAR(255),
+            metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE (user_id, provider, external_activity_id)
+        )
+    `);
+};
+
+const getFrontendBaseUrl = () => process.env.FRONTEND_URL || 'http://localhost:5173';
+
+const getPublicApiBaseUrl = (req) => {
+    const configuredBase = process.env.PUBLIC_API_URL || process.env.BACKEND_PUBLIC_URL;
+    if (configuredBase) {
+        return configuredBase.replace(/\/$/, '');
+    }
+
+    return `${req.protocol}://${req.get('host')}/api`;
+};
+
+const isGarminOAuthConfigured = () => Boolean(
+    process.env.GARMIN_CLIENT_ID &&
+    process.env.GARMIN_CLIENT_SECRET &&
+    process.env.GARMIN_OAUTH_AUTHORIZE_URL &&
+    process.env.GARMIN_OAUTH_TOKEN_URL &&
+    process.env.GARMIN_OAUTH_CALLBACK_URL
+);
+
+const isGarminActivitySyncConfigured = () => Boolean(process.env.GARMIN_ACTIVITIES_URL);
+
+const sanitizeWearableMetadata = (metadata = {}) => {
+    const safeMetadata = {};
+
+    if (typeof metadata.message === 'string' && metadata.message.trim()) {
+        safeMetadata.message = metadata.message;
+    }
+    if (typeof metadata.bridgeTokenPreview === 'string' && metadata.bridgeTokenPreview.trim()) {
+        safeMetadata.bridgeTokenPreview = metadata.bridgeTokenPreview;
+    }
+    if (typeof metadata.bridgeTokenExpiresAt === 'string' && metadata.bridgeTokenExpiresAt.trim()) {
+        safeMetadata.bridgeTokenExpiresAt = metadata.bridgeTokenExpiresAt;
+    }
+    if (typeof metadata.bridgeIngestUrl === 'string' && metadata.bridgeIngestUrl.trim()) {
+        safeMetadata.bridgeIngestUrl = metadata.bridgeIngestUrl;
+    }
+    if (metadata.lastSyncResult && typeof metadata.lastSyncResult === 'object') {
+        safeMetadata.lastSyncResult = metadata.lastSyncResult;
+    }
+
+    return safeMetadata;
+};
+
+const normalizeWearableConnectionRow = (row, overrides = {}) => {
+    const safeMetadata = sanitizeWearableMetadata(row.metadata || {});
+
+    return {
+        provider: row.provider,
+        displayName: WEARABLE_PROVIDER_LABELS[row.provider] || row.provider,
+        status: row.status || 'disconnected',
+        externalUserId: row.external_user_id || null,
+        connectedAt: row.connected_at ? new Date(row.connected_at).toISOString() : null,
+        lastSyncedAt: row.last_synced_at ? new Date(row.last_synced_at).toISOString() : null,
+        authConfigured: row.provider === 'garmin' ? isGarminOAuthConfigured() : false,
+        requiresMobileBridge: row.provider === 'samsung_watch',
+        message: safeMetadata.message || null,
+        metadata: safeMetadata,
+        ...overrides
+    };
+};
+
+const clampInteger = (value, minimum, maximum, fallback) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return fallback;
+    return Math.min(maximum, Math.max(minimum, Math.round(numeric)));
+};
+
+const parseOptionalPositiveNumber = (value) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 0) return null;
+    return numeric;
+};
+
+const parseOptionalDate = (value) => {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return date;
+};
+
+const normalizeWearableActivityType = (value) => {
+    const source = String(value || 'workout').trim().toLowerCase();
+
+    if (source.includes('tennis')) return 'tennis';
+    if (source.includes('run')) return 'running';
+    if (source.includes('walk')) return 'walking';
+    if (source.includes('ride') || source.includes('bike') || source.includes('cycle')) return 'cycling';
+    if (source.includes('strength')) return 'strength';
+    if (source.includes('swim')) return 'swimming';
+    if (source.includes('cardio')) return 'cardio';
+
+    return source || 'workout';
+};
+
+const buildWearableSecretHash = (value) => crypto.createHash('sha256').update(String(value || '')).digest('hex');
+
+const createWearableBridgeToken = () => crypto.randomBytes(24).toString('hex');
+
+const maskWearableBridgeToken = (token) => `${token.slice(0, 6)}…${token.slice(-4)}`;
+
+const buildSamsungBridgeOnboardingUrl = (req, { bridgeToken, bridgeIngestUrl, bridgeTokenExpiresAt }) => {
+    const onboardingUrl = new URL(`${getPublicApiBaseUrl(req)}/integrations/samsung-watch/onboard`);
+    onboardingUrl.searchParams.set('token', bridgeToken);
+    onboardingUrl.searchParams.set('ingestUrl', bridgeIngestUrl);
+    onboardingUrl.searchParams.set('expiresAt', bridgeTokenExpiresAt);
+    return onboardingUrl.toString();
+};
+
+const extractActivitiesFromPayload = (payload) => {
+    if (!payload) return [];
+    if (Array.isArray(payload)) return payload;
+
+    const candidates = [
+        payload.activities,
+        payload.items,
+        payload.data,
+        payload.data?.activities,
+        payload.data?.items,
+        payload.summaries,
+        payload.results,
+    ];
+
+    for (const candidate of candidates) {
+        if (Array.isArray(candidate)) return candidate;
+    }
+
+    return [];
+};
+
+const normalizeWearableActivityPayload = (provider, rawActivity = {}) => {
+    const startedAt = parseOptionalDate(
+        rawActivity.startedAt ||
+        rawActivity.startTime ||
+        rawActivity.start_time ||
+        rawActivity.startDate ||
+        rawActivity.start_date ||
+        rawActivity.beginTime ||
+        rawActivity.beginTimestamp
+    );
+    const durationSeconds = parseOptionalPositiveNumber(
+        rawActivity.durationSeconds ??
+        rawActivity.duration ??
+        rawActivity.durationInSeconds ??
+        rawActivity.elapsedDuration ??
+        rawActivity.movingDuration
+    );
+    const endedAt = parseOptionalDate(
+        rawActivity.endedAt ||
+        rawActivity.endTime ||
+        rawActivity.end_time ||
+        rawActivity.endDate ||
+        rawActivity.end_date
+    ) || (startedAt && durationSeconds !== null ? new Date(startedAt.getTime() + durationSeconds * 1000) : null);
+
+    const rawDistance = parseOptionalPositiveNumber(
+        rawActivity.distanceKm ??
+        rawActivity.distance_km ??
+        rawActivity.distanceInKm ??
+        rawActivity.distance ??
+        rawActivity.distanceMeters ??
+        rawActivity.distanceInMeters
+    );
+    const distanceKm = rawDistance === null
+        ? null
+        : rawDistance > 100
+            ? Number((rawDistance / 1000).toFixed(2))
+            : Number(rawDistance.toFixed(2));
+
+    const title = String(rawActivity.title || rawActivity.name || rawActivity.activityName || rawActivity.summary || '').trim();
+    const activityType = normalizeWearableActivityType(
+        rawActivity.activityType ||
+        rawActivity.activity_type ||
+        rawActivity.type ||
+        rawActivity.typeKey ||
+        rawActivity.sport ||
+        rawActivity.sportType
+    );
+
+    const externalActivityId = String(
+        rawActivity.externalActivityId ||
+        rawActivity.activityId ||
+        rawActivity.activity_id ||
+        rawActivity.id ||
+        rawActivity.uuid ||
+        buildWearableSecretHash([
+            provider,
+            startedAt ? startedAt.toISOString() : 'no-start',
+            durationSeconds ?? 'no-duration',
+            distanceKm ?? 'no-distance',
+            title || activityType,
+        ].join('|')).slice(0, 32)
+    );
+
+    return {
+        provider,
+        externalActivityId,
+        activityType,
+        title: title || null,
+        startedAt,
+        endedAt,
+        durationSeconds: durationSeconds === null ? null : Math.round(durationSeconds),
+        distanceKm,
+        calories: parseOptionalPositiveNumber(rawActivity.calories ?? rawActivity.kilocalories ?? rawActivity.activeKilocalories),
+        averageHeartRate: parseOptionalPositiveNumber(rawActivity.averageHeartRate ?? rawActivity.avgHeartRate ?? rawActivity.heartRateAverage),
+        maxHeartRate: parseOptionalPositiveNumber(rawActivity.maxHeartRate ?? rawActivity.heartRateMax),
+        steps: parseOptionalPositiveNumber(rawActivity.steps ?? rawActivity.stepCount),
+        sourceDevice: String(rawActivity.deviceName || rawActivity.sourceDevice || rawActivity.device || '').trim() || null,
+        metadata: {
+            sourceType: rawActivity.activityType || rawActivity.type || rawActivity.sport || null,
+            providerPayloadVersion: rawActivity.payloadVersion || null,
+        }
+    };
+};
+
+const normalizeWearableActivityRow = (row) => ({
+    id: row.id,
+    provider: row.provider,
+    externalActivityId: row.external_activity_id,
+    activityType: row.activity_type,
+    title: row.title || null,
+    startedAt: row.started_at ? new Date(row.started_at).toISOString() : null,
+    endedAt: row.ended_at ? new Date(row.ended_at).toISOString() : null,
+    durationSeconds: row.duration_seconds === null ? null : Number(row.duration_seconds),
+    distanceKm: row.distance_km === null ? null : Number(row.distance_km),
+    calories: row.calories === null ? null : Number(row.calories),
+    averageHeartRate: row.average_heart_rate === null ? null : Number(row.average_heart_rate),
+    maxHeartRate: row.max_heart_rate === null ? null : Number(row.max_heart_rate),
+    steps: row.steps === null ? null : Number(row.steps),
+    sourceDevice: row.source_device || null,
+    metadata: row.metadata || {},
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
+});
+
+const saveWearableActivities = async (userId, provider, activities = []) => {
+    if (!activities.length) return 0;
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        for (const activity of activities) {
+            await client.query(
+                `INSERT INTO wearable_activities (
+                    user_id,
+                    provider,
+                    external_activity_id,
+                    activity_type,
+                    title,
+                    started_at,
+                    ended_at,
+                    duration_seconds,
+                    distance_km,
+                    calories,
+                    average_heart_rate,
+                    max_heart_rate,
+                    steps,
+                    source_device,
+                    metadata,
+                    updated_at
+                )
+                VALUES (
+                    $1, $2, $3, $4, $5, $6, $7, $8,
+                    $9, $10, $11, $12, $13, $14, $15::jsonb, NOW()
+                )
+                ON CONFLICT (user_id, provider, external_activity_id)
+                DO UPDATE SET
+                    activity_type = EXCLUDED.activity_type,
+                    title = EXCLUDED.title,
+                    started_at = EXCLUDED.started_at,
+                    ended_at = EXCLUDED.ended_at,
+                    duration_seconds = EXCLUDED.duration_seconds,
+                    distance_km = EXCLUDED.distance_km,
+                    calories = EXCLUDED.calories,
+                    average_heart_rate = EXCLUDED.average_heart_rate,
+                    max_heart_rate = EXCLUDED.max_heart_rate,
+                    steps = EXCLUDED.steps,
+                    source_device = EXCLUDED.source_device,
+                    metadata = EXCLUDED.metadata,
+                    updated_at = NOW()`,
+                [
+                    userId,
+                    provider,
+                    activity.externalActivityId,
+                    activity.activityType,
+                    activity.title,
+                    activity.startedAt,
+                    activity.endedAt,
+                    activity.durationSeconds,
+                    activity.distanceKm,
+                    activity.calories,
+                    activity.averageHeartRate,
+                    activity.maxHeartRate,
+                    activity.steps,
+                    activity.sourceDevice,
+                    JSON.stringify(activity.metadata || {})
+                ]
+            );
+        }
+        await client.query('COMMIT');
+        return activities.length;
+    } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+    } finally {
+        client.release();
+    }
+};
+
+const refreshGarminAccessToken = async (connectionRow) => {
+    if (!connectionRow?.refresh_token) {
+        return connectionRow;
+    }
+
+    const tokenResponse = await fetch(process.env.GARMIN_OAUTH_TOKEN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: connectionRow.refresh_token,
+            client_id: process.env.GARMIN_CLIENT_ID,
+            client_secret: process.env.GARMIN_CLIENT_SECRET,
+        }),
+    });
+
+    const tokenPayload = await tokenResponse.json().catch(() => ({}));
+    if (!tokenResponse.ok || !tokenPayload.access_token) {
+        throw new Error(tokenPayload.error_description || tokenPayload.error || 'Garmin token refresh failed');
+    }
+
+    const expiresInSeconds = Number(tokenPayload.expires_in || 0);
+    const tokenExpiry = expiresInSeconds > 0 ? new Date(Date.now() + expiresInSeconds * 1000) : null;
+
+    await pool.query(
+        `UPDATE wearable_connections
+         SET access_token = $2,
+             refresh_token = COALESCE($3, refresh_token),
+             token_expires_at = $4,
+             metadata = $5::jsonb,
+             updated_at = NOW()
+         WHERE id = $1`,
+        [
+            connectionRow.id,
+            tokenPayload.access_token,
+            tokenPayload.refresh_token || null,
+            tokenExpiry,
+            JSON.stringify({ ...(connectionRow.metadata || {}), message: 'Garmin токен обновлён.' })
+        ]
+    );
+
+    return {
+        ...connectionRow,
+        access_token: tokenPayload.access_token,
+        refresh_token: tokenPayload.refresh_token || connectionRow.refresh_token,
+        token_expires_at: tokenExpiry,
+        metadata: { ...(connectionRow.metadata || {}), message: 'Garmin токен обновлён.' }
+    };
+};
+
+const ensureGarminAccessToken = async (connectionRow) => {
+    const expiresAt = connectionRow?.token_expires_at ? new Date(connectionRow.token_expires_at) : null;
+    const shouldRefresh = !connectionRow?.access_token || (expiresAt && expiresAt.getTime() <= Date.now() + 60 * 1000);
+
+    if (!shouldRefresh) {
+        return connectionRow;
+    }
+
+    return refreshGarminAccessToken(connectionRow);
+};
+
+const buildWearableConnectionsResponse = (rows = []) => {
+    const byProvider = new Map(rows.map((row) => [row.provider, row]));
+
+    return WEARABLE_ALLOWED_PROVIDERS.map((provider) => {
+        const row = byProvider.get(provider);
+        if (row) return normalizeWearableConnectionRow(row);
+
+        return normalizeWearableConnectionRow(
+            { provider, status: 'disconnected', metadata: {} },
+            {
+                authConfigured: provider === 'garmin' ? isGarminOAuthConfigured() : false,
+                requiresMobileBridge: provider === 'samsung_watch',
+                message: provider === 'samsung_watch'
+                    ? 'Для Samsung Watch нужен мобильный bridge через Samsung Health / Android.'
+                    : (isGarminOAuthConfigured() ? null : 'Garmin OAuth ещё не настроен на сервере.')
+            }
+        );
+    });
+};
+
+const requireSelfAccess = (req, res) => {
+    const requestUserId = req.headers['x-user-id'];
+    if (!requestUserId || String(requestUserId) !== String(req.params.id)) {
+        res.status(403).json({ error: 'Forbidden' });
+        return false;
+    }
+    return true;
 };
 
 const clampProgressMetric = (value) => {
@@ -1819,6 +2271,501 @@ app.put('/api/users/:id/profile', async (req, res) => {
         res.status(500).json({ error: err.message });
     } finally {
         client.release();
+    }
+});
+
+app.get('/api/users/:id/wearables', async (req, res) => {
+    if (!requireSelfAccess(req, res)) return;
+
+    try {
+        const result = await pool.query(
+            `SELECT provider, status, external_user_id, connected_at, last_synced_at, metadata
+             FROM wearable_connections
+             WHERE user_id = $1`,
+            [req.params.id]
+        );
+
+        res.json(buildWearableConnectionsResponse(result.rows));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/users/:id/wearables/activities', async (req, res) => {
+    if (!requireSelfAccess(req, res)) return;
+
+    const limit = clampInteger(req.query.limit, 1, 50, 12);
+    const provider = req.query.provider ? String(req.query.provider) : null;
+
+    if (provider && !WEARABLE_ALLOWED_PROVIDERS.includes(provider)) {
+        return res.status(400).json({ error: 'Unsupported wearable provider' });
+    }
+
+    try {
+        const activityResult = await pool.query(
+            `SELECT id, provider, external_activity_id, activity_type, title, started_at, ended_at,
+                    duration_seconds, distance_km, calories, average_heart_rate, max_heart_rate,
+                    steps, source_device, metadata, created_at
+             FROM wearable_activities
+             WHERE user_id = $1
+               AND ($2::text IS NULL OR provider = $2)
+             ORDER BY COALESCE(started_at, created_at) DESC
+             LIMIT $3`,
+            [req.params.id, provider, limit]
+        );
+
+        const summaryResult = await pool.query(
+            `SELECT COUNT(*)::int AS activity_count,
+                    COALESCE(SUM(duration_seconds), 0)::int AS duration_seconds,
+                    COALESCE(SUM(distance_km), 0)::numeric AS distance_km,
+                    COALESCE(SUM(calories), 0)::int AS calories,
+                    COALESCE(MAX(COALESCE(started_at, created_at)), NULL) AS latest_activity_at
+             FROM wearable_activities
+             WHERE user_id = $1
+               AND ($2::text IS NULL OR provider = $2)
+               AND COALESCE(started_at, created_at) >= NOW() - INTERVAL '30 days'`,
+            [req.params.id, provider]
+        );
+
+        const summary = summaryResult.rows[0] || {};
+        res.json({
+            activities: activityResult.rows.map(normalizeWearableActivityRow),
+            summary: {
+                activityCount: Number(summary.activity_count || 0),
+                durationSeconds: Number(summary.duration_seconds || 0),
+                distanceKm: Number(summary.distance_km || 0),
+                calories: Number(summary.calories || 0),
+                latestActivityAt: summary.latest_activity_at ? new Date(summary.latest_activity_at).toISOString() : null,
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/users/:id/wearables/garmin/start', async (req, res) => {
+    if (!requireSelfAccess(req, res)) return;
+
+    if (!isGarminOAuthConfigured()) {
+        await pool.query(
+            `INSERT INTO wearable_connections (user_id, provider, status, metadata, updated_at)
+             VALUES ($1, 'garmin', 'setup_required', $2::jsonb, NOW())
+             ON CONFLICT (user_id, provider)
+             DO UPDATE SET status = 'setup_required', metadata = EXCLUDED.metadata, updated_at = NOW()`,
+            [req.params.id, JSON.stringify({ message: 'Garmin OAuth ещё не настроен на сервере.' })]
+        );
+
+        return res.status(501).json({ error: 'Garmin OAuth is not configured on the server yet.' });
+    }
+
+    const state = crypto.randomUUID();
+    const authorizeUrl = new URL(process.env.GARMIN_OAUTH_AUTHORIZE_URL);
+    authorizeUrl.searchParams.set('response_type', 'code');
+    authorizeUrl.searchParams.set('client_id', process.env.GARMIN_CLIENT_ID);
+    authorizeUrl.searchParams.set('redirect_uri', process.env.GARMIN_OAUTH_CALLBACK_URL);
+    authorizeUrl.searchParams.set('state', state);
+    authorizeUrl.searchParams.set('scope', process.env.GARMIN_OAUTH_SCOPE || 'activity wellness');
+
+    await pool.query(
+        `INSERT INTO wearable_connections (user_id, provider, status, metadata, updated_at)
+         VALUES ($1, 'garmin', 'pending', $2::jsonb, NOW())
+         ON CONFLICT (user_id, provider)
+         DO UPDATE SET status = 'pending', metadata = EXCLUDED.metadata, updated_at = NOW()`,
+        [req.params.id, JSON.stringify({ oauth_state: state, message: 'Ожидаем подтверждение Garmin OAuth.' })]
+    );
+
+    res.json({ authUrl: authorizeUrl.toString() });
+});
+
+app.post('/api/users/:id/wearables/garmin/sync', async (req, res) => {
+    if (!requireSelfAccess(req, res)) return;
+
+    if (!isGarminActivitySyncConfigured()) {
+        return res.status(501).json({ error: 'Garmin activities endpoint is not configured on the server yet.' });
+    }
+
+    try {
+        const lookup = await pool.query(
+            `SELECT id, user_id, provider, status, access_token, refresh_token, token_expires_at, metadata
+             FROM wearable_connections
+             WHERE user_id = $1 AND provider = 'garmin'
+             LIMIT 1`,
+            [req.params.id]
+        );
+
+        if (lookup.rowCount === 0) {
+            return res.status(404).json({ error: 'Garmin is not connected yet.' });
+        }
+
+        let connection = lookup.rows[0];
+        if (connection.status !== 'connected' && connection.status !== 'pending') {
+            return res.status(400).json({ error: 'Garmin connection is not ready for sync.' });
+        }
+
+        connection = await ensureGarminAccessToken(connection);
+
+        const days = clampInteger(req.body?.days, 1, 90, 30);
+        const limit = clampInteger(req.body?.limit, 1, 100, 25);
+        const activitiesUrl = new URL(process.env.GARMIN_ACTIVITIES_URL);
+        activitiesUrl.searchParams.set('limit', String(limit));
+        activitiesUrl.searchParams.set('days', String(days));
+        activitiesUrl.searchParams.set('startDate', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
+
+        let activityResponse = await fetch(activitiesUrl, {
+            headers: {
+                Authorization: `Bearer ${connection.access_token}`,
+                Accept: 'application/json',
+            },
+        });
+
+        if (activityResponse.status === 401 && connection.refresh_token) {
+            connection = await refreshGarminAccessToken(connection);
+            activityResponse = await fetch(activitiesUrl, {
+                headers: {
+                    Authorization: `Bearer ${connection.access_token}`,
+                    Accept: 'application/json',
+                },
+            });
+        }
+
+        const activityPayload = await activityResponse.json().catch(() => ({}));
+        if (!activityResponse.ok) {
+            await pool.query(
+                `UPDATE wearable_connections
+                 SET metadata = $2::jsonb, updated_at = NOW()
+                 WHERE id = $1`,
+                [connection.id, JSON.stringify({ ...(connection.metadata || {}), message: 'Не удалось синхронизировать Garmin.' })]
+            );
+            return res.status(activityResponse.status).json({ error: activityPayload.error || activityPayload.message || 'Garmin sync failed' });
+        }
+
+        const normalizedActivities = extractActivitiesFromPayload(activityPayload)
+            .map((item) => normalizeWearableActivityPayload('garmin', item))
+            .filter((activity) => activity.startedAt || activity.durationSeconds !== null || activity.distanceKm !== null);
+
+        const syncedCount = await saveWearableActivities(req.params.id, 'garmin', normalizedActivities);
+        const metadata = {
+            ...(connection.metadata || {}),
+            message: syncedCount > 0 ? `Garmin синхронизирован: ${syncedCount} активностей.` : 'Garmin синхронизирован, новых активностей нет.',
+            lastSyncResult: {
+                syncedCount,
+                syncedAt: new Date().toISOString(),
+            }
+        };
+
+        await pool.query(
+            `UPDATE wearable_connections
+             SET status = 'connected', last_synced_at = NOW(), metadata = $2::jsonb, updated_at = NOW()
+             WHERE id = $1`,
+            [connection.id, JSON.stringify(metadata)]
+        );
+
+        res.json({
+            success: true,
+            syncedCount,
+            message: metadata.message,
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/integrations/garmin/callback', async (req, res) => {
+    const { code, state, error } = req.query;
+    const redirectBase = `${getFrontendBaseUrl().replace(/\/$/, '')}/?integration=garmin`;
+
+    if (error) {
+        return res.redirect(`${redirectBase}&status=error&message=${encodeURIComponent(String(error))}`);
+    }
+
+    if (!code || !state) {
+        return res.redirect(`${redirectBase}&status=error&message=${encodeURIComponent('Missing Garmin OAuth code/state')}`);
+    }
+
+    try {
+        const lookup = await pool.query(
+            `SELECT user_id, metadata
+             FROM wearable_connections
+             WHERE provider = 'garmin' AND metadata->>'oauth_state' = $1
+             LIMIT 1`,
+            [String(state)]
+        );
+
+        if (lookup.rowCount === 0) {
+            return res.redirect(`${redirectBase}&status=error&message=${encodeURIComponent('Garmin OAuth state not found')}`);
+        }
+
+        const connection = lookup.rows[0];
+        const tokenResponse = await fetch(process.env.GARMIN_OAUTH_TOKEN_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                grant_type: 'authorization_code',
+                code: String(code),
+                redirect_uri: process.env.GARMIN_OAUTH_CALLBACK_URL,
+                client_id: process.env.GARMIN_CLIENT_ID,
+                client_secret: process.env.GARMIN_CLIENT_SECRET,
+            }),
+        });
+
+        const tokenPayload = await tokenResponse.json().catch(() => ({}));
+        if (!tokenResponse.ok) {
+            await pool.query(
+                `UPDATE wearable_connections
+                 SET status = 'error', metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{message}', to_jsonb($2::text), true), updated_at = NOW()
+                 WHERE user_id = $1 AND provider = 'garmin'`,
+                [connection.user_id, tokenPayload.error_description || tokenPayload.error || 'Garmin token exchange failed']
+            );
+            return res.redirect(`${redirectBase}&status=error&message=${encodeURIComponent(tokenPayload.error_description || tokenPayload.error || 'Garmin token exchange failed')}`);
+        }
+
+        const expiresInSeconds = Number(tokenPayload.expires_in || 0);
+        const tokenExpiry = expiresInSeconds > 0 ? new Date(Date.now() + expiresInSeconds * 1000) : null;
+        await pool.query(
+            `UPDATE wearable_connections
+             SET status = 'connected',
+                 access_token = $2,
+                 refresh_token = $3,
+                 token_expires_at = $4,
+                 external_user_id = COALESCE($5, external_user_id),
+                 connected_at = COALESCE(connected_at, NOW()),
+                 metadata = $6::jsonb,
+                 updated_at = NOW()
+             WHERE user_id = $1 AND provider = 'garmin'`,
+            [
+                connection.user_id,
+                tokenPayload.access_token || null,
+                tokenPayload.refresh_token || null,
+                tokenExpiry,
+                tokenPayload.user_id || tokenPayload.sub || null,
+                JSON.stringify({ message: 'Garmin успешно подключён.' })
+            ]
+        );
+
+        res.redirect(`${redirectBase}&status=success`);
+    } catch (err) {
+        res.redirect(`${redirectBase}&status=error&message=${encodeURIComponent(err.message || 'Garmin callback failed')}`);
+    }
+});
+
+app.post('/api/users/:id/wearables/samsung-watch/start', async (req, res) => {
+    if (!requireSelfAccess(req, res)) return;
+
+    const bridgeToken = createWearableBridgeToken();
+    const bridgeTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const bridgeIngestUrl = `${getPublicApiBaseUrl(req)}/integrations/samsung-watch/ingest`;
+    const onboardingUrl = buildSamsungBridgeOnboardingUrl(req, {
+        bridgeToken,
+        bridgeIngestUrl,
+        bridgeTokenExpiresAt
+    });
+    const qrCodeDataUrl = await QRCode.toDataURL(onboardingUrl, {
+        margin: 1,
+        width: 320,
+        color: {
+            dark: '#0f172a',
+            light: '#ffffff'
+        }
+    });
+    const bridgeMetadata = {
+        message: 'Bridge-ключ создан. Передайте его в Android bridge для Samsung Health.',
+        bridgeTokenHash: buildWearableSecretHash(bridgeToken),
+        bridgeTokenPreview: maskWearableBridgeToken(bridgeToken),
+        bridgeTokenExpiresAt,
+        bridgeIngestUrl
+    };
+
+    await pool.query(
+        `INSERT INTO wearable_connections (user_id, provider, status, metadata, updated_at)
+         VALUES ($1, 'samsung_watch', 'bridge_required', $2::jsonb, NOW())
+         ON CONFLICT (user_id, provider)
+         DO UPDATE SET status = 'bridge_required', metadata = EXCLUDED.metadata, updated_at = NOW()`,
+        [req.params.id, JSON.stringify(bridgeMetadata)]
+    );
+
+    res.json({
+        success: true,
+        message: bridgeMetadata.message,
+        bridgeToken,
+        bridgeTokenPreview: bridgeMetadata.bridgeTokenPreview,
+        expiresAt: bridgeTokenExpiresAt,
+                ingestUrl: bridgeMetadata.bridgeIngestUrl,
+                onboardingUrl,
+                qrCodeDataUrl
+    });
+});
+
+app.get('/api/integrations/samsung-watch/onboard', async (req, res) => {
+        const token = String(req.query.token || '');
+        const ingestUrl = String(req.query.ingestUrl || '');
+        const expiresAt = String(req.query.expiresAt || '');
+
+        if (!token || !ingestUrl || !expiresAt) {
+                return res.status(400).send('Samsung bridge onboarding data is incomplete.');
+        }
+
+        const safeIngestUrl = ingestUrl.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safeToken = token.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safeExpiresAt = expiresAt.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const samplePayload = JSON.stringify({
+                bridgeToken: token,
+                externalUserId: 'samsung-health-user-id',
+                activities: [
+                        {
+                                id: 'session-123',
+                                activityType: 'tennis',
+                                title: 'Тренировка Samsung Health',
+                                startTime: new Date().toISOString(),
+                                durationSeconds: 3600,
+                                calories: 540,
+                                averageHeartRate: 138,
+                                steps: 6200,
+                        }
+                ]
+        }, null, 2)
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.send(`<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Samsung Watch Bridge Setup</title>
+    <style>
+        body { font-family: Inter, system-ui, -apple-system, sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }
+        .wrap { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+        .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 24px; padding: 20px; box-shadow: 0 8px 30px rgba(15,23,42,.05); }
+        .pill { display: inline-block; padding: 6px 10px; border-radius: 999px; background: #ecfccb; color: #365314; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+        code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+        pre { background: #0f172a; color: #e2e8f0; padding: 14px; border-radius: 18px; overflow: auto; font-size: 12px; }
+        .muted { color: #475569; }
+        .label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #64748b; margin-bottom: 6px; }
+        .value { font-weight: 700; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="card">
+            <div class="pill">Samsung Watch Bridge</div>
+            <h1>Подключение через мобильник</h1>
+            <p class="muted">Этот QR не синхронизирует часы сам по себе — он передаёт конфиг мобильному bridge, который уже читает Samsung Health и отправляет активности в backend.</p>
+
+            <div style="margin-top:20px;">
+                <div class="label">Bridge token</div>
+                <div class="value">${safeToken}</div>
+            </div>
+
+            <div style="margin-top:16px;">
+                <div class="label">POST endpoint</div>
+                <div class="value">${safeIngestUrl}</div>
+            </div>
+
+            <div style="margin-top:16px;">
+                <div class="label">Действует до</div>
+                <div class="value">${safeExpiresAt}</div>
+            </div>
+
+            <div style="margin-top:20px;">
+                <div class="label">Пример payload для mobile bridge</div>
+                <pre>${samplePayload}</pre>
+            </div>
+        </div>
+    </div>
+</body>
+</html>`);
+});
+
+app.post('/api/integrations/samsung-watch/ingest', async (req, res) => {
+    const bridgeToken = req.headers['x-bridge-token'] || req.body?.bridgeToken;
+    if (!bridgeToken) {
+        return res.status(401).json({ error: 'Samsung bridge token is required.' });
+    }
+
+    try {
+        const tokenHash = buildWearableSecretHash(String(bridgeToken));
+        const lookup = await pool.query(
+            `SELECT id, user_id, metadata, connected_at
+             FROM wearable_connections
+             WHERE provider = 'samsung_watch'
+               AND metadata->>'bridgeTokenHash' = $1
+             LIMIT 1`,
+            [tokenHash]
+        );
+
+        if (lookup.rowCount === 0) {
+            return res.status(401).json({ error: 'Samsung bridge token is invalid.' });
+        }
+
+        const connection = lookup.rows[0];
+        const expiresAt = parseOptionalDate(connection.metadata?.bridgeTokenExpiresAt);
+        if (!expiresAt || expiresAt.getTime() < Date.now()) {
+            return res.status(401).json({ error: 'Samsung bridge token has expired.' });
+        }
+
+        const payloadActivities = Array.isArray(req.body?.activities)
+            ? req.body.activities
+            : (req.body?.activity ? [req.body.activity] : []);
+
+        if (!payloadActivities.length) {
+            return res.status(400).json({ error: 'No Samsung activities provided.' });
+        }
+
+        const normalizedActivities = payloadActivities
+            .map((item) => normalizeWearableActivityPayload('samsung_watch', item))
+            .filter((activity) => activity.startedAt || activity.durationSeconds !== null || activity.distanceKm !== null);
+
+        const syncedCount = await saveWearableActivities(connection.user_id, 'samsung_watch', normalizedActivities);
+        const metadata = {
+            ...(connection.metadata || {}),
+            message: syncedCount > 0 ? `Samsung Watch синхронизирован: ${syncedCount} активностей.` : 'Samsung Watch синхронизирован, новых активностей нет.',
+            lastSyncResult: {
+                syncedCount,
+                syncedAt: new Date().toISOString(),
+                source: 'mobile_bridge'
+            }
+        };
+
+        await pool.query(
+            `UPDATE wearable_connections
+             SET status = 'connected',
+                 external_user_id = COALESCE($2, external_user_id),
+                 connected_at = COALESCE(connected_at, NOW()),
+                 last_synced_at = NOW(),
+                 metadata = $3::jsonb,
+                 updated_at = NOW()
+             WHERE id = $1`,
+            [
+                connection.id,
+                req.body?.externalUserId || req.body?.userId || null,
+                JSON.stringify(metadata)
+            ]
+        );
+
+        res.json({ success: true, syncedCount, message: metadata.message });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/users/:id/wearables/:provider', async (req, res) => {
+    if (!requireSelfAccess(req, res)) return;
+
+    const { provider } = req.params;
+    if (!WEARABLE_ALLOWED_PROVIDERS.includes(provider)) {
+        return res.status(400).json({ error: 'Unsupported wearable provider' });
+    }
+
+    try {
+        await pool.query(
+            `DELETE FROM wearable_connections
+             WHERE user_id = $1 AND provider = $2`,
+            [req.params.id, provider]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 
@@ -5095,6 +6042,10 @@ server.listen(PORT, async () => {
         console.log('✅ Ghost community tables ready');
         await ensurePlayerProgressTable();
         console.log('✅ Player progress table ready');
+        await ensureWearableConnectionsTable();
+        console.log('✅ Wearable connections table ready');
+        await ensureWearableActivitiesTable();
+        console.log('✅ Wearable activities table ready');
         setTimeout(() => {
             syncTrackedTournamentStages().catch(err => console.error('Initial RTT tournament sync failed:', err.message));
         }, 15000);

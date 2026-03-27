@@ -261,9 +261,24 @@ DEEPSEEK_API_KEY=your_deepseek_api_key
 
 # CORS (если фронтенд на другом домене)
 ALLOWED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
+
+# Public URLs for integrations
+FRONTEND_URL=https://yourdomain.com
+PUBLIC_API_URL=https://yourdomain.com/api
+
+# Garmin OAuth + activity sync
+GARMIN_CLIENT_ID=your_garmin_client_id
+GARMIN_CLIENT_SECRET=your_garmin_client_secret
+GARMIN_OAUTH_AUTHORIZE_URL=https://connect.garmin.com/oauthConfirm
+GARMIN_OAUTH_TOKEN_URL=https://connectapi.garmin.com/oauth-service/oauth/token
+GARMIN_OAUTH_CALLBACK_URL=https://yourdomain.com/api/integrations/garmin/callback
+GARMIN_OAUTH_SCOPE=activity wellness
+GARMIN_ACTIVITIES_URL=https://your-garmin-activity-endpoint
 ```
 
 Сохраняем (`Ctrl+O`, `Enter`, `Ctrl+X`).
+
+Samsung Watch не требует серверных OAuth-переменных, но требует Android/mobile bridge, который должен отправлять POST-запросы на `POST /api/integrations/samsung-watch/ingest` с `bridgeToken` и массивом `activities`.
 
 ### 5.3 Инициализация базы данных
 

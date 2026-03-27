@@ -1,4 +1,4 @@
-import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Match, Product, PlayerProfile, Trajectory, Conversation, ChatMessage, MarketplaceItem, CrmStats, Skill, Lesson, Tournament, Group, NewsArticle, PlayerProgressProfile } from '../types';
+import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Match, Product, PlayerProfile, Trajectory, Conversation, ChatMessage, MarketplaceItem, CrmStats, Skill, Lesson, Tournament, Group, NewsArticle, PlayerProgressProfile, WearableConnection, WearableProvider, WearableActivitiesResponse, WearableActivity, SamsungBridgeSetup } from '../types';
 import * as THREE from 'three'; // Import THREE for Vector3 deserialization
 
 // Frontend API Service
@@ -71,6 +71,8 @@ let MOCK_STUDENTS: Student[] = [
 
 let MOCK_PARTNERS: Partner[] = [];
 const MOCK_PLAYER_PROGRESS: Record<string, PlayerProgressProfile> = {};
+const MOCK_WEARABLE_CONNECTIONS: Record<string, WearableConnection[]> = {};
+const MOCK_WEARABLE_ACTIVITIES: Record<string, WearableActivity[]> = {};
 
 let MOCK_PRODUCTS: Product[] = [
     { 
@@ -1081,6 +1083,116 @@ export const api = {
                 MOCK_PLAYER_PROGRESS[String(userId)] = progress;
                 return progress;
             }
+        },
+    },
+
+    wearables: {
+        list: async (userId: string | number): Promise<WearableConnection[]> => {
+            try {
+                const res = await fetch(`${API_URL}/users/${userId}/wearables`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-user-id': String(userId),
+                    },
+                });
+                const data = await handleResponse(res);
+                const list = data as WearableConnection[];
+                MOCK_WEARABLE_CONNECTIONS[String(userId)] = list;
+                return list;
+            } catch (error) {
+                console.warn('wearables.list fallback:', error);
+                return MOCK_WEARABLE_CONNECTIONS[String(userId)] || [
+                    {
+                        provider: 'garmin',
+                        displayName: 'Garmin',
+                        status: 'disconnected',
+                        authConfigured: false,
+                        message: 'Garmin OAuth ещё не настроен на сервере.'
+                    },
+                    {
+                        provider: 'samsung_watch',
+                        displayName: 'Samsung Watch',
+                        status: 'disconnected',
+                        requiresMobileBridge: true,
+                        message: 'Для Samsung Watch нужен мобильный bridge через Samsung Health / Android.'
+                    }
+                ];
+            }
+        },
+        listActivities: async (
+            userId: string | number,
+            options?: { provider?: WearableProvider; limit?: number }
+        ): Promise<WearableActivitiesResponse> => {
+            try {
+                const params = new URLSearchParams();
+                if (options?.provider) params.set('provider', options.provider);
+                if (options?.limit) params.set('limit', String(options.limit));
+                const query = params.toString();
+                const res = await fetch(`${API_URL}/users/${userId}/wearables/activities${query ? `?${query}` : ''}`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-user-id': String(userId),
+                    },
+                });
+                const data = await handleResponse(res);
+                const response = data as WearableActivitiesResponse;
+                MOCK_WEARABLE_ACTIVITIES[String(userId)] = response.activities || [];
+                return response;
+            } catch (error) {
+                console.warn('wearables.listActivities fallback:', error);
+                const activities = MOCK_WEARABLE_ACTIVITIES[String(userId)] || [];
+                return {
+                    activities,
+                    summary: {
+                        activityCount: activities.length,
+                        durationSeconds: activities.reduce((sum, item) => sum + (item.durationSeconds || 0), 0),
+                        distanceKm: Number(activities.reduce((sum, item) => sum + (item.distanceKm || 0), 0).toFixed(2)),
+                        calories: activities.reduce((sum, item) => sum + (item.calories || 0), 0),
+                        latestActivityAt: activities[0]?.startedAt || null,
+                    }
+                };
+            }
+        },
+        startGarmin: async (userId: string | number): Promise<{ authUrl: string }> => {
+            const res = await fetch(`${API_URL}/users/${userId}/wearables/garmin/start`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-id': String(userId),
+                },
+            });
+            return handleResponse(res);
+        },
+        syncGarmin: async (userId: string | number, options?: { days?: number; limit?: number }): Promise<{ success: boolean; syncedCount: number; message: string }> => {
+            const res = await fetch(`${API_URL}/users/${userId}/wearables/garmin/sync`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-id': String(userId),
+                },
+                body: JSON.stringify(options || {}),
+            });
+            return handleResponse(res);
+        },
+        startSamsungWatch: async (userId: string | number): Promise<SamsungBridgeSetup> => {
+            const res = await fetch(`${API_URL}/users/${userId}/wearables/samsung-watch/start`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-id': String(userId),
+                },
+            });
+            return handleResponse(res);
+        },
+        disconnect: async (userId: string | number, provider: WearableProvider): Promise<void> => {
+            const res = await fetch(`${API_URL}/users/${userId}/wearables/${provider}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-id': String(userId),
+                },
+            });
+            await handleResponse(res);
         },
     },
 
