@@ -17,6 +17,9 @@ const SupportChatWidget: React.FC<SupportChatWidgetProps> = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
+  const scrollContainerRef = useRef<null | HTMLDivElement>(null);
+  const prevMessageCountRef = useRef(0);
+  const isAtBottomRef = useRef(true);
 
   const storageKey = `support_seen_${user.id}`;
 
@@ -81,8 +84,24 @@ const SupportChatWidget: React.FC<SupportChatWidgetProps> = ({ user }) => {
   }, [isOpen, user.id]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const newCount = messages.length;
+    const isFirstLoad = prevMessageCountRef.current === 0 && newCount > 0;
+    const hasNewMessage = newCount > prevMessageCountRef.current;
+
+    // Scroll to bottom only on first load or when new message arrives AND user is already at bottom
+    if (isFirstLoad || (hasNewMessage && isAtBottomRef.current)) {
+      messagesEndRef.current?.scrollIntoView({ behavior: isFirstLoad ? 'auto' : 'smooth' });
+    }
+    prevMessageCountRef.current = newCount;
   }, [messages]);
+
+  // Track whether user is at the bottom of the scroll container
+  const handleScroll = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const threshold = 60; // px from bottom
+    isAtBottomRef.current = container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+  };
 
   const handleSendMessage = async () => {
     if (newMessage.trim()) {
@@ -111,7 +130,13 @@ const SupportChatWidget: React.FC<SupportChatWidgetProps> = ({ user }) => {
     <>
       <div className="fixed bottom-8 right-8 z-50">
         <button
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => {
+            if (!isOpen) {
+              prevMessageCountRef.current = 0;
+              isAtBottomRef.current = true;
+            }
+            setIsOpen(!isOpen);
+          }}
           className="bg-slate-900 text-white w-16 h-16 rounded-full flex items-center justify-center shadow-lg hover:bg-slate-700 transition-colors relative"
         >
           {isOpen ? <X size={24} /> : <MessageSquare size={24} />}
@@ -129,7 +154,7 @@ const SupportChatWidget: React.FC<SupportChatWidgetProps> = ({ user }) => {
             <h3 className="font-bold text-lg">Чат с поддержкой</h3>
             <p className="text-sm text-slate-500">Обычно отвечаем в течении нескольких минут</p>
           </header>
-          <div className="flex-1 p-4 overflow-y-auto">
+          <div className="flex-1 p-4 overflow-y-auto" ref={scrollContainerRef} onScroll={handleScroll}>
             {loading && messages.length === 0 ? <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-slate-400"/></div> :
             <div className="space-y-4">
               {messages.map((msg, index) => (

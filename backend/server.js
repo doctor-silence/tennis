@@ -2191,6 +2191,129 @@ app.post('/api/support/messages', async (req, res) => {
         // If an admin sent it, their role is 'user' for their own client.
         res.status(201).json({ ...newMessage, role: 'user' });
 
+        // --- AI AUTO-REPLY via DeepSeek (fire-and-forget, only for user messages) ---
+        if (senderRole !== 'admin' && process.env.DEEPSEEK_API_KEY) {
+            (async () => {
+                try {
+                    // Fetch last 10 messages for context
+                    const historyRes = await pool.query(
+                        `SELECT m.text, m.sender_id, u.role
+                         FROM messages m
+                         JOIN users u ON u.id = m.sender_id
+                         WHERE m.conversation_id = $1
+                         ORDER BY m.created_at DESC LIMIT 10`,
+                        [conversationId]
+                    );
+                    const history = historyRes.rows.reverse();
+                    const aiMessages = [
+                        {
+                            role: 'system',
+                            content: `Ты — дружелюбный и внимательный помощник поддержки платформы NAKORTE (сайт nakorte.ru).
+NAKORTE — это теннисная платформа для любителей и профессионалов в России.
+
+Отвечай ТОЛЬКО на русском языке. Будь кратким, конкретным и дружелюбным.
+Никогда не называй себя TennisApp, OpenAI, DeepSeek или другим именем — ты помощник NAKORTE.
+Если не знаешь точного ответа — скажи что уточнишь у оператора и попросишь его ответить.
+Не придумывай данные конкретного пользователя, которых у тебя нет.
+ВАЖНО: не используй markdown-разметку в ответах (никаких **, *, # и т.д.) — пиши обычным текстом.
+
+=== ФУНКЦИИ ПЛАТФОРМЫ NAKORTE ===
+
+ПОИСК ПАРТНЁРА
+— Поиск теннисных партнёров по городу, уровню NTRP и имени
+— Фильтр «Только РТТ» — показывает игроков с рейтингом РТТ
+— Можно написать партнёру в чат или бросить вызов на матч
+
+КОРТЫ
+— Поиск теннисных кортов по городу и названию
+— Бронирование корта через платформу
+
+ТУРНИРЫ
+— Внутренние турниры платформы
+— Интеграция с турнирами РТТ (Российский Теннисный Тур) — синхронизация результатов
+— Подача заявок, сетки, стадии, результаты матчей
+
+РЕЙТИНГ / ЛЕСТНИЦА
+— Клубный рейтинг (Club ELO) — начисляется за матчи внутри платформы
+— Рейтинг РТТ — официальный рейтинг для верифицированных игроков
+
+ПРОФИЛЬ
+— Редактирование имени, города, уровня NTRP, аватара
+— Статистика: матчи, победы, XP, рейтинг
+— Карта прогресса по навыкам (подача, форхенд, бэкхенд и т.д.)
+— Дневник тенниса — записи тренировок и матчей
+— Подключение устройств: Garmin, Samsung Watch, Apple Watch (в разработке)
+
+ТАКТИКА (3D-корт)
+— Интерактивная 3D-модель теннисного корта
+— Инструмент для отработки тактики и стратегии игры
+— Можно расставлять игроков, прокладывать траектории мячей, разбирать розыгрыши
+— Помогает тренерам и игрокам визуализировать и планировать тактические схемы
+
+AI-ТРЕНЕР
+— Персональные советы по технике, тактике и физподготовке от искусственного интеллекта
+— Доступен в разделе «AI-тренер» в личном кабинете
+
+РАСПИСАНИЕ
+— Умное расписание тренировок
+— Планирование занятий с тренером
+
+СООБЩЕСТВО
+— Лента активности, группы по интересам
+
+ЧАТЫ
+— Личные сообщения с другими игроками
+— Чат поддержки (этот чат)
+
+ТРЕНЕР / CRM
+— Тренеры могут вести список учеников, планировать занятия, отслеживать прогресс
+
+PRO-ПОДПИСКА
+— Расширенные функции для тренеров и серьёзных игроков, подробности на странице /pro
+
+=== УРОВНИ ИГРОКОВ (NTRP) ===
+2.0 — Новичок, 3.0 — Начальный, 3.5 — Средний, 4.0 — Продвинутый, 4.5 — Полупрофи, 5.0+ — Профи/РТТ
+
+=== РОЛИ ПОЛЬЗОВАТЕЛЕЙ ===
+amateur — обычный игрок-любитель
+coach — тренер (доступен CRM)
+rtt_pro — игрок с официальным рейтингом РТТ (верифицирован)
+admin — администратор платформы`
+                        },
+                        ...history.map(m => ({
+                            role: m.role === 'admin' ? 'assistant' : 'user',
+                            content: m.text
+                        }))
+                    ];
+
+                    // Small delay for natural feel
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+
+                    const completion = await deepseek.chat.completions.create({
+                        model: 'deepseek-chat',
+                        messages: aiMessages,
+                        max_tokens: 300,
+                        temperature: 0.7,
+                    });
+
+                    const aiReply = completion.choices?.[0]?.message?.content?.trim();
+                    if (aiReply) {
+                        await pool.query(
+                            'INSERT INTO messages (conversation_id, sender_id, text) VALUES ($1, $2, $3)',
+                            [conversationId, SUPPORT_ADMIN_ID, aiReply]
+                        );
+                        await pool.query(
+                            'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+                            [conversationId]
+                        );
+                    }
+                } catch (aiErr) {
+                    console.error('Support AI auto-reply error:', aiErr.message);
+                }
+            })();
+        }
+        // --- END AI AUTO-REPLY ---
+
     } catch (error) {
         await client.query('ROLLBACK');
         console.error('Error sending support message:', error);

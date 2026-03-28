@@ -26,6 +26,9 @@ const AdminSupportChat: React.FC<AdminSupportChatProps> = ({ user, isDarkTheme =
   const [usersLoading, setUsersLoading] = useState(false);
 
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
+  const scrollContainerRef = useRef<null | HTMLDivElement>(null);
+  const prevMessageCountRef = useRef(0);
+  const isAtBottomRef = useRef(true);
 
   // Fetch all users for new chat search
   useEffect(() => {
@@ -77,12 +80,27 @@ const AdminSupportChat: React.FC<AdminSupportChatProps> = ({ user, isDarkTheme =
   }, [selectedConversation]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const newCount = messages.length;
+    const isFirstLoad = prevMessageCountRef.current === 0 && newCount > 0;
+    const hasNewMessage = newCount > prevMessageCountRef.current;
+
+    if (isFirstLoad || (hasNewMessage && isAtBottomRef.current)) {
+      messagesEndRef.current?.scrollIntoView({ behavior: isFirstLoad ? 'auto' : 'smooth' });
+    }
+    prevMessageCountRef.current = newCount;
   }, [messages]);
+
+  const handleScroll = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    isAtBottomRef.current = container.scrollHeight - container.scrollTop - container.clientHeight < 60;
+  };
 
   const selectConversation = (convo: any) => {
     if (selectedConversation?.id === convo.id) return;
     setMessages([]);
+    prevMessageCountRef.current = 0;
+    isAtBottomRef.current = true;
     setSelectedConversation(convo);
     setShowNewChat(false);
     setConversations(prev => prev.map(c => c.id === convo.id ? { ...c, unread: 0 } : c));
@@ -99,6 +117,8 @@ const AdminSupportChat: React.FC<AdminSupportChatProps> = ({ user, isDarkTheme =
       unread: 0,
     };
     setMessages([]);
+    prevMessageCountRef.current = 0;
+    isAtBottomRef.current = true;
     setSelectedConversation(fakeConvo);
     setShowNewChat(false);
     setUserSearch('');
@@ -255,7 +275,7 @@ const AdminSupportChat: React.FC<AdminSupportChatProps> = ({ user, isDarkTheme =
                 )}
               </div>
             </header>
-            <div className={`flex-1 p-6 overflow-y-auto ${isDarkTheme ? 'bg-slate-950' : 'bg-slate-50'}`}>
+            <div ref={scrollContainerRef} onScroll={handleScroll} className={`flex-1 p-6 overflow-y-auto ${isDarkTheme ? 'bg-slate-950' : 'bg-slate-50'}`}>
               {loading.messages && messages.length === 0 ? (
                 <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-slate-400"/></div>
               ) : messages.length === 0 ? (
