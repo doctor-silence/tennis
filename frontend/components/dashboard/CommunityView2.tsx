@@ -477,7 +477,7 @@ const TextPost = ({ post, user, onUpdate }: { post: any, user: User, onUpdate: (
     );
 };
 
-const PartnerSearchPost = ({ post }: { post: any }) => (
+const PartnerSearchPost = ({ post, onStartConversation }: { post: any, onStartConversation?: (partnerId: string) => void }) => (
     <div className="bg-white p-6 rounded-2xl shadow-sm border border-lime-200">
         <div className="flex justify-between items-start">
             <div className="flex gap-3">
@@ -503,7 +503,7 @@ const PartnerSearchPost = ({ post }: { post: any }) => (
         </div>
         <div className="flex justify-between items-center">
             <p className="text-sm"><span className="text-slate-500">Требование:</span> <span className="font-bold">{post.content.details.requirement}</span></p>
-            <Button><Swords size={16}/>Сыграть</Button>
+            <Button onClick={() => onStartConversation?.(String(post.author.id))}><Swords size={16}/>Сыграть</Button>
         </div>
     </div>
 );
@@ -1067,7 +1067,7 @@ const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate, onSta
                     case 'text_post':
                         return <TextPost key={item.id} post={item} user={user} onUpdate={onUpdate} />;
                     case 'partner_search':
-                        return <PartnerSearchPost key={item.id} post={item} />;
+                        return <PartnerSearchPost key={item.id} post={item} onStartConversation={onStartConversation} />;
                     case 'match_result':
                         // Если есть tournamentName или player1Name — это турнирный пост от админа
                         return (item.content?.tournamentName || item.content?.player1Name)
@@ -1091,7 +1091,7 @@ const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate, onSta
     const SearchPlayFeed = () => (
          <div className="space-y-4">
             {feedItems.filter(item => item.type === 'partner_search').map(item => (
-                <PartnerSearchPost key={item.id} post={item} />
+                <PartnerSearchPost key={item.id} post={item} onStartConversation={onStartConversation} />
             ))}
         </div>
     );

@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, MapPin, Radar, CheckCircle2 } from 'lucide-react';
-import { Partner, DashboardTab, User } from '../../types';
+import { Search, Filter, MapPin, Radar, CheckCircle2, Loader2 } from 'lucide-react';
+import { Partner, DashboardTab, User, PlayerProfile } from '../../types';
 import Button from '../Button';
 import { api } from '../../services/api';
+import PlayerProfileFlyout from './PlayerProfileFlyout';
 
 interface PartnerSearchViewProps {
     user: User;
@@ -18,6 +19,10 @@ const PartnerSearchView = ({ user, onNavigate, onStartConversation, onCreateChal
     const [cities, setCities] = useState<string[]>([]);
     const [onlineStats, setOnlineStats] = useState<{ online: number; total: number } | null>(null);
     const [fakeOnline, setFakeOnline] = useState(Math.floor(Math.random() * 11) + 20);
+
+    const [selectedProfile, setSelectedProfile] = useState<PlayerProfile | null>(null);
+    const [selectedProfileAnchorY, setSelectedProfileAnchorY] = useState<number | null>(null);
+    const [isProfileLoading, setIsProfileLoading] = useState<string | null>(null); // stores partnerId being loaded
 
     // Анимированный счётчик онлайна: меняется каждые 4-7 секунд
     useEffect(() => {
@@ -57,6 +62,19 @@ const PartnerSearchView = ({ user, onNavigate, onStartConversation, onCreateChal
         fetchCities();
     }, []);
 
+    const handlePartnerClick = async (partner: Partner, event: React.MouseEvent<HTMLDivElement>) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        setSelectedProfileAnchorY(rect.top);
+        setIsProfileLoading(partner.id);
+        const profile = await api.ladder.getPlayerProfile(partner.id);
+        if (profile) {
+            setSelectedProfile(profile);
+        } else {
+            setSelectedProfileAnchorY(null);
+        }
+        setIsProfileLoading(null);
+    };
+
     const renderPartnerAvatar = (partner: Partner) => (
         <div className="w-24 h-24 mb-4 relative flex items-center justify-center">
             <div className="w-full h-full rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
@@ -74,6 +92,13 @@ const PartnerSearchView = ({ user, onNavigate, onStartConversation, onCreateChal
 
     return (
         <div className="space-y-6">
+            {selectedProfile && (
+                <PlayerProfileFlyout
+                    profile={selectedProfile}
+                    anchorY={selectedProfileAnchorY}
+                    onClose={() => { setSelectedProfile(null); setSelectedProfileAnchorY(null); }}
+                />
+            )}
             {/* Контейнер баннера */}
             <div className="relative overflow-hidden bg-slate-900 rounded-[32px] p-8 text-white h-44 flex items-center shadow-xl">
                 
@@ -182,11 +207,22 @@ const PartnerSearchView = ({ user, onNavigate, onStartConversation, onCreateChal
             {/* List */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {partners.map(partner => (
-                    <div key={partner.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center text-center hover:border-lime-400 transition-all group">
-                        {renderPartnerAvatar(partner)}
+                    <div
+                        key={partner.id}
+                        onClick={(e) => handlePartnerClick(partner, e)}
+                        className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center text-center hover:border-lime-400 hover:shadow-md transition-all group cursor-pointer"
+                    >
+                        <div className="relative">
+                            {renderPartnerAvatar(partner)}
+                            {isProfileLoading === partner.id && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-white/70 rounded-full">
+                                    <Loader2 className="animate-spin text-slate-400" size={24} />
+                                </div>
+                            )}
+                        </div>
                         <h3 className="font-bold text-lg">{partner.name}</h3>
                         <p className="text-slate-500 text-sm mb-4 flex items-center justify-center gap-1"><MapPin size={12}/> {partner.city} • {partner.role === 'rtt_pro' ? `${partner.rating} очков РТТ` : partner.level}</p>
-                        <div className="grid grid-cols-2 gap-2 w-full mt-auto">
+                        <div className="grid grid-cols-2 gap-2 w-full mt-auto" onClick={e => e.stopPropagation()}>
                             <Button variant="outline" size="sm" onClick={() => onStartConversation(partner.id)}>Написать</Button>
                             <Button size="sm" onClick={() => onCreateChallenge(partner.id)}>Играть</Button>
                         </div>
