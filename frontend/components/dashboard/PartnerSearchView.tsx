@@ -14,7 +14,7 @@ interface PartnerSearchViewProps {
 
 const PartnerSearchView = ({ user, onNavigate, onStartConversation, onCreateChallenge }: PartnerSearchViewProps) => {
     const [partners, setPartners] = useState<Partner[]>([]);
-    const [filter, setFilter] = useState({ city: '', level: 'all', search: '' });
+    const [filter, setFilter] = useState({ city: '', level: 'all', search: '', rtt_only: false });
     const [cities, setCities] = useState<string[]>([]);
     const [onlineStats, setOnlineStats] = useState<{ online: number; total: number } | null>(null);
     const [fakeOnline, setFakeOnline] = useState(Math.floor(Math.random() * 11) + 20);
@@ -164,6 +164,17 @@ const PartnerSearchView = ({ user, onNavigate, onStartConversation, onCreateChal
                          <option value="4.5">NTRP 4.5 (Полупрофи)</option>
                          <option value="5.0">NTRP 5.0+ (Профи)</option>
                      </select>
+                     <button
+                         onClick={() => setFilter(f => ({ ...f, rtt_only: !f.rtt_only }))}
+                         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border font-bold text-sm transition-all flex-shrink-0 ${
+                             filter.rtt_only
+                                 ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-400/30'
+                                 : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-400 hover:text-blue-600'
+                         }`}
+                     >
+                         <CheckCircle2 size={16} />
+                         Только РТТ
+                     </button>
                      <button className="w-12 h-12 flex items-center justify-center bg-lime-400 hover:bg-lime-500 text-slate-900 rounded-xl shadow-lg shadow-lime-400/30 transition-all active:scale-95 flex-shrink-0"><Filter size={20}/></button>
                  </div>
             </div>

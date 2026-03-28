@@ -1218,12 +1218,13 @@ export const api = {
         } catch { return { online: 0, total: 0 }; }
     },
 
-    getPartners: async (params?: { city?: string; level?: string; search?: string }) => {
+    getPartners: async (params?: { city?: string; level?: string; search?: string; rtt_only?: boolean }) => {
         try {
             const searchParams = new URLSearchParams();
             if (params?.city) searchParams.append('city', params.city);
             if (params?.level) searchParams.append('level', params.level);
             if (params?.search) searchParams.append('search', params.search);
+            if (params?.rtt_only) searchParams.append('rtt_only', 'true');
 
             const res = await fetch(`${API_URL}/partners?${searchParams.toString()}`);
             if (!res.ok) throw new Error('Failed to fetch partners');

@@ -3465,13 +3465,16 @@ app.get('/api/cities', async (req, res) => {
 });
 
 app.get('/api/partners', async (req, res) => {
-    const { city, level, search } = req.query;
+    const { city, level, search, rtt_only } = req.query;
 
     try {
         // --- Реальные пользователи ---
         let query = "SELECT id, name, age, level, city, avatar as image, (role = 'rtt_pro' or role = 'coach') as isPro, rtt_rank, rating, role, xp FROM users WHERE role != 'admin' AND (is_private IS NULL OR is_private = FALSE)";
         const queryParams = [];
 
+        if (rtt_only === 'true') {
+            query += " AND role = 'rtt_pro'";
+        }
         if (city) {
             queryParams.push(city);
             query += ` AND city = $${queryParams.length}`;
@@ -3490,6 +3493,9 @@ app.get('/api/partners', async (req, res) => {
         // --- Призраки из ghost_users (не в реальной таблице users) ---
         let ghostQuery = "SELECT id, name, age, level, city, avatar as image, (role = 'rtt_pro' or role = 'coach') as isPro, rtt_rank, rating, role, xp FROM ghost_users WHERE TRUE";
         const ghostParams = [];
+        if (rtt_only === 'true') {
+            ghostQuery += " AND role = 'rtt_pro'";
+        }
         if (city) {
             ghostParams.push(city);
             ghostQuery += ` AND city = $${ghostParams.length}`;
