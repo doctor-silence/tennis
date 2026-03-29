@@ -38,6 +38,417 @@ const isUpcomingAdminTournament = (tournament: Tournament) => {
     return !isTournamentLive(tournament) && !isTournamentFinished(tournament);
 };
 
+const normalizeTournamentText = (value?: string | null) =>
+    String(value || '')
+        .toLowerCase()
+        .replace(/ё/g, 'е')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+const extractTournamentAgeBucket = (value?: string | null): string | null => {
+    const normalized = normalizeTournamentText(value);
+    if (!normalized) return null;
+    if (normalized.includes('9-10') || normalized.includes('9–10')) return '9-10';
+    if (normalized.includes('до 13')) return '12u';
+    if (normalized.includes('до 15')) return '14u';
+    if (normalized.includes('до 17')) return '16u';
+    if (normalized.includes('до 19')) return '18u';
+    if (normalized.includes('взросл')) return 'adult';
+    return null;
+};
+
+const ROMAN_TO_ARABIC: Record<string, string> = {
+    VI: '6',
+    V: '5',
+    IV: '4',
+    III: '3',
+    II: '2',
+    I: '1'
+};
+
+const CYRILLIC_TO_LATIN_SUFFIX: Record<string, string> = {
+    А: 'A',
+    Б: 'B',
+    В: 'V',
+    Г: 'G',
+    Д: 'D'
+};
+
+const normalizeTournamentCategoryCode = (value?: string | null) => {
+    const raw = String(value || '').toUpperCase().replace(/Ё/g, 'Е').trim();
+    if (!raw) return 'UNKNOWN';
+    if (raw.includes('ФТ')) return 'FT';
+
+    const compact = raw.replace(/\s+/g, '').replace(/–/g, '-');
+    const romanMatch = compact.match(/(VI|IV|V|III|II|I)([АБВГДABVGD])?/);
+    if (romanMatch) {
+        const major = ROMAN_TO_ARABIC[romanMatch[1]] || romanMatch[1];
+        const suffix = romanMatch[2]
+            ? (CYRILLIC_TO_LATIN_SUFFIX[romanMatch[2] as keyof typeof CYRILLIC_TO_LATIN_SUFFIX] || romanMatch[2])
+            : '';
+        return `${major}${suffix}`;
+    }
+
+    const arabicMatch = compact.match(/([1-6])([АБВГДABVGD])?/);
+    if (arabicMatch) {
+        const suffix = arabicMatch[2]
+            ? (CYRILLIC_TO_LATIN_SUFFIX[arabicMatch[2] as keyof typeof CYRILLIC_TO_LATIN_SUFFIX] || arabicMatch[2])
+            : '';
+        return `${arabicMatch[1]}${suffix}`;
+    }
+
+    return compact || 'UNKNOWN';
+};
+
+const normalizeTournamentSystemCode = (value?: string | null) => {
+    const normalized = normalizeTournamentText(value);
+    if (!normalized) return 'uo';
+    if (normalized.includes('оидт')) return 'oidt';
+    if (normalized.includes('ком')) return 'team';
+    if (normalized === 'о.' || normalized === 'о' || normalized.includes('олимп')) return 'o';
+    return 'uo';
+};
+
+const RTT_ALLOWED_DRAW_SIZES = new Set([4, 8, 16, 24, 32, 48, 56, 64]);
+
+const cleanTournamentCategoryLabel = (value?: string | null) => {
+    const raw = String(value || '').replace(/\s+/g, ' ').trim();
+    if (!raw) return '—';
+
+    return raw
+        .replace(/\s+(корты|покрытие)\s*:\s*.*$/i, '')
+        .replace(/\s+корты\s+.*$/i, '')
+        .trim();
+};
+
+const getTournamentPointsBase = (categoryCode: string, ageBucket?: string | null) => {
+    const pointsMap: Record<string, Record<string, number>> = {
+        '9-10': { FT: 40, '1A': 36, '1B': 32, '2A': 28, '2B': 24, '3A': 18, '3B': 16, '3V': 15, '4A': 12, '4B': 11, '4V': 10, '5A': 9, '5B': 8, '5V': 7, '5G': 6, '6A': 5, '6B': 4, '6V': 3, '6G': 2, '6D': 1 },
+        '12u': { FT: 150, '1A': 130, '1B': 120, '2A': 105, '2B': 95, '3A': 80, '3B': 75, '3V': 70, '4A': 60, '4B': 55, '4V': 50, '5A': 45, '5B': 40, '5V': 35, '5G': 22 },
+        '14u': { FT: 350, '1A': 250, '1B': 230, '2A': 200, '2B': 180, '3A': 150, '3B': 130, '3V': 120, '4A': 100, '4B': 90, '4V': 85, '5A': 75, '5B': 70, '5V': 60, '5G': 22 },
+        '16u': { FT: 550, '1A': 450, '1B': 430, '2A': 400, '2B': 350, '3A': 300, '3B': 280, '3V': 250, '4A': 200, '4B': 180, '4V': 150, '5A': 120, '5B': 100, '5V': 90, '5G': 47 },
+        '18u': { FT: 900, '1A': 700, '1B': 650, '2A': 550, '2B': 500, '3A': 400, '3B': 350, '3V': 300, '4A': 260, '4B': 230, '4V': 210, '5A': 180, '5B': 150, '5V': 120, '5G': 63 },
+        adult: { FT: 900, '1A': 700, '1B': 650, '2A': 550, '2B': 500, '3A': 400, '3B': 350, '3V': 300, '4A': 260, '4B': 230, '4V': 210, '5A': 180, '5B': 150, '5V': 120, '5G': 63 }
+    };
+
+    const bucket = ageBucket || 'adult';
+    const table = pointsMap[bucket] || pointsMap.adult;
+    if (table[categoryCode]) return table[categoryCode];
+
+    const major = categoryCode.match(/^([1-6])/)?.[1] || null;
+    if (major) {
+        const fallbackByMajor: Record<string, string> = {
+            '1': '1B',
+            '2': '2B',
+            '3': '3B',
+            '4': '4B',
+            '5': '5B',
+            '6': '6B'
+        };
+        return table[fallbackByMajor[major]] || 24;
+    }
+
+    return Math.max(18, Math.round((table['4B'] || 26) * 0.8));
+};
+
+const getParticipantsMultiplier = (participants: number) => {
+    if (participants >= 32) return 1;
+    if (participants >= 24) return 0.88;
+    if (participants >= 16) return 0.72;
+    if (participants >= 8) return 0.52;
+    return 0.35;
+};
+
+const getSystemMultiplier = (systemCode: string) => {
+    if (systemCode === 'oidt') return 0.9;
+    if (systemCode === 'o') return 0.72;
+    if (systemCode === 'team') return 0.4;
+    return 1;
+};
+
+const resolveTournamentParticipants = (tournament: Tournament, tournamentDetails?: any) => {
+    const directValue = Number(tournamentDetails?.participantsCount || tournament.participants_count || tournament.participantsCount || 0);
+    if (Number.isFinite(directValue) && directValue > 0) return directValue;
+
+    const firstRound = tournament.rounds?.[0];
+    const firstRoundMatches = firstRound?.matches?.length || 0;
+    if (firstRoundMatches > 0) {
+        return firstRoundMatches * 2;
+    }
+
+    return 8;
+};
+
+const estimateTournamentPointsByPlace = (tournament: Tournament, place: number, tournamentDetails?: any) => {
+    const participants = resolveTournamentParticipants(tournament, tournamentDetails);
+    const ageBucket = extractTournamentAgeBucket(tournamentDetails?.ageGroup || tournament.age_group || tournament.ageGroup || tournament.group_name || tournament.groupName || '');
+    const categoryCode = normalizeTournamentCategoryCode(tournamentDetails?.category || tournament.category);
+    const systemCode = normalizeTournamentSystemCode(tournamentDetails?.system || tournament.system);
+    const championPoints = getTournamentPointsBase(categoryCode, ageBucket) * getParticipantsMultiplier(participants) * getSystemMultiplier(systemCode);
+
+    const placeMultiplier = Math.pow(place, -0.42);
+    return Math.max(1, Math.round(championPoints * placeMultiplier));
+};
+
+const parseOfficialTournamentPointsTable = (tournamentDetails?: any) => {
+    if (!Array.isArray(tournamentDetails?.pointsTable)) {
+        return [];
+    }
+
+    return tournamentDetails.pointsTable
+        .map((row: any) => {
+            const stageLabel = String(row?.stage || '').trim();
+            const drawSize = Number(stageLabel.replace(/\D/g, ''));
+            const values = String(row?.points || '')
+                .split(',')
+                .map((value) => String(value).trim())
+                .filter((value) => value.length > 0);
+
+            if (!stageLabel || !Number.isFinite(drawSize) || !RTT_ALLOWED_DRAW_SIZES.has(drawSize) || values.length === 0) {
+                return null;
+            }
+
+            return {
+                stageLabel: String(drawSize),
+                drawSize,
+                values,
+            };
+        })
+        .filter(Boolean);
+};
+
+const getRecommendedOfficialPointsRow = (rows: Array<{ stageLabel: string; drawSize: number | null; values: string[] }>, participants: number) => {
+    const rowsWithDraw = rows.filter((row) => Number.isFinite(row.drawSize) && (row.drawSize || 0) > 0);
+
+    if (!rowsWithDraw.length) {
+        return null;
+    }
+
+    const exactMatch = rowsWithDraw.find((row) => row.drawSize === participants);
+    if (exactMatch) {
+        return exactMatch;
+    }
+
+    const largerMatch = rowsWithDraw
+        .filter((row) => (row.drawSize || 0) >= participants)
+        .sort((left, right) => (left.drawSize || 0) - (right.drawSize || 0))[0];
+
+    if (largerMatch) {
+        return largerMatch;
+    }
+
+    return rowsWithDraw.sort((left, right) => (right.drawSize || 0) - (left.drawSize || 0))[0];
+};
+
+const buildTournamentPointsPreviewRows = (tournament: Tournament, tournamentDetails?: any) => {
+    const participants = resolveTournamentParticipants(tournament, tournamentDetails);
+    const ranges = [
+        { label: '1 место', from: 1, to: 1 },
+        { label: '2 место', from: 2, to: 2 },
+        { label: '3–4 место', from: 3, to: Math.min(4, participants) },
+        { label: '5–8 место', from: 5, to: Math.min(8, participants) },
+        { label: '9–16 место', from: 9, to: Math.min(16, participants) },
+        { label: '17–32 место', from: 17, to: Math.min(32, participants) }
+    ];
+
+    return ranges
+        .filter((range) => range.from <= participants)
+        .map((range) => {
+            const fromPoints = estimateTournamentPointsByPlace(tournament, range.from, tournamentDetails);
+            const toPoints = estimateTournamentPointsByPlace(tournament, range.to, tournamentDetails);
+            return {
+                label: range.label,
+                points: fromPoints === toPoints ? `${fromPoints}` : `${fromPoints}–${toPoints}`
+            };
+        });
+};
+
+const TournamentPointsPreview = ({ tournament, tournamentDetails }: { tournament: Tournament, tournamentDetails?: any }) => {
+    const participants = resolveTournamentParticipants(tournament, tournamentDetails);
+    const officialRows = parseOfficialTournamentPointsTable(tournamentDetails);
+    const recommendedOfficialRow = getRecommendedOfficialPointsRow(officialRows, participants);
+    const fallbackRows = buildTournamentPointsPreviewRows(tournament, tournamentDetails);
+    const maxOfficialColumns = officialRows.reduce((max, row) => Math.max(max, row.values.length), 0);
+    const useStageHeaders = maxOfficialColumns > 0 && maxOfficialColumns <= 7;
+    const officialHeaders = useStageHeaders
+        ? ['П', 'Ф', '1/2', '1/4', '1/8', '1/16', '1/32'].slice(0, maxOfficialColumns)
+        : Array.from({ length: maxOfficialColumns }, (_, index) => `${index + 1}`);
+    const isOfficial = officialRows.length > 0;
+    const displayCategory = cleanTournamentCategoryLabel(tournamentDetails?.category || tournament.category || '—');
+    const displayAgeGroup = tournamentDetails?.ageGroup || tournament.age_group || tournament.ageGroup || 'возраст не указан';
+    const displaySystem = tournamentDetails?.system || tournament.system || 'система не указана';
+    const drawSizeLabel = recommendedOfficialRow?.drawSize && recommendedOfficialRow.drawSize !== participants
+        ? ` • рекомендованная сетка ${recommendedOfficialRow.drawSize}`
+        : '';
+
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-start justify-between gap-3 mb-3">
+                <div>
+                    <h4 className="font-bold text-slate-900">Таблица очков</h4>
+                    <p className="text-xs text-slate-500 mt-1">
+                        Категория {displayCategory} • {displayAgeGroup} • {displaySystem} • {participants} участников{drawSizeLabel}
+                    </p>
+                </div>
+                <div className="text-right text-[11px] text-slate-400 uppercase tracking-wider">{isOfficial ? 'RTT' : 'оценка'}</div>
+            </div>
+
+            {isOfficial ? (
+                <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                    <table className="min-w-full border-collapse text-sm">
+                        <thead>
+                            <tr className="bg-slate-100 text-xs font-bold uppercase tracking-wider text-slate-500">
+                                <th className="px-3 py-2 text-left">Сетка</th>
+                                {officialHeaders.map((header) => (
+                                    <th key={header} className="px-3 py-2 text-center whitespace-nowrap">{header}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {officialRows.map((row) => {
+                                const isRecommended = recommendedOfficialRow?.stageLabel === row.stageLabel;
+
+                                return (
+                                    <tr key={`${row.stageLabel}-${row.values.join('-')}`} className={isRecommended ? 'bg-lime-50' : 'bg-white'}>
+                                        <td className={`px-3 py-2 font-bold ${isRecommended ? 'text-lime-700' : 'text-slate-700'}`}>
+                                            {row.stageLabel}
+                                        </td>
+                                        {officialHeaders.map((_, index) => (
+                                            <td key={`${row.stageLabel}-${index}`} className="px-3 py-2 text-center font-semibold text-slate-900 whitespace-nowrap border-l border-slate-100">
+                                                {row.values[index] || '—'}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            ) : (
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                    <div className="grid grid-cols-2 bg-slate-100 text-xs font-bold uppercase tracking-wider text-slate-500">
+                        <div className="px-3 py-2">Место</div>
+                        <div className="px-3 py-2 text-right">Очки</div>
+                    </div>
+                    {fallbackRows.map((row) => (
+                        <div key={row.label} className="grid grid-cols-2 border-t border-slate-100 text-sm">
+                            <div className="px-3 py-2 text-slate-700">{row.label}</div>
+                            <div className="px-3 py-2 text-right font-bold text-slate-900">{row.points}</div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const getTournamentDisplayStatus = (status?: string | null) => {
+    if (status === 'draft') return 'Набор';
+    if (status === 'open') return 'Регистрация';
+    if (status === 'live') return 'Идет';
+    if (status === 'finished') return 'Завершен';
+    return status || 'Не указан';
+};
+
+const TournamentDetailsModal = ({
+    isOpen,
+    onClose,
+    tournament,
+    tournamentDetails,
+    loadingTournamentDetails,
+    canApply = false,
+    hasApplied = false,
+    isApplying = false,
+    applicationStatus = null,
+    onApply,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    tournament: any;
+    tournamentDetails?: any;
+    loadingTournamentDetails?: boolean;
+    canApply?: boolean;
+    hasApplied?: boolean;
+    isApplying?: boolean;
+    applicationStatus?: { message: string; type: 'success' | 'error' } | null;
+    onApply?: () => void;
+}) => {
+    if (!tournament) {
+        return null;
+    }
+
+    const hasRttLink = Boolean(tournament?.rtt_link || tournament?.rttLink);
+    const shouldWaitForRttDetails = hasRttLink && !tournamentDetails;
+
+    return (
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={tournament?.name || tournament?.title || ''}
+            maxWidth="max-w-6xl"
+            bodyClassName="p-0"
+        >
+            <div className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+                <p className="text-slate-600"><strong>Группа:</strong> {tournament.groupName || tournament.group_name || 'без группы'}</p>
+                <p className="text-slate-600"><strong>Статус:</strong> {getTournamentDisplayStatus(tournament.status)}</p>
+                <p className="text-slate-600 col-span-2"><strong>Категория:</strong> {cleanTournamentCategoryLabel(tournamentDetails?.category || tournament.category || 'Не указана')}</p>
+                <p className="text-slate-600"><strong>Разряд:</strong> {tournament.tournament_type || tournament.tournamentType || 'Не указан'}</p>
+                <p className="text-slate-600"><strong>Пол:</strong> {tournament.gender || 'Не указан'}</p>
+                <p className="text-slate-600 col-span-2"><strong>Возраст:</strong> {tournamentDetails?.ageGroup || tournament.age_group || tournament.ageGroup || 'Не указана'}</p>
+                <p className="text-slate-600"><strong>Система:</strong> {tournamentDetails?.system || tournament.system || 'Не указана'}</p>
+                <p className="text-slate-600"><strong>Формат:</strong> {tournament.match_format || tournament.matchFormat || 'Не указан'}</p>
+                <p className="text-slate-600 col-span-2"><strong>Участники:</strong> {resolveTournamentParticipants(tournament, tournamentDetails)}</p>
+                <p className="text-slate-600"><strong>Начало:</strong> {
+                    (tournament.start_date || tournament.startDate) && !isNaN(new Date(tournament.start_date || tournament.startDate).getTime())
+                        ? new Date(tournament.start_date || tournament.startDate).toLocaleDateString('ru-RU')
+                        : 'Не указана'
+                }</p>
+                <p className="text-slate-600"><strong>Окончание:</strong> {
+                    (tournament.end_date || tournament.endDate) && !isNaN(new Date(tournament.end_date || tournament.endDate).getTime())
+                        ? new Date(tournament.end_date || tournament.endDate).toLocaleDateString('ru-RU')
+                        : 'Не указана'
+                }</p>
+                {(() => {
+                    const tournamentMeta = getTournamentMetaLabel(tournament.prize_pool || tournament.prizePool);
+                    return <p className="text-slate-600 col-span-2"><strong>{tournamentMeta.label}:</strong> {tournamentMeta.value}</p>;
+                })()}
+            </div>
+
+            <div className="px-6 md:px-8 pb-6 md:pb-8">
+                {shouldWaitForRttDetails && (
+                    <div className="mb-3 flex items-center gap-2 text-sm text-slate-500">
+                        <Loader2 className="animate-spin" size={16} /> Загружаю RTT-данные турнира...
+                    </div>
+                )}
+                {!shouldWaitForRttDetails && (
+                    <TournamentPointsPreview tournament={tournament} tournamentDetails={tournamentDetails} />
+                )}
+            </div>
+
+            {(canApply || hasApplied) && (
+                <div className="p-4 border-t border-slate-200">
+                    {applicationStatus && (
+                        <div className={`mb-4 text-center p-2 rounded-lg text-sm ${applicationStatus.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                            {applicationStatus.message}
+                        </div>
+                    )}
+                    <Button
+                        onClick={onApply}
+                        className="w-full"
+                        disabled={isApplying || hasApplied}
+                    >
+                        {isApplying
+                            ? <Loader2 className="animate-spin" />
+                            : hasApplied
+                                ? 'Заявка отправлена'
+                                : 'Подать заявку'}
+                    </Button>
+                </div>
+            )}
+        </Modal>
+    );
+};
+
 const getTournamentStartDate = (tournament: Tournament) => {
     const rawDate = tournament.start_date || tournament.startDate;
 
@@ -152,6 +563,7 @@ const buildTournamentAnnouncementContent = (tournament: Tournament, announcement
     tournamentId: String(tournament.id),
     announcementKind,
     title: tournament.name,
+    name: tournament.name,
     groupName: tournament.groupName || tournament.group_name,
     prizePool: tournament.prize_pool || tournament.prizePool,
     date,
@@ -165,10 +577,12 @@ const buildTournamentAnnouncementContent = (tournament: Tournament, announcement
     ageGroup: tournament.age_group || tournament.ageGroup,
     system: tournament.system,
     matchFormat: tournament.match_format || tournament.matchFormat,
-    participantsCount: tournament.participants_count || tournament.participantsCount,
+    participantsCount: resolveTournamentParticipants(tournament),
     startDate: tournament.start_date || tournament.startDate,
     endDate: tournament.end_date || tournament.endDate,
     creatorRole: tournament.creator_role,
+    rttLink: tournament.rtt_link,
+    rtt_link: tournament.rtt_link,
 });
 
 const buildUpcomingAdminTournamentAnnouncementPosts = (tournaments: Tournament[], posts: any[], user: User) => {
@@ -852,44 +1266,99 @@ const MarketplacePost = ({ post, user, onStartConversation, onUpdate }: { post: 
 
 const TournamentAnnouncementPost = ({ post }: { post: any }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [tournamentDetails, setTournamentDetails] = useState<any>(null);
+    const [loadingTournamentDetails, setLoadingTournamentDetails] = useState(false);
     const isUpcoming = post.content?.announcementKind === 'upcoming';
 
+    useEffect(() => {
+        const rttLink = post.content?.rtt_link || post.content?.rttLink;
+
+        if (!isOpen || !rttLink) {
+            if (!isOpen) {
+                setTournamentDetails(null);
+            }
+            return;
+        }
+
+        let isActive = true;
+        setLoadingTournamentDetails(true);
+
+        api.rtt.getTournamentDetails(rttLink)
+            .then((data) => {
+                if (isActive && data?.success) {
+                    setTournamentDetails(data.tournament || null);
+                }
+            })
+            .catch((error) => {
+                console.error('Failed to load RTT tournament details for feed modal', error);
+            })
+            .finally(() => {
+                if (isActive) {
+                    setLoadingTournamentDetails(false);
+                }
+            });
+
+        return () => {
+            isActive = false;
+        };
+    }, [isOpen, post.content?.rtt_link, post.content?.rttLink]);
+
+    const tournamentFromPost = {
+        ...post.content,
+        name: post.content?.name || post.content?.title,
+        tournament_type: post.content?.tournamentType,
+        age_group: post.content?.ageGroup,
+        match_format: post.content?.matchFormat,
+        prize_pool: post.content?.prizePool,
+        rtt_link: post.content?.rtt_link || post.content?.rttLink,
+    };
+
+    const handleOpenTournament = () => {
+        if (tournamentFromPost.rtt_link) {
+            setLoadingTournamentDetails(true);
+        }
+        setIsOpen(true);
+    };
+
     return (
-    <>
-    <button onClick={() => setIsOpen(true)} className="bg-white p-6 rounded-2xl shadow-sm border border-blue-200 w-full text-left hover:shadow-md transition-shadow cursor-pointer">
-        <div className="flex justify-between items-start mb-4">
-            <div className="flex gap-3 items-center">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <Trophy size={20} className="text-blue-500" />
+        <>
+            <button onClick={handleOpenTournament} className="bg-white p-6 rounded-2xl shadow-sm border border-blue-200 w-full text-left hover:shadow-md transition-shadow cursor-pointer">
+                <div className="flex justify-between items-start mb-4">
+                    <div className="flex gap-3 items-center">
+                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                            <Trophy size={20} className="text-blue-500" />
+                        </div>
+                        <div>
+                            <p className="font-bold text-blue-600">{isUpcoming ? 'Анонс турнира' : 'Начался новый турнир!'}</p>
+                            <p className="text-xs text-slate-400">Опубликовал: {post.content.authorName || (post.author?.role === 'admin' ? 'Администрация' : post.author?.name) || 'Организатор'}</p>
+                        </div>
+                    </div>
+                    <div className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded">{isUpcoming ? 'АНОНС' : 'ТУРНИР'}</div>
                 </div>
-                <div>
-                    <p className="font-bold text-blue-600">{isUpcoming ? 'Анонс турнира' : 'Начался новый турнир!'}</p>
-                    <p className="text-xs text-slate-400">Опубликовал: {post.content.authorName || (post.author?.role === 'admin' ? 'Администрация' : post.author?.name) || 'Организатор'}</p>
-                </div>
-            </div>
-            <div className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded">{isUpcoming ? 'АНОНС' : 'ТУРНИР'}</div>
-        </div>
-        <h3 className="text-xl font-black text-slate-900 mb-2">{post.content.title}</h3>
-        {(() => {
-            const tournamentMeta = getTournamentMetaLabel(post.content.prizePool);
-            return (
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
-            {post.content.groupName && <p><strong>Группа:</strong> {post.content.groupName}</p>}
-            <p><strong>{tournamentMeta.label}:</strong> {tournamentMeta.value}</p>
-            <p><strong>Дата:</strong> {new Date(post.content.date).toLocaleDateString('ru-RU')}</p>
-        </div>
-            );
-        })()}
-        <p className="text-xs text-blue-600 font-semibold mt-4">Нажмите, чтобы открыть детали турнира</p>
-    </button>
-    <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title={post.content?.title || 'Анонс турнира'}>
-        <TournamentAnnouncementDetails content={post.content} />
-    </Modal>
-    </>
+                <h3 className="text-xl font-black text-slate-900 mb-2">{post.content.title}</h3>
+                {(() => {
+                    const tournamentMeta = getTournamentMetaLabel(post.content.prizePool);
+                    return (
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
+                            {post.content.groupName && <p><strong>Группа:</strong> {post.content.groupName}</p>}
+                            <p><strong>{tournamentMeta.label}:</strong> {tournamentMeta.value}</p>
+                            <p><strong>Дата:</strong> {new Date(post.content.date).toLocaleDateString('ru-RU')}</p>
+                        </div>
+                    );
+                })()}
+                <p className="text-xs text-blue-600 font-semibold mt-4">Нажмите, чтобы открыть детали турнира</p>
+            </button>
+            <TournamentDetailsModal
+                isOpen={isOpen}
+                onClose={() => setIsOpen(false)}
+                tournament={tournamentFromPost}
+                tournamentDetails={tournamentDetails}
+                loadingTournamentDetails={loadingTournamentDetails}
+            />
+        </>
     );
 };
 
-// Результат матча в рамках турнира (публикует админ)
 const TournamentMatchResultPost = ({ post }: { post: any }) => {
     const c = post.content || {};
     const isFullResult = !c.player1Name;
@@ -1142,25 +1611,23 @@ const GroupsView = forwardRef(({ user, onGroupSelect }: { user: User, onGroupSel
     }, []);
 
     return (
-        <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {groups.map(group => (
-                    <div key={group.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 cursor-pointer overflow-hidden" onClick={() => onGroupSelect(group)}>
-                        {group.avatar ? (
-                            <img src={group.avatar} alt={group.name} className="w-full h-32 object-cover" />
-                        ) : (
-                            <div className="w-full h-32 bg-slate-100 flex items-center justify-center">
-                                <Users className="text-slate-400" size={48} />
-                            </div>
-                        )}
-                        <div className="p-6">
-                            <h3 className="font-bold text-lg">{group.name}</h3>
-                            <p className="text-sm text-slate-500">{group.location}</p>
-                            <p className="text-sm text-slate-600 mt-2">{group.description}</p>
+        <div className="space-y-4">
+            {groups.map(group => (
+                <div key={group.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 cursor-pointer overflow-hidden" onClick={() => onGroupSelect(group)}>
+                    {group.avatar ? (
+                        <img src={group.avatar} alt={group.name} className="w-full h-32 object-cover" />
+                    ) : (
+                        <div className="w-full h-32 bg-slate-100 flex items-center justify-center text-3xl font-bold text-slate-400">
+                            {group.name?.charAt(0) || 'G'}
                         </div>
+                    )}
+                    <div className="p-4">
+                        <h3 className="font-bold text-lg text-slate-900">{group.name}</h3>
+                        {group.location && <p className="text-sm text-slate-500">{group.location}</p>}
+                        {group.description && <p className="text-sm text-slate-600 mt-2">{group.description}</p>}
                     </div>
-                ))}
-            </div>
+                </div>
+            ))}
         </div>
     );
 });
@@ -1273,6 +1740,8 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
     const [tournaments, setTournaments] = useState<Tournament[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null);
+    const [selectedTournamentDetails, setSelectedTournamentDetails] = useState<any | null>(null);
+    const [loadingTournamentDetails, setLoadingTournamentDetails] = useState(false);
     const [isApplying, setIsApplying] = useState(false);
     const [applicationStatus, setApplicationStatus] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [userApplications, setUserApplications] = useState<any[]>([]);
@@ -1321,8 +1790,36 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
 
     const handleModalClose = () => {
         setSelectedTournament(null);
+        setSelectedTournamentDetails(null);
         setApplicationStatus(null);
     };
+
+    useEffect(() => {
+        if (!selectedTournament?.rtt_link) {
+            setSelectedTournamentDetails(null);
+            return;
+        }
+
+        let isActive = true;
+        setLoadingTournamentDetails(true);
+
+        api.rtt.getTournamentDetails(selectedTournament.rtt_link)
+            .then((data) => {
+                if (isActive && data?.success) {
+                    setSelectedTournamentDetails(data.tournament || null);
+                }
+            })
+            .catch((error) => {
+                console.error('Failed to load RTT tournament details for community modal', error);
+            })
+            .finally(() => {
+                if (isActive) setLoadingTournamentDetails(false);
+            });
+
+        return () => {
+            isActive = false;
+        };
+    }, [selectedTournament?.rtt_link]);
 
     const handleAllClick = () => {
         if (user.role === 'coach') {
@@ -1352,7 +1849,12 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
                     {!loading && tournaments.map(t => {
                         const { month, day } = formatDate(t.start_date);
                         return (
-                            <div key={t.id} onClick={() => setSelectedTournament(t)} className="flex items-center gap-4 cursor-pointer group">
+                            <div key={t.id} onClick={() => {
+                                if (t.rtt_link) {
+                                    setLoadingTournamentDetails(true);
+                                }
+                                setSelectedTournament(t);
+                            }} className="flex items-center gap-4 cursor-pointer group">
                                 <div className="w-12 h-12 bg-slate-100 rounded-lg flex flex-col items-center justify-center group-hover:bg-lime-100 transition-colors">
                                     <span className="text-xs font-bold text-red-600">{month}</span>
                                     <span className="font-bold text-lg">{day}</span>
@@ -1370,64 +1872,18 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
                 </div>
             </div>
 
-            <Modal isOpen={!!selectedTournament} onClose={handleModalClose} title={selectedTournament?.name || ''}>
-                {selectedTournament && (
-                    <>
-                        <div className="p-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                            <p className="text-slate-600"><strong>Группа:</strong> {selectedTournament.groupName || 'без группы'}</p>
-                            <p className="text-slate-600"><strong>Статус:</strong> {
-                                selectedTournament.status === 'draft' ? 'Набор' :
-                                selectedTournament.status === 'open' ? 'Регистрация' :
-                                selectedTournament.status === 'live' ? 'Идет' :
-                                selectedTournament.status === 'finished' ? 'Завершен' :
-                                selectedTournament.status
-                            }</p>
-                            <p className="text-slate-600 col-span-2"><strong>Категория:</strong> {selectedTournament.category || 'Не указана'}</p>
-                            <p className="text-slate-600"><strong>Разряд:</strong> {selectedTournament.tournament_type || 'Не указан'}</p>
-                            <p className="text-slate-600"><strong>Пол:</strong> {selectedTournament.gender || 'Не указан'}</p>
-                            <p className="text-slate-600 col-span-2"><strong>Возраст:</strong> {selectedTournament.age_group || 'Не указана'}</p>
-                            <p className="text-slate-600"><strong>Система:</strong> {selectedTournament.system || 'Не указана'}</p>
-                            <p className="text-slate-600"><strong>Формат:</strong> {selectedTournament.match_format || 'Не указан'}</p>
-                            <p className="text-slate-600 col-span-2"><strong>Участники:</strong> {selectedTournament.participants_count || 'Не указано'}</p>
-                            <p className="text-slate-600"><strong>Начало:</strong> {
-                                selectedTournament.start_date && !isNaN(new Date(selectedTournament.start_date).getTime())
-                                    ? new Date(selectedTournament.start_date).toLocaleDateString('ru-RU')
-                                    : 'Не указана'
-                            }</p>
-                            <p className="text-slate-600"><strong>Окончание:</strong> {
-                                selectedTournament.end_date && !isNaN(new Date(selectedTournament.end_date).getTime())
-                                    ? new Date(selectedTournament.end_date).toLocaleDateString('ru-RU')
-                                    : 'Не указана'
-                            }</p>
-                            {(() => {
-                                const tournamentMeta = getTournamentMetaLabel(selectedTournament.prize_pool);
-                                return <p className="text-slate-600 col-span-2"><strong>{tournamentMeta.label}:</strong> {tournamentMeta.value}</p>;
-                            })()}
-                        </div>
-                        
-                        {(canApply || hasApplied) && (
-                            <div className="p-4 border-t border-slate-200">
-                                {applicationStatus && (
-                                    <div className={`mb-4 text-center p-2 rounded-lg text-sm ${applicationStatus.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                        {applicationStatus.message}
-                                    </div>
-                                )}
-                                <Button 
-                                    onClick={() => handleApply(selectedTournament.id)} 
-                                    className="w-full"
-                                    disabled={isApplying || hasApplied}
-                                >
-                                    {isApplying 
-                                        ? <Loader2 className="animate-spin" /> 
-                                        : hasApplied 
-                                        ? 'Заявка отправлена' 
-                                        : 'Подать заявку'}
-                                </Button>
-                            </div>
-                        )}
-                    </>
-                )}
-            </Modal>
+            <TournamentDetailsModal
+                isOpen={!!selectedTournament}
+                onClose={handleModalClose}
+                tournament={selectedTournament}
+                tournamentDetails={selectedTournamentDetails}
+                loadingTournamentDetails={loadingTournamentDetails}
+                canApply={!!canApply}
+                hasApplied={hasApplied}
+                isApplying={isApplying}
+                applicationStatus={applicationStatus}
+                onApply={() => selectedTournament && handleApply(selectedTournament.id)}
+            />
             <Modal isOpen={showAllTournamentsModal} onClose={() => setShowAllTournamentsModal(false)} title="Все турниры">
                 <div className="space-y-4">
                     {loading && <Loader2 className="animate-spin text-slate-400" />}
@@ -1435,6 +1891,9 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
                         const { month, day } = formatDate(t.start_date);
                         return (
                             <div key={t.id} onClick={() => {
+                                if (t.rtt_link) {
+                                    setLoadingTournamentDetails(true);
+                                }
                                 setSelectedTournament(t);
                                 setShowAllTournamentsModal(false);
                             }} className="flex items-center gap-4 cursor-pointer group">

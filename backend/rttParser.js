@@ -153,6 +153,139 @@ class RTTParser {
       .find((cellText, index) => index > 0 && this.isLikelyHumanName(cellText)) || '';
   }
 
+  isLikelyDateValue(value = '') {
+    const normalized = String(value || '').replace(/\s+/g, ' ').trim();
+    return /\b\d{1,2}\.\d{1,2}\.\d{2,4}\b/.test(normalized);
+  }
+
+  isLikelyScoreValue(value = '') {
+    const normalized = String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+    if (!normalized) {
+      return false;
+    }
+
+    return /^(\d+[-:]\d+(?:\([^)]*\))?(?:,\d+[-:]\d+(?:\([^)]*\))?)*)$/.test(normalized);
+  }
+
+  extractApplicantMeta(rawValue = '') {
+    const normalized = String(rawValue || '').replace(/\s+/g, ' ').trim();
+    const ageMatch = normalized.match(/(\d+\s*лет|до\s*\d+\s*лет)/i);
+    const cityMatch = normalized.match(/,\s*([^,]+)$/);
+
+    return {
+      age: ageMatch ? ageMatch[1].trim() : '',
+      city: cityMatch ? cityMatch[1].trim() : ''
+    };
+  }
+
+  getHeaderIndex(headers = [], patterns = []) {
+    return headers.findIndex(header => patterns.some(pattern => header.includes(pattern)));
+  }
+
+  isApplicationsTable(headers = []) {
+    const headerText = headers.join(' ');
+    const hasNameColumn = headers.some(header => ['имя', 'фио', 'участник', 'игрок'].some(pattern => header.includes(pattern)));
+    const hasSupportColumn = headers.some(header => ['место', '№', 'рейтинг', 'очк', 'город', 'возраст', 'рни'].some(pattern => header.includes(pattern)));
+    const hasMatchOnlyColumns = ['дата', 'счет', 'счёт', 'результ', 'турнир', 'раунд', 'круг', 'матч', 'сет', 'гейм']
+      .some(pattern => headerText.includes(pattern));
+
+    return hasNameColumn && hasSupportColumn && !hasMatchOnlyColumns;
+  }
+
+  parseApplicationsTable($table, headers = [], $) {
+    const participants = [];
+    const seenParticipants = new Set();
+
+    const placeIndex = this.getHeaderIndex(headers, ['место', '№']);
+    const nameIndex = this.getHeaderIndex(headers, ['имя', 'фио', 'участник', 'игрок']);
+    const ratingIndex = this.getHeaderIndex(headers, ['рейтинг', 'очк']);
+    const cityIndex = this.getHeaderIndex(headers, ['город']);
+    const ageIndex = this.getHeaderIndex(headers, ['возраст']);
+
+    $table.find('tbody tr, tr').each((rowIndex, row) => {
+      if (rowIndex === 0 && headers.length > 0) return;
+
+      const $row = $(row);
+      const cells = [];
+
+      $row.find('td').each((_, cell) => {
+        cells.push($(cell).text().replace(/\s+/g, ' ').trim());
+      });
+
+      if (cells.length < 2) {
+        return;
+      }
+
+      const rowLinks = [];
+      $row.find('td a').each((_, link) => {
+        const linkText = $(link).text().replace(/\s+/g, ' ').trim();
+        if (linkText) {
+          rowLinks.push(linkText);
+        }
+      });
+
+      let rni = '';
+      $row.find('td a').each((_, link) => {
+        const href = $(link).attr('href');
+        if (href && href.includes('/player/')) {
+          const match = href.match(/\/player\/(\d+)/);
+          if (match) {
+            rni = match[1];
+          }
+        }
+      });
+
+      const rowHeaderProbe = String(cells[0] || '').toLowerCase();
+      if (rowHeaderProbe.includes('место') || rowHeaderProbe.includes('фио') || rowHeaderProbe.includes('участник') || rowHeaderProbe.includes('игрок')) {
+        return;
+      }
+
+      const rawPrimaryCell = cells[0] || '';
+      const fallbackMeta = this.extractApplicantMeta(rawPrimaryCell);
+      const name = this.extractCleanPlayerName(nameIndex >= 0 ? cells[nameIndex] : this.extractParticipantName(cells, rowLinks));
+      const placeRaw = placeIndex >= 0 ? cells[placeIndex] : rawPrimaryCell;
+      const rating = ratingIndex >= 0 ? String(cells[ratingIndex] || '').trim() : '';
+      const city = cityIndex >= 0 ? String(cells[cityIndex] || '').trim() : fallbackMeta.city;
+      const age = ageIndex >= 0 ? String(cells[ageIndex] || '').trim() : fallbackMeta.age;
+      const place = String(placeRaw || '').match(/\d+/)?.[0] || '';
+
+      if (!this.isLikelyHumanName(name)) {
+        return;
+      }
+
+      if (rating && this.isLikelyScoreValue(rating)) {
+        return;
+      }
+
+      if (city && this.isLikelyDateValue(city)) {
+        return;
+      }
+
+      if (age && !/(лет|до\s*\d+)/i.test(age)) {
+        return;
+      }
+
+      const participantKey = `${rni || ''}|${name.toLowerCase()}|${city.toLowerCase()}`;
+      if (seenParticipants.has(participantKey)) {
+        return;
+      }
+
+      seenParticipants.add(participantKey);
+      participants.push({
+        place,
+        name,
+        rating,
+        city,
+        age,
+        points: rating,
+        rni
+      });
+    });
+
+    return participants;
+  }
+
   extractTournamentCity(tournamentLabel = '') {
     const normalized = String(tournamentLabel || '').trim();
     if (!normalized.includes('.')) return '';
@@ -897,8 +1030,9 @@ class RTTParser {
       console.log('📋 Информация о турнире:', tournamentInfo);
 
       // Парсим ВСЕ таблицы на странице
-      const participants = [];
+      let participants = [];
       const pointsTable = [];
+      const participantTableCandidates = [];
       let tablesParsed = 0;
 
       $('table').each((tableIndex, table) => {
@@ -920,80 +1054,37 @@ class RTTParser {
         }
 
         const headerText = headers.join(' ');
+        const isParticipantsLikeTable =
+          headerText.includes('рни') ||
+          headerText.includes('фио') ||
+          headerText.includes('участник') ||
+          headerText.includes('игрок') ||
+          headerText.includes('возраст') ||
+          headerText.includes('город');
 
-        // Парсинг участников - ищем таблицы с игроками/участниками
-        if (headerText.includes('участник') || headerText.includes('игрок') || headerText.includes('фио') || 
-            headerText.includes('место') || headerText.includes('рейтинг') || headerText.includes('очки')) {
-          
-          console.log(`👥 Найдена таблица участников (таблица ${tableIndex + 1})`);
-          
-          $table.find('tbody tr, tr').each((rowIndex, row) => {
-            if (rowIndex === 0 && headers.length > 0) return; // Пропускаем заголовок
-            
-            const $row = $(row);
-            const cells = [];
-            $row.find('td').each((i, cell) => {
-              cells.push($(cell).text().trim());
+        if (this.isApplicationsTable(headers)) {
+          const parsedApplicants = this.parseApplicationsTable($table, headers, $);
+
+          if (parsedApplicants.length > 0) {
+            participantTableCandidates.push({
+              headers,
+              participants: parsedApplicants,
+              tableIndex,
             });
-            const rowLinkTexts = [];
-            $row.find('td a').each((i, link) => {
-              const linkText = $(link).text().replace(/\s+/g, ' ').trim();
-              if (linkText) {
-                rowLinkTexts.push(linkText);
-              }
-            });
-
-            // Ищем РНИ в ссылках (обычно в первой или второй ячейке)
-            let rni = null;
-            $row.find('td a').each((i, link) => {
-              const href = $(link).attr('href');
-              if (href && href.includes('/player/')) {
-                const match = href.match(/\/player\/(\d+)/);
-                if (match) {
-                  rni = match[1];
-                }
-              }
-            });
-
-            // Нужно минимум 2 ячейки (место/имя или имя/рейтинг)
-            if (cells.length >= 2 && cells[0] && cells[1]) {
-              // Пропускаем строки-заголовки
-              const firstCell = cells[0].toLowerCase();
-              if (firstCell.includes('место') || firstCell.includes('№') || 
-                  firstCell.includes('фио') || firstCell.includes('участник')) {
-                return;
-              }
-
-                const participantName = this.extractParticipantName(cells, rowLinkTexts);
-              const participant = {
-                place: cells[0] || '',
-                name: participantName,
-                rating: cells[2] || '',
-                city: cells[3] || '',
-                age: cells[4] || '',
-                points: cells[5] || '',
-                rni: rni || ''
-              };
-
-              // Проверяем, что это реальный участник (есть имя длиной больше 2 символов)
-              if (this.isLikelyHumanName(participant.name)) {
-                participants.push(participant);
-                console.log(`✅ Участник ${participants.length}:`, participant.name);
-              }
-            }
-          });
+            console.log(`👥 Найдена валидная таблица заявок (таблица ${tableIndex + 1}): ${parsedApplicants.length} игроков`);
+          }
         }
 
         // Парсинг таблицы очков/этапов турнира
-        if (headerText.includes('этап') || headerText.includes('раунд') || headerText.includes('место') ||
-            (headerText.includes('очки') || headerText.includes('1/2') || headerText.includes('1/4'))) {
+        if (!isParticipantsLikeTable && (headerText.includes('этап') || headerText.includes('раунд') || headerText.includes('место') ||
+          headerText.includes('очки') || headerText.includes('1/2') || headerText.includes('1/4'))) {
           
           console.log(`🏆 Найдена таблица очков (таблица ${tableIndex + 1})`);
           
           $table.find('tbody tr, tr').each((rowIndex, row) => {
             const $row = $(row);
             const cells = [];
-            $row.find('td').each((i, cell) => {
+            $row.find('th, td').each((i, cell) => {
               cells.push($(cell).text().trim());
             });
 
@@ -1001,9 +1092,15 @@ class RTTParser {
             // Остальные ячейки - очки для каждого места
             if (cells.length >= 2 && cells[0]) {
               const firstCell = cells[0].toLowerCase();
+              const drawSize = parseInt(String(cells[0]).replace(/\D/g, ''), 10);
               
               // Пропускаем строки-заголовки
               if (firstCell.includes('этап') || firstCell.includes('место') || firstCell === 'п' || firstCell === 'ф') {
+                return;
+              }
+
+              // Для таблицы очков берем только строки, где первый столбец — размер сетки
+              if (!Number.isFinite(drawSize) || drawSize <= 0) {
                 return;
               }
 
@@ -1012,11 +1109,11 @@ class RTTParser {
 
               if (allPoints) {
                 pointsTable.push({
-                  stage: cells[0] || '',
+                  stage: String(drawSize),
                   points: allPoints,
                   description: ''
                 });
-                console.log(`📊 Сетка ${cells[0]}: ${allPoints}`);
+                console.log(`📊 Сетка ${drawSize}: ${allPoints}`);
               }
             }
           });
@@ -1024,6 +1121,12 @@ class RTTParser {
 
         tablesParsed++;
       });
+
+      if (participantTableCandidates.length > 0) {
+        const bestCandidate = [...participantTableCandidates].sort((left, right) => right.participants.length - left.participants.length)[0];
+        participants = bestCandidate.participants;
+        console.log(`✅ Выбрана таблица заявок ${bestCandidate.tableIndex + 1}: ${participants.length} игроков`);
+      }
 
       console.log(`✅ Обработано таблиц: ${tablesParsed}`);
       console.log(`👥 Найдено участников: ${participants.length}`);

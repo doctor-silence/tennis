@@ -38,6 +38,134 @@ const resolveTournamentDate = (tournament: Tournament) => tournament.start_date 
 
 const resolveTournamentParticipants = (tournament: Tournament) => tournament.participants_count || tournament.participantsCount || 8;
 
+const ROMAN_TO_ARABIC: Record<string, string> = {
+    VI: '6',
+    V: '5',
+    IV: '4',
+    III: '3',
+    II: '2',
+    I: '1'
+};
+
+const CYRILLIC_TO_LATIN_SUFFIX: Record<string, string> = {
+    А: 'A',
+    Б: 'B',
+    В: 'V',
+    Г: 'G',
+    Д: 'D'
+};
+
+const normalizeComparableText = (value?: string | null) =>
+    String(value || '')
+        .toLowerCase()
+        .replace(/ё/g, 'е')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+const extractAgeBucket = (value?: string | null): string | null => {
+    const normalized = normalizeComparableText(value);
+    if (!normalized) return null;
+    if (normalized.includes('9-10') || normalized.includes('9–10')) return '9-10';
+    if (normalized.includes('до 13')) return '12u';
+    if (normalized.includes('до 15')) return '14u';
+    if (normalized.includes('до 17')) return '16u';
+    if (normalized.includes('до 19')) return '18u';
+    if (normalized.includes('взросл')) return 'adult';
+    return null;
+};
+
+const getUserAgeBucket = (user: User) => {
+    const fromCategory = extractAgeBucket(user.rttCategory);
+    if (fromCategory) return fromCategory;
+
+    if (typeof user.age === 'number') {
+        if (user.age <= 10) return '9-10';
+        if (user.age <= 12) return '12u';
+        if (user.age <= 14) return '14u';
+        if (user.age <= 16) return '16u';
+        if (user.age <= 18) return '18u';
+        return 'adult';
+    }
+
+    return null;
+};
+
+const getTournamentAgeBucket = (tournament: Tournament) =>
+    extractAgeBucket(tournament.age_group || tournament.ageGroup || tournament.group_name || tournament.groupName || '');
+
+const isTournamentAgeCompatible = (tournament: Tournament, user: User) => {
+    const userAgeBucket = getUserAgeBucket(user);
+    const tournamentAgeBucket = getTournamentAgeBucket(tournament);
+
+    if (!userAgeBucket || !tournamentAgeBucket) return true;
+    return userAgeBucket === tournamentAgeBucket;
+};
+
+const normalizeTournamentCategoryCode = (value?: string | null) => {
+    const raw = String(value || '').toUpperCase().replace(/Ё/g, 'Е').trim();
+    if (!raw) return 'UNKNOWN';
+    if (raw.includes('ФТ')) return 'FT';
+
+    const compact = raw.replace(/\s+/g, '').replace(/–/g, '-');
+    const romanMatch = compact.match(/(VI|IV|V|III|II|I)([АБВГДABVGD])?/);
+    if (romanMatch) {
+        const major = ROMAN_TO_ARABIC[romanMatch[1]] || romanMatch[1];
+        const suffix = romanMatch[2]
+            ? (CYRILLIC_TO_LATIN_SUFFIX[romanMatch[2] as keyof typeof CYRILLIC_TO_LATIN_SUFFIX] || romanMatch[2])
+            : '';
+        return `${major}${suffix}`;
+    }
+
+    const arabicMatch = compact.match(/([1-6])([АБВГДABVGD])?/);
+    if (arabicMatch) {
+        const suffix = arabicMatch[2]
+            ? (CYRILLIC_TO_LATIN_SUFFIX[arabicMatch[2] as keyof typeof CYRILLIC_TO_LATIN_SUFFIX] || arabicMatch[2])
+            : '';
+        return `${arabicMatch[1]}${suffix}`;
+    }
+
+    return compact || 'UNKNOWN';
+};
+
+const normalizeTournamentSystem = (value?: string | null) => {
+    const normalized = normalizeComparableText(value);
+    if (!normalized) return 'uo';
+    if (normalized.includes('оидт')) return 'oidt';
+    if (normalized.includes('ком')) return 'team';
+    if (normalized === 'о.' || normalized === 'о' || normalized.includes('олимп')) return 'o';
+    return 'uo';
+};
+
+const estimateCategoryBasePoints = (categoryCode: string, ageBucket?: string | null) => {
+    const ageAwareBaseMap: Record<string, Record<string, number>> = {
+        '9-10': { FT: 40, '1A': 36, '1B': 32, '2A': 28, '2B': 24, '3A': 18, '3B': 16, '3V': 15, '4A': 12, '4B': 11, '4V': 10, '5A': 9, '5B': 8, '5V': 7, '5G': 6, '6A': 5, '6B': 4, '6V': 3, '6G': 2, '6D': 1 },
+        '12u': { FT: 150, '1A': 130, '1B': 120, '2A': 105, '2B': 95, '3A': 80, '3B': 75, '3V': 70, '4A': 60, '4B': 55, '4V': 50, '5A': 45, '5B': 40, '5V': 35, '5G': 22 },
+        '14u': { FT: 350, '1A': 250, '1B': 230, '2A': 200, '2B': 180, '3A': 150, '3B': 130, '3V': 120, '4A': 100, '4B': 90, '4V': 85, '5A': 75, '5B': 70, '5V': 60, '5G': 22 },
+        '16u': { FT: 550, '1A': 450, '1B': 430, '2A': 400, '2B': 350, '3A': 300, '3B': 280, '3V': 250, '4A': 200, '4B': 180, '4V': 150, '5A': 120, '5B': 100, '5V': 90, '5G': 47 },
+        '18u': { FT: 900, '1A': 700, '1B': 650, '2A': 550, '2B': 500, '3A': 400, '3B': 350, '3V': 300, '4A': 260, '4B': 230, '4V': 210, '5A': 180, '5B': 150, '5V': 120, '5G': 63 },
+        adult: { FT: 900, '1A': 700, '1B': 650, '2A': 550, '2B': 500, '3A': 400, '3B': 350, '3V': 300, '4A': 260, '4B': 230, '4V': 210, '5A': 180, '5B': 150, '5V': 120, '5G': 63 }
+    };
+
+    const bucket = ageBucket || 'adult';
+    const table = ageAwareBaseMap[bucket] || ageAwareBaseMap.adult;
+    if (table[categoryCode]) return table[categoryCode];
+
+    const major = categoryCode.match(/^([1-6])/)?.[1] || null;
+    if (major) {
+        const fallbackByMajor: Record<string, string> = {
+            '1': '1B',
+            '2': '2B',
+            '3': '3B',
+            '4': '4B',
+            '5': '5B',
+            '6': '6B'
+        };
+        return table[fallbackByMajor[major]] || 24;
+    }
+
+    return Math.max(18, Math.round((table['4B'] || 26) * 0.8));
+};
+
 const formatWearableDuration = (durationSeconds?: number | null) => {
     if (!durationSeconds) return '—';
     const hours = Math.floor(durationSeconds / 3600);
@@ -68,7 +196,8 @@ const estimatePointsForTargetRank = (currentPoints: number, currentRank?: number
     if (targetRank >= currentRank) return Math.max(currentPoints, 0);
 
     const rankGap = currentRank - targetRank;
-    const projectedGain = Math.max(60, Math.round(Math.sqrt(rankGap) * 3.2));
+    const competitionBuffer = targetRank <= 50 ? 70 : targetRank <= 100 ? 45 : 25;
+    const projectedGain = Math.max(90, Math.round(rankGap * 5.5 + competitionBuffer));
     return currentPoints + projectedGain;
 };
 
@@ -148,21 +277,198 @@ const buildDefaultGoal = (user: User): ProfileGoalState => {
     };
 };
 
-const estimateTournamentPoints = (tournament: Tournament) => {
+const estimateTournamentPoints = (tournament: Tournament, user: User) => {
     const participants = resolveTournamentParticipants(tournament);
-    const category = (tournament.category || '').toLowerCase();
-    const format = tournament.tournament_type || tournament.tournamentType;
-    let points = 30 + Math.min(28, participants * 1.8);
+    const categoryCode = normalizeTournamentCategoryCode(tournament.category);
+    const userAgeBucket = getUserAgeBucket(user);
+    const tournamentAgeBucket = getTournamentAgeBucket(tournament);
+    const systemCode = normalizeTournamentSystem(tournament.system);
 
-    if (category.includes('1') || category.includes('всероссий')) points += 34;
-    else if (category.includes('2') || category.includes('регион')) points += 24;
-    else if (category.includes('3') || category.includes('город')) points += 16;
-    else if (category.includes('люб')) points += 10;
+    let points = estimateCategoryBasePoints(categoryCode, tournamentAgeBucket || userAgeBucket);
 
-    if (format === 'Одиночный') points += 8;
-    if (tournament.creator_role === 'admin') points += 4;
+    if (participants >= 32) points *= 1;
+    else if (participants >= 24) points *= 0.88;
+    else if (participants >= 16) points *= 0.72;
+    else if (participants >= 8) points *= 0.52;
+    else points *= 0.35;
 
-    return Math.max(25, Math.round(points));
+    if (systemCode === 'oidt') points *= 0.9;
+    else if (systemCode === 'o') points *= 0.72;
+    else if (systemCode === 'team') points *= 0.4;
+
+    if (userAgeBucket && tournamentAgeBucket && userAgeBucket !== tournamentAgeBucket) {
+        points *= 0.35;
+    }
+
+    return Math.max(3, Math.round(points));
+};
+
+const cleanTournamentCategoryLabel = (value?: string | null) => {
+    const raw = String(value || '').replace(/\s+/g, ' ').trim();
+    if (!raw) return '—';
+
+    return raw
+        .replace(/\s+(корты|покрытие)\s*:\s*.*$/i, '')
+        .replace(/\s+корты\s+.*$/i, '')
+        .trim();
+};
+
+const RTT_ALLOWED_DRAW_SIZES = new Set([4, 8, 16, 24, 32, 48, 56, 64]);
+
+const parseOfficialTournamentPointsTable = (tournamentDetails?: any) => {
+    if (!Array.isArray(tournamentDetails?.pointsTable)) {
+        return [];
+    }
+
+    return tournamentDetails.pointsTable
+        .map((row: any) => {
+            const drawSize = Number(String(row?.stage || '').replace(/\D/g, ''));
+            const values = String(row?.points || '')
+                .split(',')
+                .map((value) => String(value).trim())
+                .filter((value) => value.length > 0);
+
+            if (!Number.isFinite(drawSize) || !RTT_ALLOWED_DRAW_SIZES.has(drawSize) || values.length === 0) {
+                return null;
+            }
+
+            return {
+                stageLabel: String(drawSize),
+                drawSize,
+                values,
+            };
+        })
+        .filter(Boolean);
+};
+
+const getRecommendedOfficialPointsRow = (rows: Array<{ stageLabel: string; drawSize: number; values: string[] }>, participants: number) => {
+    if (!rows.length) {
+        return null;
+    }
+
+    const exactMatch = rows.find((row) => row.drawSize === participants);
+    if (exactMatch) {
+        return exactMatch;
+    }
+
+    const largerMatch = rows
+        .filter((row) => row.drawSize >= participants)
+        .sort((left, right) => left.drawSize - right.drawSize)[0];
+
+    if (largerMatch) {
+        return largerMatch;
+    }
+
+    return [...rows].sort((left, right) => right.drawSize - left.drawSize)[0];
+};
+
+const RttTournamentPointsPreview: React.FC<{ tournament: any; tournamentDetails?: any }> = ({ tournament, tournamentDetails }) => {
+    const participants = Number(tournamentDetails?.participantsCount || tournament?.applications || tournament?.applicationsCount || 0) || 0;
+    const officialRows = parseOfficialTournamentPointsTable(tournamentDetails);
+
+    if (!officialRows.length) {
+        return (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                Официальная RTT-таблица очков для этого турнира пока недоступна.
+            </div>
+        );
+    }
+
+    const recommendedOfficialRow = getRecommendedOfficialPointsRow(officialRows as Array<{ stageLabel: string; drawSize: number; values: string[] }>, participants);
+    const maxOfficialColumns = officialRows.reduce((max, row) => Math.max(max, row.values.length), 0);
+    const useStageHeaders = maxOfficialColumns > 0 && maxOfficialColumns <= 7;
+    const officialHeaders = useStageHeaders
+        ? ['П', 'Ф', '1/2', '1/4', '1/8', '1/16', '1/32'].slice(0, maxOfficialColumns)
+        : Array.from({ length: maxOfficialColumns }, (_, index) => `${index + 1}`);
+
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-start justify-between gap-3 mb-3">
+                <div>
+                    <h4 className="font-bold text-slate-900">Таблица очков</h4>
+                    <p className="text-xs text-slate-500 mt-1">
+                        Категория {cleanTournamentCategoryLabel(tournamentDetails?.category || tournament?.category || '—')} • {tournamentDetails?.ageGroup || tournament?.ageGroup || 'возраст не указан'} • {participants || '—'} участников
+                    </p>
+                </div>
+                <div className="text-right text-[11px] text-slate-400 uppercase tracking-wider">RTT</div>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                <table className="min-w-full border-collapse text-sm">
+                    <thead>
+                        <tr className="bg-slate-100 text-xs font-bold uppercase tracking-wider text-slate-500">
+                            <th className="px-3 py-2 text-left">Сетка</th>
+                            {officialHeaders.map((header) => (
+                                <th key={header} className="px-3 py-2 text-center whitespace-nowrap">{header}</th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {officialRows.map((row) => {
+                            const isRecommended = recommendedOfficialRow?.stageLabel === row.stageLabel;
+                            return (
+                                <tr key={`${row.stageLabel}-${row.values.join('-')}`} className={isRecommended ? 'bg-lime-50' : 'bg-white'}>
+                                    <td className={`px-3 py-2 font-bold ${isRecommended ? 'text-lime-700' : 'text-slate-700'}`}>{row.stageLabel}</td>
+                                    {officialHeaders.map((_, index) => (
+                                        <td key={`${row.stageLabel}-${index}`} className="px-3 py-2 text-center font-semibold text-slate-900 whitespace-nowrap border-l border-slate-100">
+                                            {row.values[index] || '—'}
+                                        </td>
+                                    ))}
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
+const RttTournamentDetailsModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    tournament: any;
+    tournamentDetails?: any;
+    loadingTournamentDetails?: boolean;
+}> = ({ isOpen, onClose, tournament, tournamentDetails, loadingTournamentDetails }) => {
+    if (!tournament) return null;
+
+    const displayTitle = tournamentDetails?.name || tournament?.name || 'Турнир РТТ';
+    const displayCity = tournamentDetails?.city || tournament?.city || '—';
+    const displayCategory = cleanTournamentCategoryLabel(tournamentDetails?.category || tournament?.category || '—');
+    const displayAgeGroup = tournamentDetails?.ageGroup || tournament?.ageGroup || '—';
+    const displayType = tournamentDetails?.type || tournament?.type || '—';
+    const displayGender = tournamentDetails?.gender || '—';
+    const displayParticipants = tournamentDetails?.participantsCount || tournament?.applicationsCount || tournament?.applications || '—';
+    const displayAvgRating = tournamentDetails?.avgRating || tournament?.avgRating || '—';
+    const displayStartDate = tournamentDetails?.startDate || tournament?.startDate || '—';
+    const displayEndDate = tournamentDetails?.endDate || tournament?.endDate || '—';
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={displayTitle} maxWidth="max-w-6xl" bodyClassName="p-0">
+            <div className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+                <p className="text-slate-600"><strong>Город:</strong> {displayCity}</p>
+                <p className="text-slate-600"><strong>Тип:</strong> {displayType}</p>
+                <p className="text-slate-600 col-span-2"><strong>Категория:</strong> {displayCategory}</p>
+                <p className="text-slate-600"><strong>Пол:</strong> {displayGender}</p>
+                <p className="text-slate-600"><strong>Возраст:</strong> {displayAgeGroup}</p>
+                <p className="text-slate-600"><strong>Участники:</strong> {displayParticipants}</p>
+                <p className="text-slate-600"><strong>Средний рейтинг:</strong> {displayAvgRating}</p>
+                <p className="text-slate-600"><strong>Начало:</strong> {displayStartDate}</p>
+                <p className="text-slate-600"><strong>Окончание:</strong> {displayEndDate}</p>
+            </div>
+
+            <div className="px-6 md:px-8 pb-6 md:pb-8">
+                {loadingTournamentDetails || !tournamentDetails ? (
+                    <div className="mb-3 flex items-center gap-2 text-sm text-slate-500">
+                        <Loader2 className="animate-spin" size={16} /> Загружаю RTT-данные турнира...
+                    </div>
+                ) : (
+                    <RttTournamentPointsPreview tournament={tournament} tournamentDetails={tournamentDetails} />
+                )}
+            </div>
+        </Modal>
+    );
 };
 
 const SkillRadarChart: React.FC<{ skills: SkillRadarValues }> = ({ skills }) => {
@@ -284,6 +590,9 @@ const NearbyTournamentsWidget: React.FC<{ userId: string; city: string }> = ({ u
   const [tournaments, setTournaments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [districtName, setDistrictName] = useState('');
+    const [selectedTournament, setSelectedTournament] = useState<any | null>(null);
+    const [selectedTournamentDetails, setSelectedTournamentDetails] = useState<any | null>(null);
+    const [loadingTournamentDetails, setLoadingTournamentDetails] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -308,6 +617,33 @@ const NearbyTournamentsWidget: React.FC<{ userId: string; city: string }> = ({ u
     load();
   }, [userId]);
 
+    useEffect(() => {
+        if (!selectedTournament?.link) {
+            setSelectedTournamentDetails(null);
+            return;
+        }
+
+        let isActive = true;
+        setLoadingTournamentDetails(true);
+
+        api.rtt.getTournamentDetails(selectedTournament.link)
+            .then((data) => {
+                if (isActive && data?.success) {
+                    setSelectedTournamentDetails(data.tournament || null);
+                }
+            })
+            .catch((error) => {
+                console.error('Failed to load RTT tournament details in profile', error);
+            })
+            .finally(() => {
+                if (isActive) setLoadingTournamentDetails(false);
+            });
+
+        return () => {
+            isActive = false;
+        };
+    }, [selectedTournament?.link]);
+
   if (loading) return <div className="flex justify-center py-4"><Loader2 className="animate-spin text-slate-300" size={20}/></div>;
 
   if (!tournaments.length) return (
@@ -315,28 +651,43 @@ const NearbyTournamentsWidget: React.FC<{ userId: string; city: string }> = ({ u
   );
 
   return (
-    <div className="space-y-2">
-      {districtName && <p className="text-xs text-slate-400 mb-3">{districtName} • топ-10 ближайших</p>}
-      <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-        {tournaments.map((t: any, i: number) => (
-          <a
-            key={i}
-            href={t.link || '#'}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-amber-50 hover:border-amber-200 transition-colors group cursor-pointer"
-          >
-            <div className="flex-shrink-0 w-10 text-center">
-              <div className="text-xs font-bold text-amber-600 leading-tight">{t.startDate?.slice(0,5) || '—'}</div>
+        <>
+            <div className="space-y-2">
+                {districtName && <p className="text-xs text-slate-400 mb-3">{districtName} • топ-10 ближайших</p>}
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    {tournaments.map((t: any, i: number) => (
+                        <button
+                            key={i}
+                            type="button"
+                            onClick={() => {
+                                setLoadingTournamentDetails(true);
+                                setSelectedTournament(t);
+                            }}
+                            className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-amber-50 hover:border-amber-200 transition-colors group cursor-pointer text-left"
+                        >
+                            <div className="flex-shrink-0 w-10 text-center">
+                                <div className="text-xs font-bold text-amber-600 leading-tight">{t.startDate?.slice(0,5) || '—'}</div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="font-bold text-sm text-slate-900 group-hover:text-amber-700 leading-snug">{t.name}</div>
+                                <div className="text-xs text-slate-400 mt-0.5">{[t.city, t.ageGroup, cleanTournamentCategoryLabel(t.category)].filter(Boolean).join(' · ')}</div>
+                            </div>
+                        </button>
+                    ))}
+                </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-bold text-sm text-slate-900 group-hover:text-amber-700 leading-snug">{t.name}</div>
-              <div className="text-xs text-slate-400 mt-0.5">{[t.city, t.ageGroup, t.category].filter(Boolean).join(' · ')}</div>
-            </div>
-          </a>
-        ))}
-      </div>
-    </div>
+
+            <RttTournamentDetailsModal
+                isOpen={!!selectedTournament}
+                onClose={() => {
+                    setSelectedTournament(null);
+                    setSelectedTournamentDetails(null);
+                }}
+                tournament={selectedTournament}
+                tournamentDetails={selectedTournamentDetails}
+                loadingTournamentDetails={loadingTournamentDetails}
+            />
+        </>
   );
 };
 
@@ -710,10 +1061,10 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
       return tournaments
           .filter((tournament) => {
               const startDate = resolveTournamentDate(tournament);
-              return Boolean(startDate) && new Date(startDate) > new Date();
+              return Boolean(startDate) && new Date(startDate) > new Date() && isTournamentAgeCompatible(tournament, user);
           })
           .map((tournament) => {
-              const estimatedPoints = estimateTournamentPoints(tournament);
+              const estimatedPoints = estimateTournamentPoints(tournament, user);
               const date = resolveTournamentDate(tournament);
               const daysUntilStart = date ? Math.max(0, Math.ceil((new Date(date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 365;
               const fitScore = estimatedPoints - Math.min(daysUntilStart, 45) * 0.35;
@@ -721,7 +1072,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
           })
           .sort((left, right) => right.fitScore - left.fitScore)
           .slice(0, 3);
-    }, [isRttPlayer, tournaments]);
+    }, [isRttPlayer, tournaments, user]);
 
   const pointsRemaining = Math.max(playerProgress.goal.targetPoints - currentRatingPoints, 0);
   const rankGap = user.rttRank && playerProgress.goal.targetRank
@@ -1063,7 +1414,12 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
                                           <div>
                                               <div className="font-bold text-white">{tournament.name}</div>
                                               <div className="text-xs text-slate-400 mt-1">
-                                                  {[resolveTournamentDate(tournament), tournament.category, tournament.groupName || tournament.group_name || 'без группы'].filter(Boolean).join(' • ')}
+                                                  {[
+                                                      resolveTournamentDate(tournament),
+                                                      tournament.category,
+                                                      tournament.ageGroup || tournament.age_group,
+                                                      tournament.groupName || tournament.group_name || 'без группы'
+                                                  ].filter(Boolean).join(' • ')}
                                               </div>
                                           </div>
                                           <div className="text-right">

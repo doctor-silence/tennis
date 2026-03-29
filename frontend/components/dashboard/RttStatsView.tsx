@@ -1,9 +1,131 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { Loader2, Filter, ExternalLink, RefreshCw } from 'lucide-react';
+import { Loader2, Filter, RefreshCw } from 'lucide-react';
 import { User } from '../../types';
 import Button from '../Button';
 import { api } from '../../services/api';
+
+const cleanTournamentCategoryLabel = (value?: string | null) => {
+    const raw = String(value || '').replace(/\s+/g, ' ').trim();
+    if (!raw) return '—';
+
+    return raw
+        .replace(/\s+(корты|покрытие)\s*:\s*.*$/i, '')
+        .replace(/\s+корты\s+.*$/i, '')
+        .trim();
+};
+
+const RTT_ALLOWED_DRAW_SIZES = new Set([4, 8, 16, 24, 32, 48, 56, 64]);
+
+const parseOfficialTournamentPointsTable = (tournamentDetails?: any) => {
+    if (!Array.isArray(tournamentDetails?.pointsTable)) {
+        return [];
+    }
+
+    return tournamentDetails.pointsTable
+        .map((row: any) => {
+            const drawSize = Number(String(row?.stage || '').replace(/\D/g, ''));
+            const values = String(row?.points || '')
+                .split(',')
+                .map((value) => String(value).trim())
+                .filter((value) => value.length > 0);
+
+            if (!Number.isFinite(drawSize) || !RTT_ALLOWED_DRAW_SIZES.has(drawSize) || values.length === 0) {
+                return null;
+            }
+
+            return {
+                stageLabel: String(drawSize),
+                drawSize,
+                values,
+            };
+        })
+        .filter(Boolean);
+};
+
+const getRecommendedOfficialPointsRow = (rows: Array<{ stageLabel: string; drawSize: number; values: string[] }>, participants: number) => {
+    if (!rows.length) {
+        return null;
+    }
+
+    const exactMatch = rows.find((row) => row.drawSize === participants);
+    if (exactMatch) {
+        return exactMatch;
+    }
+
+    const largerMatch = rows
+        .filter((row) => row.drawSize >= participants)
+        .sort((left, right) => left.drawSize - right.drawSize)[0];
+
+    if (largerMatch) {
+        return largerMatch;
+    }
+
+    return [...rows].sort((left, right) => right.drawSize - left.drawSize)[0];
+};
+
+const TournamentPointsPreview: React.FC<{ tournament: any; tournamentDetails?: any }> = ({ tournament, tournamentDetails }) => {
+    const participants = Number(tournamentDetails?.participantsCount || tournament?.applications || tournament?.applicationsCount || 0) || 0;
+    const officialRows = parseOfficialTournamentPointsTable(tournamentDetails);
+
+    if (!officialRows.length) {
+        return (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                Официальная RTT-таблица очков для этого турнира пока недоступна.
+            </div>
+        );
+    }
+
+    const recommendedOfficialRow = getRecommendedOfficialPointsRow(officialRows as Array<{ stageLabel: string; drawSize: number; values: string[] }>, participants);
+    const maxOfficialColumns = officialRows.reduce((max, row) => Math.max(max, row.values.length), 0);
+    const useStageHeaders = maxOfficialColumns > 0 && maxOfficialColumns <= 7;
+    const officialHeaders = useStageHeaders
+        ? ['П', 'Ф', '1/2', '1/4', '1/8', '1/16', '1/32'].slice(0, maxOfficialColumns)
+        : Array.from({ length: maxOfficialColumns }, (_, index) => `${index + 1}`);
+
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                    <h4 className="font-bold text-slate-900">Официальные очки RTT</h4>
+                    <p className="mt-1 text-xs text-slate-500">
+                        Категория {cleanTournamentCategoryLabel(tournamentDetails?.category || tournament?.category || '—')} • {tournamentDetails?.ageGroup || tournament?.ageGroup || 'возраст не указан'} • {participants || '—'} участников
+                    </p>
+                </div>
+                <div className="text-right text-[11px] uppercase tracking-wider text-slate-400">RTT</div>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                <table className="min-w-full border-collapse text-sm">
+                    <thead>
+                        <tr className="bg-slate-100 text-xs font-bold uppercase tracking-wider text-slate-500">
+                            <th className="px-3 py-2 text-left">Сетка</th>
+                            {officialHeaders.map((header) => (
+                                <th key={header} className="whitespace-nowrap px-3 py-2 text-center">{header}</th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {officialRows.map((row) => {
+                            const isRecommended = recommendedOfficialRow?.stageLabel === row.stageLabel;
+
+                            return (
+                                <tr key={`${row.stageLabel}-${row.values.join('-')}`} className={isRecommended ? 'bg-lime-50' : 'bg-white'}>
+                                    <td className={`px-3 py-2 font-bold ${isRecommended ? 'text-lime-700' : 'text-slate-700'}`}>{row.stageLabel}</td>
+                                    {officialHeaders.map((_, index) => (
+                                        <td key={`${row.stageLabel}-${index}`} className="whitespace-nowrap border-l border-slate-100 px-3 py-2 text-center font-semibold text-slate-900">
+                                            {row.values[index] || '—'}
+                                        </td>
+                                    ))}
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
 
 export const RttStatsView = ({ user }: { user: User }) => {
     const [activeTab, setActiveTab] = useState<'rni' | 'tournaments'>('rni');
@@ -394,7 +516,10 @@ export const RttStatsView = ({ user }: { user: User }) => {
                             </thead>
                             <tbody>
                                 {tourList.map((t: any, i: number) => (
-                                    <tr key={i} className={`border-b border-slate-100 hover:bg-orange-50 transition-colors ${i % 2 === 0 ? '' : 'bg-slate-25'}`}>
+                                    <tr
+                                        key={i}
+                                        className={`border-b border-slate-100 hover:bg-orange-50 transition-colors ${i % 2 === 0 ? '' : 'bg-slate-25'}`}
+                                    >
                                         <td className="px-3 py-2 font-medium text-slate-800 whitespace-nowrap">{t.city || '—'}</td>
                                         <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{t.type || '—'}</td>
                                         <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{t.ageGroup || '—'}</td>
@@ -414,13 +539,16 @@ export const RttStatsView = ({ user }: { user: User }) => {
                                             </span>
                                         </td>
                                         <td className="px-3 py-2 font-medium text-slate-800">
-                                            {t.link ? (
-                                                <a href={t.link} target="_blank" rel="noopener noreferrer"
-                                                    className="text-orange-600 hover:text-orange-800 hover:underline flex items-center gap-1">
-                                                    {t.name}
-                                                    <ExternalLink size={12} />
-                                                </a>
-                                            ) : t.name || '—'}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSelectedTournament(t);
+                                                    setTournamentModalOpen(true);
+                                                }}
+                                                className="text-left text-orange-600 hover:text-orange-800 hover:underline"
+                                            >
+                                                {t.name || '—'}
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}
@@ -745,14 +873,19 @@ const TournamentModal = ({ isOpen, onClose, tournament }: { isOpen: boolean; onC
 
     const displayTitle = tournamentDetails?.name || tournament?.name || tournament?.tournament || 'Турнир РТТ';
     const displayCity = tournamentDetails?.city || tournament?.city || '—';
-    const displayDate = tournamentDetails?.date || tournament?.date || tournament?.startDate || '—';
+    const displayStartDate = tournamentDetails?.startDate || tournamentDetails?.date || tournament?.startDate || tournament?.date || '—';
+    const displayEndDate = tournamentDetails?.endDate || tournament?.endDate || '—';
+    const displayDate = displayEndDate && displayEndDate !== '—' && displayEndDate !== displayStartDate
+        ? `${displayStartDate} — ${displayEndDate}`
+        : displayStartDate;
     const displayAgeGroup = tournamentDetails?.ageGroup || tournament?.ageGroup || tournament?.category || '—';
     const displayType = tournamentDetails?.type || tournament?.type || '—';
-    const displayCategory = tournamentDetails?.category || tournament?.category || tournament?.ageGroup || '—';
+    const displayCategory = cleanTournamentCategoryLabel(tournamentDetails?.category || tournament?.category || tournament?.ageGroup || '—');
     const displaySurface = tournamentDetails?.surface || tournament?.surface || '—';
     const displayGender = tournamentDetails?.gender || '—';
     const displayApplications = tournamentDetails?.participantsCount || tournament?.applicationsCount || tournament?.applications || '—';
     const displayAvgRating = tournamentDetails?.avgRating || tournament?.avgRating || '—';
+    const participants = Array.isArray(tournamentDetails?.participants) ? tournamentDetails.participants : [];
     
     if (!elRef.current) {
         elRef.current = document.createElement('div');
@@ -763,6 +896,7 @@ const TournamentModal = ({ isOpen, onClose, tournament }: { isOpen: boolean; onC
         if (isOpen && modalRoot) {
             modalRoot.appendChild(el);
             document.body.style.overflow = 'hidden';
+            setTournamentDetails(null);
             
             // Загрузка детальной информации о турнире
             if (tournament?.link) {
@@ -775,6 +909,8 @@ const TournamentModal = ({ isOpen, onClose, tournament }: { isOpen: boolean; onC
                     })
                     .catch(err => console.error('Error loading tournament details:', err))
                     .finally(() => setLoadingDetails(false));
+            } else {
+                setLoadingDetails(false);
             }
         }
         return () => {
@@ -843,7 +979,7 @@ const TournamentModal = ({ isOpen, onClose, tournament }: { isOpen: boolean; onC
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                                 <div className="bg-slate-50 rounded-2xl border border-slate-200 p-5">
                                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider mb-4">О турнире</h3>
                                     <div className="space-y-3 text-sm">
@@ -863,6 +999,14 @@ const TournamentModal = ({ isOpen, onClose, tournament }: { isOpen: boolean; onC
                                             <span className="text-slate-500">Пол</span>
                                             <span className="text-right font-semibold text-slate-900 break-words">{displayGender}</span>
                                         </div>
+                                        <div className="flex items-start justify-between gap-4">
+                                            <span className="text-slate-500">Начало</span>
+                                            <span className="text-right font-semibold text-slate-900 break-words">{displayStartDate}</span>
+                                        </div>
+                                        <div className="flex items-start justify-between gap-4">
+                                            <span className="text-slate-500">Окончание</span>
+                                            <span className="text-right font-semibold text-slate-900 break-words">{displayEndDate}</span>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -881,16 +1025,23 @@ const TournamentModal = ({ isOpen, onClose, tournament }: { isOpen: boolean; onC
                                             <span className="text-slate-500">Категория</span>
                                             <span className="text-right font-semibold text-slate-900 break-words">{displayCategory}</span>
                                         </div>
+                                        <div className="flex items-start justify-between gap-4">
+                                            <span className="text-slate-500">Заявок</span>
+                                            <span className="text-right font-semibold text-slate-900 break-words">{displayApplications}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
+                            <div className="mb-6">
+                                <TournamentPointsPreview tournament={tournament} tournamentDetails={tournamentDetails} />
+                            </div>
+
                             <div className="space-y-6">
-                                {/* Participants Table */}
-                                {tournamentDetails?.participants && tournamentDetails.participants.length > 0 ? (
+                                {participants.length > 0 ? (
                                     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                                         <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
-                                            <h3 className="text-xl font-bold text-white">Участники турнира</h3>
+                                            <h3 className="text-xl font-bold text-white">Заявки на турнир</h3>
                                         </div>
                                         <div className="overflow-x-auto">
                                             <table className="w-full">
@@ -904,13 +1055,13 @@ const TournamentModal = ({ isOpen, onClose, tournament }: { isOpen: boolean; onC
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
-                                                    {tournamentDetails.participants.map((participant: any, idx: number) => (
+                                                    {participants.map((participant: any, idx: number) => (
                                                         <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                                            <td className="px-6 py-4 text-sm font-bold text-slate-900">{participant.place}</td>
-                                                            <td className="px-6 py-4 text-sm text-slate-700">{participant.name}</td>
-                                                            <td className="px-6 py-4 text-sm font-semibold text-blue-600">{participant.rating}</td>
-                                                            <td className="px-6 py-4 text-sm text-slate-600">{participant.city}</td>
-                                                            <td className="px-6 py-4 text-sm text-slate-600">{participant.age}</td>
+                                                            <td className="px-6 py-4 text-sm font-bold text-slate-900">{participant.place || participant.seed || idx + 1}</td>
+                                                            <td className="px-6 py-4 text-sm text-slate-700">{participant.name || participant.player || '—'}</td>
+                                                            <td className="px-6 py-4 text-sm font-semibold text-blue-600">{participant.rating || participant.points || '—'}</td>
+                                                            <td className="px-6 py-4 text-sm text-slate-600">{participant.city || '—'}</td>
+                                                            <td className="px-6 py-4 text-sm text-slate-600">{participant.age || '—'}</td>
                                                         </tr>
                                                     ))}
                                                 </tbody>
@@ -926,28 +1077,11 @@ const TournamentModal = ({ isOpen, onClose, tournament }: { isOpen: boolean; onC
                                                 </svg>
                                             </div>
                                             <h3 className="text-xl font-bold text-slate-700 mb-2">Таблица участников</h3>
-                                            <p className="text-slate-500 text-center">Информация о участниках недоступна</p>
+                                            <p className="text-slate-500 text-center">Информация о заявках на турнир недоступна</p>
                                         </div>
                                     </div>
                                 )}
                             </div>
-
-                            {/* Link to RTT */}
-                            {tournament.link && (
-                                <div className="mt-8 text-center">
-                                    <a 
-                                        href={tournament.link} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold rounded-xl hover:shadow-lg transition-all"
-                                    >
-                                        Открыть на RTTSTAT.RU
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                        </svg>
-                                    </a>
-                                </div>
-                            )}
                         </>
                     )}
                 </div>
