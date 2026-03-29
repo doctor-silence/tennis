@@ -8,6 +8,27 @@ import Tooltip from '../Tooltip';
 import { MarketplaceItem, LadderPlayer, User, Group, Tournament } from '../../types';
 import { Modal } from '../Shared';
 
+const getGroupCover = (group: Group) => {
+    const possibleImage = (group as Group & { image?: string; coverImage?: string; cover_image?: string }).avatar
+        || (group as Group & { image?: string; coverImage?: string; cover_image?: string }).image
+        || (group as Group & { image?: string; coverImage?: string; cover_image?: string }).coverImage
+        || (group as Group & { image?: string; coverImage?: string; cover_image?: string }).cover_image;
+
+    if (possibleImage) {
+        return possibleImage;
+    }
+
+    const palette = [
+        'from-blue-500 via-indigo-500 to-violet-500',
+        'from-emerald-500 via-lime-500 to-green-500',
+        'from-orange-500 via-amber-500 to-yellow-500',
+        'from-fuchsia-500 via-pink-500 to-rose-500',
+        'from-cyan-500 via-sky-500 to-blue-500'
+    ];
+    const index = (group.name || '').length % palette.length;
+    return palette[index];
+};
+
 const isTournamentLive = (tournament: Tournament) => {
     const status = (tournament.status || '').toLowerCase();
     const stageStatus = (tournament.stageStatus || tournament.stage_status || '').toLowerCase();
@@ -1611,23 +1632,32 @@ const GroupsView = forwardRef(({ user, onGroupSelect }: { user: User, onGroupSel
     }, []);
 
     return (
-        <div className="space-y-4">
-            {groups.map(group => (
-                <div key={group.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 cursor-pointer overflow-hidden" onClick={() => onGroupSelect(group)}>
-                    {group.avatar ? (
-                        <img src={group.avatar} alt={group.name} className="w-full h-32 object-cover" />
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+            {groups.map(group => {
+                const groupCover = getGroupCover(group);
+                const isImageCover = !groupCover.startsWith('from-');
+
+                return (
+                <div key={group.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 cursor-pointer overflow-hidden h-full flex flex-col" onClick={() => onGroupSelect(group)}>
+                    {isImageCover ? (
+                        <img src={groupCover} alt={group.name} className="w-full h-40 object-cover" />
                     ) : (
-                        <div className="w-full h-32 bg-slate-100 flex items-center justify-center text-3xl font-bold text-slate-400">
-                            {group.name?.charAt(0) || 'G'}
+                        <div className={`w-full h-40 bg-gradient-to-br ${groupCover} relative overflow-hidden flex items-center justify-center`}>
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.35),transparent_35%)]" />
+                            <div className="absolute -bottom-8 -right-8 w-28 h-28 rounded-full bg-white/10" />
+                            <div className="absolute top-4 left-4 text-white/80 text-xs font-black uppercase tracking-[0.25em]">Группа</div>
+                            <div className="w-20 h-20 rounded-3xl bg-white/20 backdrop-blur-md flex items-center justify-center text-4xl font-black text-white shadow-lg border border-white/20">
+                                {group.name?.charAt(0)?.toUpperCase() || 'G'}
+                            </div>
                         </div>
                     )}
-                    <div className="p-4">
+                    <div className="p-4 flex-1 flex flex-col">
                         <h3 className="font-bold text-lg text-slate-900">{group.name}</h3>
                         {group.location && <p className="text-sm text-slate-500">{group.location}</p>}
-                        {group.description && <p className="text-sm text-slate-600 mt-2">{group.description}</p>}
+                        <p className="text-sm text-slate-600 mt-2 line-clamp-3">{group.description || 'Нет описания.'}</p>
                     </div>
                 </div>
-            ))}
+            )})}
         </div>
     );
 });
@@ -2367,6 +2397,8 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated,
     }
     
     const isMemberOfSelectedGroup = selectedGroupForModal ? myGroups.some(g => g.id === selectedGroupForModal.id) : false;
+    const selectedGroupCover = selectedGroupForModal ? getGroupCover(selectedGroupForModal) : null;
+    const selectedGroupHasImageCover = Boolean(selectedGroupCover && !selectedGroupCover.startsWith('from-'));
 
     const handlePublishPost = async (data: any) => {
         let postData;
@@ -2523,10 +2555,36 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated,
                  {selectedGroupForModal && (
                 <Modal isOpen={!!selectedGroupForModal} onClose={() => setSelectedGroupForModal(null)} title={selectedGroupForModal.name}>
                     <div className="p-6">
+                        {(() => {
+                            const groupCover = selectedGroupCover || getGroupCover(selectedGroupForModal);
+                            const isImageCover = selectedGroupHasImageCover;
+
+                            return isImageCover ? (
+                                <img src={groupCover} alt={selectedGroupForModal.name} className="w-full h-48 object-cover rounded-2xl mb-5" />
+                            ) : (
+                                <div className={`w-full h-48 rounded-2xl mb-5 bg-gradient-to-br ${groupCover} relative overflow-hidden flex items-center justify-center`}>
+                                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.35),transparent_35%)]" />
+                                    <div className="absolute -bottom-10 -right-10 w-32 h-32 rounded-full bg-white/10" />
+                                    <div className="absolute top-5 left-5 text-white/80 text-xs font-black uppercase tracking-[0.25em]">Группа</div>
+                                    <div className="w-24 h-24 rounded-[28px] bg-white/20 backdrop-blur-md flex items-center justify-center text-5xl font-black text-white shadow-lg border border-white/20">
+                                        {selectedGroupForModal.name.charAt(0).toUpperCase()}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
                         <div className="flex items-center gap-4 mb-4">
-                            <div className="w-16 h-16 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-slate-500 text-2xl">
-                                {selectedGroupForModal.name.charAt(0)}
-                            </div>
+                            {selectedGroupHasImageCover ? (
+                                <img
+                                    src={selectedGroupCover || undefined}
+                                    alt={selectedGroupForModal.name}
+                                    className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-200"
+                                />
+                            ) : (
+                                <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${selectedGroupCover} flex items-center justify-center font-bold text-white text-2xl shrink-0`}>
+                                    {selectedGroupForModal.name.charAt(0).toUpperCase()}
+                                </div>
+                            )}
                             <div>
                                 <h3 className="font-bold text-xl">{selectedGroupForModal.name}</h3>
                                 <p className="text-sm text-slate-500">{selectedGroupForModal.location}</p>
