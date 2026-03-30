@@ -191,6 +191,16 @@ const safeRatio = (value: number, maxValue: number) => maxValue > 0 ? value / ma
 
 const getMatchesWithDetailedStats = (matches: Match[]) => matches.filter((match) => match.stats);
 
+const parseScoreSets = (score?: string | null) => {
+    const normalized = String(score || '').replace(/\s+/g, ' ').trim();
+    if (!normalized) return [] as Array<{ player: number; opponent: number }>;
+
+    return [...normalized.matchAll(/(\d+)\s*[-:–]\s*(\d+)/g)].map((match) => ({
+        player: Number(match[1]),
+        opponent: Number(match[2]),
+    }));
+};
+
 const estimatePointsForTargetRank = (currentPoints: number, currentRank?: number, targetRank?: number | null) => {
     if (!targetRank || !currentRank) return Math.max(currentPoints + 80, 120);
     if (targetRank >= currentRank) return Math.max(currentPoints, 0);
@@ -262,6 +272,98 @@ const buildDefaultSkills = (_user: User, matches: Match[]): SkillRadarValues => 
         stamina: clampSkillValue(staminaScore),
         psychology: clampSkillValue(psychologyScore)
     };
+};
+
+const buildRttDerivedSkills = (user: User, rttStatsData?: any): SkillRadarValues => {
+    const rttMatches = Array.isArray(rttStatsData?.matches) ? rttStatsData.matches : [];
+    const totalMatches = Number(rttStatsData?.totalMatches || rttMatches.length || 0);
+    const wins = Number(rttStatsData?.wins || rttMatches.filter((match: any) => match.result === 'win').length || 0);
+    const winRateRatio = typeof rttStatsData?.winRate === 'number'
+        ? rttStatsData.winRate / 100
+        : totalMatches > 0
+            ? wins / totalMatches
+            : 0;
+
+    if (!rttMatches.length && totalMatches === 0) {
+        return EMPTY_SKILL_VALUES;
+    }
+
+    const parsedMatches = rttMatches.map((match: any) => {
+        const sets = parseScoreSets(match?.score);
+        const wonSets = sets.filter((set) => set.player > set.opponent).length;
+        const lostSets = sets.filter((set) => set.opponent > set.player).length;
+        const closeSets = sets.filter((set) => Math.abs(set.player - set.opponent) <= 2 || (set.player >= 6 && set.opponent >= 6)).length;
+        const closeSetWins = sets.filter((set) => (Math.abs(set.player - set.opponent) <= 2 || (set.player >= 6 && set.opponent >= 6)) && set.player > set.opponent).length;
+        const decisive = sets.length >= 3;
+        const decisiveWin = decisive && wonSets > lostSets;
+        const dominantWonSets = sets.filter((set) => set.player > set.opponent && (set.player - set.opponent) >= 3).length;
+        const oneSidedLostSets = sets.filter((set) => set.opponent > set.player && (set.opponent - set.player) >= 4).length;
+
+        return {
+            ...match,
+            sets,
+            wonSets,
+            lostSets,
+            closeSets,
+            closeSetWins,
+            decisive,
+            decisiveWin,
+            dominantWonSets,
+            oneSidedLostSets,
+        };
+    });
+
+    const totalSets = parsedMatches.reduce((sum: number, match: any) => sum + match.sets.length, 0);
+    const totalWonSets = parsedMatches.reduce((sum: number, match: any) => sum + match.wonSets, 0);
+    const closeSetsCount = parsedMatches.reduce((sum: number, match: any) => sum + match.closeSets, 0);
+    const closeSetWins = parsedMatches.reduce((sum: number, match: any) => sum + match.closeSetWins, 0);
+    const decidingMatches = parsedMatches.filter((match: any) => match.decisive);
+    const decidingWins = decidingMatches.filter((match: any) => match.decisiveWin).length;
+    const dominantWonSets = parsedMatches.reduce((sum: number, match: any) => sum + match.dominantWonSets, 0);
+    const oneSidedLostSets = parsedMatches.reduce((sum: number, match: any) => sum + match.oneSidedLostSets, 0);
+    const opponentRatings = parsedMatches
+        .map((match: any) => Number(match?.opponentPoints || 0))
+        .filter((value: number) => Number.isFinite(value) && value > 0);
+    const averageOpponentRating = average(opponentRatings);
+    const currentRating = Number(user.rating || 0);
+    const strongOppMatches = parsedMatches.filter((match: any) => Number(match?.opponentPoints || 0) >= Math.max(currentRating - 25, 1));
+    const winsAgainstStrongOpponents = strongOppMatches.filter((match: any) => match.result === 'win').length;
+
+    const setWinRatio = totalSets > 0 ? totalWonSets / totalSets : winRateRatio;
+    const closeSetWinRatio = closeSetsCount > 0 ? closeSetWins / closeSetsCount : winRateRatio;
+    const decidingWinRatio = decidingMatches.length > 0 ? decidingWins / decidingMatches.length : winRateRatio;
+    const dominantSetRatio = totalSets > 0 ? dominantWonSets / totalSets : winRateRatio;
+    const lowCollapseRatio = totalSets > 0 ? Math.max(0, 1 - oneSidedLostSets / totalSets) : winRateRatio;
+    const strongOpponentWinRatio = strongOppMatches.length > 0 ? winsAgainstStrongOpponents / strongOppMatches.length : winRateRatio;
+    const experienceFactor = Math.min(totalMatches / 18, 1);
+    const competitionFactor = averageOpponentRating > 0 && currentRating > 0
+        ? Math.min(averageOpponentRating / Math.max(currentRating, 1), 1.15)
+        : 0.8;
+
+    const serveScore = 18 + winRateRatio * 24 + dominantSetRatio * 22 + lowCollapseRatio * 14 + competitionFactor * 12 + experienceFactor * 10;
+    const forehandScore = 16 + setWinRatio * 24 + dominantSetRatio * 20 + strongOpponentWinRatio * 18 + experienceFactor * 12 + closeSetWinRatio * 10;
+    const backhandScore = 15 + closeSetWinRatio * 24 + lowCollapseRatio * 18 + strongOpponentWinRatio * 16 + setWinRatio * 10 + experienceFactor * 10;
+    const staminaScore = 18 + decidingWinRatio * 24 + setWinRatio * 18 + experienceFactor * 20 + lowCollapseRatio * 12 + closeSetWinRatio * 8;
+    const psychologyScore = 18 + closeSetWinRatio * 26 + decidingWinRatio * 22 + winRateRatio * 18 + lowCollapseRatio * 10 + experienceFactor * 6;
+
+    return {
+        serve: clampSkillValue(serveScore),
+        forehand: clampSkillValue(forehandScore),
+        backhand: clampSkillValue(backhandScore),
+        stamina: clampSkillValue(staminaScore),
+        psychology: clampSkillValue(psychologyScore)
+    };
+};
+
+const buildSkillRadarFromSources = (user: User, matches: Match[], rttStatsData?: any): SkillRadarValues => {
+    const localSkills = buildDefaultSkills(user, matches);
+    const hasLocalSkills = Object.values(localSkills).some((value) => value > 0);
+
+    if (hasLocalSkills) {
+        return localSkills;
+    }
+
+    return buildRttDerivedSkills(user, rttStatsData);
 };
 
 const buildDefaultGoal = (user: User): ProfileGoalState => {
@@ -730,6 +832,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
   
   const [matches, setMatches] = useState<Match[]>([]);
   const [rttMatches, setRttMatches] = useState<Match[]>([]);
+    const [rttPlayerStats, setRttPlayerStats] = useState<any>(null);
   const [loadingRttMatches, setLoadingRttMatches] = useState(false);
   const [rttMatchesError, setRttMatchesError] = useState<string | null>(null);
   const [syncingRtt, setSyncingRtt] = useState(false);
@@ -763,6 +866,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
           if (user.rni) {
               const rttData = await api.rtt.getPlayerStats(user.rni);
               if (rttData.success && Array.isArray(rttData.data?.matches)) {
+                  setRttPlayerStats(rttData.data);
                   const mappedMatches: Match[] = rttData.data.matches.map((match: any, index: number) => ({
                       id: `rtt-${user.id}-${index}`,
                       userId: String(user.id),
@@ -774,6 +878,8 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
                   }));
                   setRttMatches(mappedMatches);
                   setRttMatchesError(null);
+              } else {
+                  setRttPlayerStats(rttData?.data || null);
               }
           }
       } catch (e: any) {
@@ -795,6 +901,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
             goal: buildDefaultGoal(user)
     }));
     const [isProgressReady, setIsProgressReady] = useState(false);
+        const [progressRecalcMessage, setProgressRecalcMessage] = useState<string | null>(null);
         const progressSaveTimeoutRef = useRef<number | null>(null);
 
   const [editFormData, setEditFormData] = useState({
@@ -910,7 +1017,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
 
       const fallbackState: PlayerProgressState = {
           version: PLAYER_PROGRESS_SCHEMA_VERSION,
-          skills: buildDefaultSkills(user, matches),
+          skills: buildSkillRadarFromSources(user, matches, rttPlayerStats),
           goal: buildDefaultGoal(user)
       };
 
@@ -952,7 +1059,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
       return () => {
           isCancelled = true;
       };
-  }, [isPlayerProfile, matches, user]);
+    }, [isPlayerProfile, matches, rttPlayerStats, user]);
 
   useEffect(() => {
       if (!isPlayerProfile || !isProgressReady) return;
@@ -993,6 +1100,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
           try {
               const data = await api.rtt.getPlayerStats(user.rni);
               if (data.success && Array.isArray(data.data?.matches)) {
+                  setRttPlayerStats(data.data);
                   const mappedMatches: Match[] = data.data.matches.map((match: any, index: number) => ({
                       id: `rtt-${user.id}-${index}`,
                       userId: String(user.id),
@@ -1003,12 +1111,15 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
                       surface: 'hard'
                   }));
                   setRttMatches(mappedMatches);
+                  setRttMatchesError(null);
               } else {
+                  setRttPlayerStats(data?.data || null);
                   setRttMatches([]);
                   setRttMatchesError(data.error || 'Нет данных');
               }
           } catch (error) {
               console.error(error);
+              setRttPlayerStats(null);
               setRttMatches([]);
               setRttMatchesError('Ошибка загрузки');
           } finally {
@@ -1086,9 +1197,34 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
       ? Math.min(100, Math.round((currentRatingPoints / playerProgress.goal.targetPoints) * 100))
       : 0;
   const detailedSkillMatches = useMemo(() => getMatchesWithDetailedStats(matches), [matches]);
+  const rttDerivedSkills = useMemo(() => buildRttDerivedSkills(user, rttPlayerStats), [user, rttPlayerStats]);
   const hasDetailedSkillData = detailedSkillMatches.length > 0;
+  const hasRttSkillData = isRttPlayer && Object.values(rttDerivedSkills).some((value) => value > 0);
   const hasAnySkillValues = Object.values(playerProgress.skills).some((value) => value > 0);
-  const showSkillDataPlaceholder = !hasDetailedSkillData && !hasAnySkillValues;
+  const showSkillDataPlaceholder = !hasDetailedSkillData && !hasRttSkillData && !hasAnySkillValues;
+  const rttAnalysisSummary = useMemo(() => {
+      if (!isRttPlayer || !rttPlayerStats) return null;
+
+      const totalMatches = Number(rttPlayerStats.totalMatches || rttPlayerStats.matches?.length || 0);
+      const wins = Number(rttPlayerStats.wins || rttPlayerStats.matches?.filter((match: any) => match.result === 'win').length || 0);
+      const winRate = typeof rttPlayerStats.winRate === 'number'
+          ? rttPlayerStats.winRate
+          : totalMatches > 0
+              ? Math.round((wins / totalMatches) * 100)
+              : 0;
+      const parsedMatches = Array.isArray(rttPlayerStats.matches) ? rttPlayerStats.matches : [];
+      const averageOpponent = average(parsedMatches.map((match: any) => Number(match.opponentPoints || 0)).filter((value: number) => Number.isFinite(value) && value > 0));
+      const decidingMatches = parsedMatches.filter((match: any) => parseScoreSets(match.score).length >= 3);
+      const decidingWins = decidingMatches.filter((match: any) => match.result === 'win').length;
+      const decidingRate = decidingMatches.length > 0 ? Math.round((decidingWins / decidingMatches.length) * 100) : null;
+
+      return {
+          totalMatches,
+          winRate,
+          averageOpponent: averageOpponent > 0 ? Math.round(averageOpponent) : null,
+          decidingRate,
+      };
+  }, [isRttPlayer, rttPlayerStats]);
   const sortedSkillMetrics = useMemo(
       () => [...skillMetricConfig].sort((left, right) => playerProgress.skills[right.key] - playerProgress.skills[left.key]),
       [playerProgress.skills]
@@ -1134,17 +1270,29 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
   };
 
   const resetProgressFromStats = () => {
+      const recalculatedSkills = buildSkillRadarFromSources(user, matches, rttPlayerStats);
+      const hasChanges = skillMetricConfig.some((metric) => playerProgress.skills[metric.key] !== recalculatedSkills[metric.key]);
+
+      if (!hasDetailedSkillData && !hasRttSkillData) {
+          setProgressRecalcMessage('Пока нет достаточных данных из RTT-парсера или матчевой статистики — пересчитывать нечего.');
+          window.setTimeout(() => setProgressRecalcMessage(null), 3000);
+          return;
+      }
+
       setPlayerProgress((prev) => ({
           ...prev,
-          skills: buildDefaultSkills(user, matches)
+          skills: recalculatedSkills
       }));
+
+      setProgressRecalcMessage(hasChanges ? 'Навыки пересчитаны на основе RTT-парсера и матчевой статистики.' : 'Значения уже актуальны.');
+      window.setTimeout(() => setProgressRecalcMessage(null), 2500);
   };
 
   const progressHighlightText = pointsRemaining > 0
       ? `До цели не хватает ${pointsRemaining} ${pointsLabel.toLowerCase()}`
       : 'Цель по очкам уже достигнута';
   const progressSkillHighlightText = showSkillDataPlaceholder
-      ? 'Навыки появятся после первых матчей со статистикой'
+      ? 'Навыки появятся после первых данных RTT или матчей со статистикой'
       : `Сильные стороны: ${strongestSkill} и ${secondStrongestSkill}`;
   const goalIntentHint = useMemo(() => {
       const intent = parseGoalIntent(playerProgress.goal.title);
@@ -1263,7 +1411,12 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
                       <h4 className="font-bold text-slate-900">Skill-Radar</h4>
                       <p className="text-sm text-slate-500">Пять ключевых зон, которые влияют на стабильность результатов.</p>
                   </div>
-                  <Button variant="outline" size="sm" onClick={resetProgressFromStats}>Пересчитать</Button>
+                  <div className="flex flex-col items-end gap-2">
+                      <Button variant="outline" size="sm" onClick={resetProgressFromStats}>Пересчитать</Button>
+                      {progressRecalcMessage && (
+                          <span className="text-xs font-medium text-slate-500 max-w-[260px] text-right">{progressRecalcMessage}</span>
+                      )}
+                  </div>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)] gap-6 items-start">
@@ -1272,7 +1425,18 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
                   <div className="space-y-4">
                       {showSkillDataPlaceholder && (
                           <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
-                              Пока нет достаточной матчевой статистики, поэтому `Skill-Radar` не заполняется автоматически. После матчей с подробными метриками или ручного ввода тренером/игроком значения появятся здесь.
+                              Пока нет достаточной RTT- или матчевой статистики, поэтому `Skill-Radar` не заполняется автоматически. После матчей из RTT-парсера, матчей с подробными метриками или ручного ввода значения появятся здесь.
+                          </div>
+                      )}
+
+                      {!showSkillDataPlaceholder && rttAnalysisSummary && (
+                          <div className="rounded-2xl border border-lime-100 bg-lime-50 p-4 text-sm text-slate-700">
+                              <div className="font-bold text-slate-900 mb-1">Анализ RTT</div>
+                              <p>
+                                  Основано на {rttAnalysisSummary.totalMatches} матчах RTT: побед {rttAnalysisSummary.winRate}%
+                                  {rttAnalysisSummary.averageOpponent ? `, средний рейтинг соперников около ${rttAnalysisSummary.averageOpponent}` : ''}
+                                  {rttAnalysisSummary.decidingRate !== null ? `, в решающих матчах успешность ${rttAnalysisSummary.decidingRate}%` : ''}.
+                              </p>
                           </div>
                       )}
 
