@@ -456,6 +456,8 @@ const TournamentDetailsModal = ({
     tournament,
     tournamentDetails,
     loadingTournamentDetails,
+    currentUserId,
+    onStartConversation,
     canApply = false,
     hasApplied = false,
     isApplying = false,
@@ -467,6 +469,8 @@ const TournamentDetailsModal = ({
     tournament: any;
     tournamentDetails?: any;
     loadingTournamentDetails?: boolean;
+    currentUserId?: string;
+    onStartConversation?: (partnerId: string) => void;
     canApply?: boolean;
     hasApplied?: boolean;
     isApplying?: boolean;
@@ -499,9 +503,40 @@ const TournamentDetailsModal = ({
         ? new Date(tournament.end_date || tournament.endDate).toLocaleDateString('ru-RU')
         : 'Не указана';
     const tournamentMeta = getTournamentMetaLabel(tournament.prize_pool || tournament.prizePool);
-    const organizerName = tournament.director_name
-        || tournament.creator_name
-        || getTournamentAnnouncementAuthorName(tournament, tournament.author_name || tournament.authorName || null);
+    const organizerRole = String(tournament.creator_role || tournament.creatorRole || '').trim();
+    const directorDisplayName = String(tournament.director_name || '').trim();
+    const rttOrganizerName = String(tournamentDetails?.organizerName || tournamentDetails?.organizer || '').trim();
+    const rttOrganizerPhone = String(tournamentDetails?.organizerPhone || '').trim();
+    const rttOrganizerEmail = String(tournamentDetails?.organizerEmail || '').trim();
+    const rttOrganizerContacts = String(tournamentDetails?.organizerContacts || '').trim();
+    const hasDirectorContacts = Boolean(
+        tournament.director_email
+        || tournament.director_phone
+        || tournament.director_telegram
+        || tournament.director_max
+    );
+    const hasRttOrganizerContacts = Boolean(rttOrganizerPhone || rttOrganizerEmail || rttOrganizerContacts);
+    const isDirectorTournament = organizerRole === 'tournament_director' || Boolean(directorDisplayName || hasDirectorContacts);
+    const organizerName = isDirectorTournament
+        ? directorDisplayName || 'Директор турнира'
+        : rttOrganizerName
+            ? rttOrganizerName
+        : organizerRole === 'admin'
+            ? 'Организатор турнира'
+            : tournament.creator_name
+                || getTournamentAnnouncementAuthorName(tournament, tournament.author_name || tournament.authorName || null)
+                || 'Организатор турнира';
+    const organizerId = String(
+        tournament.user_id
+        || tournament.userId
+        || tournament.creator_id
+        || tournament.creatorId
+        || tournament.author_id
+        || tournament.authorId
+        || tournament.author?.id
+        || ''
+    ).trim();
+    const canMessageOrganizer = Boolean(isDirectorTournament && onStartConversation && organizerId);
     const directorEmail = String(tournament.director_email || '').trim();
     const directorPhone = String(tournament.director_phone || '').trim();
     const directorTelegram = String(tournament.director_telegram || '').trim();
@@ -566,21 +601,39 @@ const TournamentDetailsModal = ({
 
                     <div className="rounded-[26px] border border-white/12 bg-white/10 p-4 shadow-2xl backdrop-blur-md">
                         <div className="text-[11px] font-black uppercase tracking-[0.22em] text-white/65">Организатор</div>
-                        <div className="mt-2 text-lg font-black text-white">{organizerName || 'Организатор турнира'}</div>
-                        <div className="mt-1 text-sm text-white/70">{tournament.groupName || tournament.group_name || 'Открытый турнир сообщества'}</div>
-                        <div className="mt-4 flex items-center justify-between rounded-2xl bg-black/15 px-4 py-3">
-                            <div>
-                                <div className="text-[11px] uppercase tracking-[0.16em] text-white/55">{slotsLabel}</div>
-                                <div className="mt-1 text-2xl font-black text-white">
+                        {canMessageOrganizer ? (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onStartConversation?.(organizerId);
+                                    onClose();
+                                }}
+                                className="group mt-2 inline-flex max-w-full flex-col items-start text-left text-white transition-transform duration-200 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+                            >
+                                <span className="inline-flex items-center gap-2 text-lg font-black text-white transition-colors group-hover:text-emerald-200">
+                                    <span className="max-w-full truncate">{organizerName || 'Организатор турнира'}</span>
+                                    <MessageCircle size={16} className="shrink-0 text-white/75 transition-colors group-hover:text-emerald-200" />
+                                </span>
+                                <span className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-white/65 transition-colors group-hover:text-white/90">
+                                    Написать директору
+                                </span>
+                            </button>
+                        ) : (
+                            <div className="mt-2 text-lg font-black text-white">{organizerName || 'Организатор турнира'}</div>
+                        )}
+                        <div className="mt-4 grid grid-cols-2 gap-4 rounded-2xl bg-black/15 px-4 py-3">
+                            <div className="min-w-0">
+                                <div className="min-h-[2rem] text-[10px] font-black uppercase leading-tight tracking-[0.14em] text-white/55 sm:text-[11px]">{slotsLabel}</div>
+                                <div className="mt-1 text-2xl font-black leading-none text-white">
                                     {participantLimit > 0 ? Math.max(participantLimit - approvedParticipantsCount, 0) : '∞'}
                                 </div>
                             </div>
-                            <div className="text-right">
-                                <div className="text-[11px] uppercase tracking-[0.16em] text-white/55">{occupiedLabel}</div>
-                                <div className="mt-1 text-xl font-black text-emerald-300">{participantsDisplay}</div>
+                            <div className="min-w-0 text-right">
+                                <div className="ml-auto min-h-[2rem] text-[10px] font-black uppercase leading-tight tracking-[0.14em] text-white/55 sm:text-[11px]">{occupiedLabel}</div>
+                                <div className="mt-1 text-xl font-black leading-none text-emerald-300">{participantsDisplay}</div>
                             </div>
                         </div>
-                        {(directorEmail || directorPhone || directorTelegram || directorMax) && (
+                        {isDirectorTournament && (directorEmail || directorPhone || directorTelegram || directorMax) && (
                             <div className="mt-4 flex flex-wrap gap-2">
                                 {directorEmail && (
                                     <a
@@ -617,6 +670,31 @@ const TournamentDetailsModal = ({
                                     >
                                         <MessageCircle size={14} /> MAX: {directorMax}
                                     </a>
+                                )}
+                            </div>
+                        )}
+                        {!isDirectorTournament && hasRttOrganizerContacts && (
+                            <div className="mt-4 flex flex-wrap gap-2">
+                                {rttOrganizerEmail && (
+                                    <a
+                                        href={`mailto:${rttOrganizerEmail}`}
+                                        className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold text-white/90 transition-colors hover:bg-white/15"
+                                    >
+                                        <Mail size={14} /> {rttOrganizerEmail}
+                                    </a>
+                                )}
+                                {rttOrganizerPhone && (
+                                    <a
+                                        href={`tel:${rttOrganizerPhone.replace(/\s+/g, '')}`}
+                                        className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold text-white/90 transition-colors hover:bg-white/15"
+                                    >
+                                        <Phone size={14} /> {rttOrganizerPhone}
+                                    </a>
+                                )}
+                                {rttOrganizerContacts && !rttOrganizerEmail && !rttOrganizerPhone && (
+                                    <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold text-white/90">
+                                        <MessageCircle size={14} /> {rttOrganizerContacts}
+                                    </div>
                                 )}
                             </div>
                         )}
@@ -1554,7 +1632,7 @@ const MarketplacePost = ({ post, user, onStartConversation, onUpdate }: { post: 
     );
 };
 
-const TournamentAnnouncementPost = ({ post }: { post: any }) => {
+const TournamentAnnouncementPost = ({ post, currentUserId, onStartConversation }: { post: any; currentUserId: string; onStartConversation: (partnerId: string) => void }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [tournamentDetails, setTournamentDetails] = useState<any>(null);
     const [loadingTournamentDetails, setLoadingTournamentDetails] = useState(false);
@@ -1596,6 +1674,8 @@ const TournamentAnnouncementPost = ({ post }: { post: any }) => {
     const tournamentFromPost = {
         ...post.content,
         name: post.content?.name || post.content?.title,
+        user_id: post.content?.user_id || post.content?.userId || post.author?.id,
+        creator_role: post.content?.creator_role || post.content?.creatorRole || post.author?.role,
         tournament_type: post.content?.tournamentType,
         age_group: post.content?.ageGroup,
         match_format: post.content?.matchFormat,
@@ -1644,6 +1724,8 @@ const TournamentAnnouncementPost = ({ post }: { post: any }) => {
                 tournament={tournamentFromPost}
                 tournamentDetails={tournamentDetails}
                 loadingTournamentDetails={loadingTournamentDetails}
+                currentUserId={currentUserId}
+                onStartConversation={onStartConversation}
             />
         </>
     );
@@ -1835,7 +1917,7 @@ const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate, onSta
                     case 'marketplace':
                         return <MarketplacePost key={item.id} post={item} user={user} onStartConversation={onStartConversation} onUpdate={onUpdate} />;
                     case 'tournament_announcement':
-                        return <TournamentAnnouncementPost key={item.id} post={item} />;
+                        return <TournamentAnnouncementPost key={item.id} post={item} currentUserId={user.id} onStartConversation={onStartConversation} />;
                     case 'tournament_stage_update':
                         return <TournamentStageUpdatePost key={item.id} post={item} />;
                     case 'tournament_result':
@@ -2035,7 +2117,7 @@ const GroupPostForm = ({ user, onPostCreated }: { user: User, onPostCreated: () 
 
 // --- Widgets ---
 
-const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavigate: (tab: string) => void, myGroups: Group[] }) => {
+const TournamentsWidget = ({ user, onNavigate, myGroups, onStartConversation }: { user: User, onNavigate: (tab: string) => void, myGroups: Group[]; onStartConversation: (partnerId: string) => void }) => {
     const [tournaments, setTournaments] = useState<Tournament[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null);
@@ -2180,6 +2262,8 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
                 tournament={selectedTournament}
                 tournamentDetails={selectedTournamentDetails}
                 loadingTournamentDetails={loadingTournamentDetails}
+                currentUserId={user.id}
+                onStartConversation={onStartConversation}
                 canApply={!!canApply}
                 hasApplied={hasApplied}
                 isApplying={isApplying}
@@ -2820,7 +2904,7 @@ const CommunityView2 = ({ user, onNavigate, onStartConversation, onGroupCreated,
                 )}
             </div>
             <div className="hidden lg:block space-y-6">
-                <div id="community-widget-tournaments"><TournamentsWidget user={user} onNavigate={onNavigate} myGroups={myGroups} /></div>
+                <div id="community-widget-tournaments"><TournamentsWidget user={user} onNavigate={onNavigate} myGroups={myGroups} onStartConversation={onStartConversation} /></div>
                 <div id="community-widget-top"><TopPlayersWidget onNavigate={onNavigate} /></div>
                 <div id="community-widget-groups"><GroupsWidget onGroupClickForModal={setSelectedGroupForModal} myGroups={myGroups} /></div>
                 <div id="community-widget-marketplace"><MarketplaceWidget user={user} onNavigate={setActiveTab} /></div>

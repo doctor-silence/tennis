@@ -918,6 +918,12 @@ class RTTParser {
       const allText = $('body').text();
       const normalizedText = allText.replace(/\s+/g, ' ').trim();
       const metaStopLabels = [
+        'Организатор',
+        'Проводящая организация',
+        'Контакты',
+        'Телефон',
+        'E-mail',
+        'Email',
         'Город',
         'Покрытие',
         'Дата',
@@ -968,6 +974,30 @@ class RTTParser {
         metaStopLabels.filter(label => label !== 'Город')
       );
       if (cityValue) tournamentInfo.city = cityValue;
+
+      const organizerValue = this.sanitizeTournamentMetaValue(
+        this.extractLabeledValue(normalizedText, ['Организатор', 'Проводящая организация'], metaStopLabels.filter(label => label !== 'Организатор' && label !== 'Проводящая организация')),
+        metaStopLabels.filter(label => label !== 'Организатор' && label !== 'Проводящая организация')
+      );
+      if (organizerValue) tournamentInfo.organizerName = organizerValue;
+
+      const organizerPhoneValue = this.sanitizeTournamentMetaValue(
+        this.extractLabeledValue(normalizedText, ['Телефон'], metaStopLabels.filter(label => label !== 'Телефон')),
+        metaStopLabels.filter(label => label !== 'Телефон')
+      );
+      if (organizerPhoneValue) tournamentInfo.organizerPhone = organizerPhoneValue;
+
+      const organizerEmailValue = this.sanitizeTournamentMetaValue(
+        this.extractLabeledValue(normalizedText, ['E-mail', 'Email'], metaStopLabels.filter(label => label !== 'E-mail' && label !== 'Email')),
+        metaStopLabels.filter(label => label !== 'E-mail' && label !== 'Email')
+      );
+      if (organizerEmailValue) tournamentInfo.organizerEmail = organizerEmailValue;
+
+      const contactsValue = this.sanitizeTournamentMetaValue(
+        this.extractLabeledValue(normalizedText, ['Контакты'], metaStopLabels.filter(label => label !== 'Контакты')),
+        metaStopLabels.filter(label => label !== 'Контакты')
+      );
+      if (contactsValue) tournamentInfo.organizerContacts = contactsValue;
 
       const surfaceValue = this.sanitizeTournamentMetaValue(
         this.extractLabeledValue(normalizedText, ['Покрытие'], metaStopLabels.filter(label => label !== 'Покрытие')),
