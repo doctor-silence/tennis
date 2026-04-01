@@ -21,6 +21,7 @@ import { TournamentsView } from './dashboard/TournamentsView';
 import { MyApplications } from './dashboard/MyApplications';
 import { RttStatsView } from './dashboard/RttStatsView';
 import TennisDiaryView from './dashboard/TennisDiaryView';
+import TournamentOrganizationView from './dashboard/TournamentOrganizationView';
 
 interface DashboardProps {
   user: User;
@@ -36,27 +37,32 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate, imp
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loadingConversations, setLoadingConversations] = useState(true);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [unreadLadderNotifications, setUnreadLadderNotifications] = useState(0);
+  const [unreadTournamentOrganizationNotifications, setUnreadTournamentOrganizationNotifications] = useState(0);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [feedVersion, setFeedVersion] = useState(0);
 
   const incrementFeedVersion = () => setFeedVersion(v => v + 1);
 
-  const fetchUnreadCount = () => {
-    api.notifications.getUnreadCount(user.id).then(data => {
-        console.log("Unread count fetched:", data.count);
-        console.log("Setting unreadLadderNotifications to:", data.count);
-        setUnreadLadderNotifications(data.count);
-        console.log("State should now be:", data.count);
-    }).catch(err => {
-        console.error("Failed to fetch unread count:", err);
-    });
-  }
+  const fetchNotificationCounters = () => {
+    api.notifications.getAll(user.id).then(items => {
+        const unreadItems = items.filter(item => !item.is_read);
+        const ladderCount = unreadItems.filter(item => ['new_challenge', 'challenge_accepted'].includes(item.type)).length;
+        const tournamentOrganizationCount = user.role === 'tournament_director'
+          ? unreadItems.filter(item => item.type === 'tournament_application').length
+          : 0;
 
-  // Debug: log state changes
-  useEffect(() => {
-    console.log("unreadLadderNotifications state changed to:", unreadLadderNotifications);
-  }, [unreadLadderNotifications]);
+        setUnreadNotifications(unreadItems.length);
+        setUnreadLadderNotifications(ladderCount);
+        setUnreadTournamentOrganizationNotifications(tournamentOrganizationCount);
+    }).catch(err => {
+        console.error("Failed to fetch notifications:", err);
+        setUnreadNotifications(0);
+        setUnreadLadderNotifications(0);
+        setUnreadTournamentOrganizationNotifications(0);
+    });
+  };
 
   useEffect(() => {
     api.messages.getConversations(user.id).then(data => {
@@ -64,9 +70,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate, imp
       setLoadingConversations(false);
     });
     api.ladder.getChallenges(user.id).then(setChallenges);
-    fetchUnreadCount();
+    fetchNotificationCounters();
     
-    const interval = setInterval(fetchUnreadCount, 15000); // Poll every 15 seconds
+    const interval = setInterval(fetchNotificationCounters, 15000);
 
     return () => clearInterval(interval); // Cleanup on component unmount
   }, [user.id]);
@@ -114,7 +120,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate, imp
   };
   
   const handleNotificationsRead = () => {
+      setUnreadNotifications(0);
       setUnreadLadderNotifications(0);
+      setUnreadTournamentOrganizationNotifications(0);
   };
 
   const renderContent = () => {
@@ -135,8 +143,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate, imp
         tactics: <TacticsView user={user} />,
         students: <StudentsView user={user} />,
         tournaments: <TournamentsView user={user} onTournamentUpdate={incrementFeedVersion} />,
+        tournament_organization: <TournamentOrganizationView user={user} />,
         video_analysis: <VideoAnalysisView />,
-        ladder: <LadderView user={user} challenges={challenges} setChallenges={setChallenges} onChallengeCreated={fetchUnreadCount} onStartConversation={handleStartConversation} isActive={activeTab === 'ladder'} />,
+        ladder: <LadderView user={user} challenges={challenges} setChallenges={setChallenges} onChallengeCreated={fetchNotificationCounters} onStartConversation={handleStartConversation} isActive={activeTab === 'ladder'} />,
         community: <CommunityView user={user} onNavigate={handleNavigate} onStartConversation={handleStartConversation} feedVersion={feedVersion} isActive={activeTab === 'community'} />,
         my_applications: <MyApplications user={user} />,
         rtt_stats: <RttStatsView user={user} />,
@@ -159,6 +168,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate, imp
     ai_coach: 'AI Тренер',
     students: 'CRM Система',
     tournaments: 'Мои Турниры',
+    tournament_organization: 'Организация турнира',
     ladder: 'Лестница',
     community: 'Сообщество',
     profile: 'Личный кабинет',
@@ -187,6 +197,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate, imp
         onLogout={onLogout}
         unreadCount={totalUnread}
         ladderNotifications={unreadLadderNotifications}
+        tournamentOrganizationNotifications={unreadTournamentOrganizationNotifications}
       />
 
       {/* Mobile Drawer Overlay */}
@@ -226,6 +237,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate, imp
             ...(user.role === 'coach' ? [
               { tab: 'students' as DashboardTab, icon: <Users size={18}/>, label: 'Ученики (CRM)' },
               { tab: 'tournaments' as DashboardTab, icon: <Trophy size={18}/>, label: 'Мои Турниры' },
+            ] : []),
+            ...(user.role === 'tournament_director' ? [
+              { tab: 'tournament_organization' as DashboardTab, icon: <Trophy size={18}/>, label: 'Организация турнира', badge: unreadTournamentOrganizationNotifications > 0 ? unreadTournamentOrganizationNotifications : null },
             ] : []),
           ].map(({ tab, icon, label, badge }) => (
             <button
@@ -282,9 +296,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate, imp
             className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-slate-800 border border-slate-700 text-slate-300"
           >
             <Bell size={18}/>
-            {unreadLadderNotifications > 0 && (
+            {unreadNotifications > 0 && (
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center border border-slate-900">
-                {unreadLadderNotifications}
+                {unreadNotifications}
               </span>
             )}
           </button>
@@ -329,9 +343,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdate, imp
               <div className="hidden md:flex items-center gap-4">
                  <button onClick={() => setActiveTab('notifications')} className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors shadow-sm relative ${activeTab === 'notifications' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
                    <Bell size={20} />
-                   {unreadLadderNotifications > 0 && (
+                   {unreadNotifications > 0 && (
                      <span className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 rounded-full border-2 border-white flex items-center justify-center z-10">
-                       <span className="text-white text-xs font-bold">{unreadLadderNotifications}</span>
+                       <span className="text-white text-xs font-bold">{unreadNotifications}</span>
                      </span>
                    )}
                  </button>

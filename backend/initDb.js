@@ -499,7 +499,31 @@ const initDb = async () => {
     await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS participants_count INTEGER;`);
     await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS stage_status VARCHAR(255);`);
     await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS rtt_link TEXT;`);
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS director_name VARCHAR(255);`);
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS director_phone VARCHAR(100);`);
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS director_email VARCHAR(255);`);
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS director_telegram VARCHAR(255);`);
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS director_max VARCHAR(255);`);
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS entry_fee NUMERIC(10, 2);`);
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS club_name VARCHAR(255);`);
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS court_name VARCHAR(255);`);
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS address TEXT;`);
+    await client.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS surface VARCHAR(100);`);
     console.log('✅ Table "tournaments" checked and migrated.');
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS tournament_regulations (
+        id SERIAL PRIMARY KEY,
+        tournament_id INTEGER NOT NULL UNIQUE REFERENCES tournaments(id) ON DELETE CASCADE,
+        file_name VARCHAR(255) NOT NULL,
+        mime_type VARCHAR(100) NOT NULL DEFAULT 'application/pdf',
+        file_size INTEGER NOT NULL DEFAULT 0,
+        file_data TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    console.log('✅ Table "tournament_regulations" checked.');
 
     // 16. Create Tournament Applications Table
     await client.query(`

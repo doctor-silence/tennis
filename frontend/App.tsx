@@ -2022,7 +2022,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
   const [age, setAge] = useState('');
-  const [role, setRole] = useState<'amateur' | 'rtt_pro' | 'coach'>('amateur');
+  const [role, setRole] = useState<'amateur' | 'rtt_pro' | 'coach' | 'tournament_director'>('amateur');
   const [level, setLevel] = useState('NTRP 2.0 (Новичок)');
 
   // 2FA States
@@ -2159,7 +2159,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
             city,
             age: ageNum,
             role,
-            level: role === 'amateur' ? level : (role === 'coach' ? 'Coach' : undefined),
+            level: role === 'amateur' ? level : (role === 'coach' ? 'Coach' : role === 'tournament_director' ? 'Tournament Director' : undefined),
             // Mapping new RTT fields
             rating: role === 'rtt_pro' ? parseInt(rttPoints) : 0, // Points
             rttRank: role === 'rtt_pro' ? parseInt(rttRank) : 0,   // Position
@@ -2193,12 +2193,12 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
            <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">
                {authMode === 'login' && 'Вход в клуб'}
                {authMode === 'register' && registerStep === 1 && 'Регистрация'}
-               {authMode === 'register' && registerStep === 2 && 'Профиль игрока'}
+               {authMode === 'register' && registerStep === 2 && 'Профиль пользователя'}
            </h2>
            <p className="text-slate-400 text-sm">
              {authMode === 'login' && 'Добро пожаловать обратно на корт.'}
              {authMode === 'register' && registerStep === 1 && 'Создайте учетную запись для доступа.'}
-             {authMode === 'register' && registerStep === 2 && 'Расскажите о себе для подбора соперников.'}
+             {authMode === 'register' && registerStep === 2 && 'Расскажите о себе, чтобы настроить подходящий сценарий работы в платформе.'}
            </p>
          </div>
 
@@ -2382,7 +2382,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
 
                 <div className="pt-2">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Ваш статус</label>
-                    <div className="grid grid-cols-3 gap-3 mb-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                         <div 
                             onClick={() => setRole('amateur')}
                             className={`cursor-pointer rounded-xl p-3 border text-center transition-all ${role === 'amateur' ? 'bg-lime-400 border-lime-400 text-slate-900' : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'}`}
@@ -2403,6 +2403,13 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
                         >
                             <Briefcase className="mx-auto mb-1" size={20}/>
                             <div className="font-bold text-sm">Тренер</div>
+                        </div>
+                        <div 
+                          onClick={() => setRole('tournament_director')}
+                          className={`cursor-pointer rounded-xl p-3 border text-center transition-all ${role === 'tournament_director' ? 'bg-lime-400 border-lime-400 text-slate-900' : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'}`}
+                        >
+                          <Trophy className="mx-auto mb-1" size={20}/>
+                          <div className="font-bold text-sm">Директор турниров</div>
                         </div>
                     </div>
 
@@ -2521,6 +2528,15 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
                                 <br/><span className="text-lime-400 text-xs mt-1 block">Дополнительные поля можно заполнить позже в профиле.</span>
                             </p>
                         </div>
+                    )}
+
+                    {role === 'tournament_director' && (
+                      <div className="bg-slate-800/30 p-4 rounded-xl border border-slate-700 animate-fade-in-up">
+                        <p className="text-sm text-slate-400">
+                          Аккаунт директора турниров открывает CRM для создания турниров, загрузки регламентов, обработки заявок и ведения состава участников.
+                          <br/><span className="text-lime-400 text-xs mt-1 block">Контакты и детали турниров можно будет заполнить сразу после регистрации в дашборде.</span>
+                        </p>
+                      </div>
                     )}
                 </div>
 

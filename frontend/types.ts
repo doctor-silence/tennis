@@ -1,11 +1,11 @@
 export type ViewState = 'landing' | 'auth' | 'dashboard' | 'pro' | 'shop' | 'admin' | 'news' | 'privacy' | 'terms' | 'rtt-info' | 'crm-info' | 'partner-search' | 'find-partner' | 'find-courts' | 'ai-coach-info' | 'amateur-tournaments' | 'community-info' | 'tactics-3d-info' | 'tennis-diary-info';
-export type DashboardTab = 'profile' | 'search' | 'courts' | 'ai_coach' | 'messages' | 'notifications' | 'tactics' | 'students' | 'tournaments' | 'video_analysis' | 'ladder' | 'community' | 'my_applications' | 'rtt_stats' | 'diary';
+export type DashboardTab = 'profile' | 'search' | 'courts' | 'ai_coach' | 'messages' | 'notifications' | 'tactics' | 'students' | 'tournaments' | 'tournament_organization' | 'video_analysis' | 'ladder' | 'community' | 'my_applications' | 'rtt_stats' | 'diary';
 
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'amateur' | 'rtt_pro' | 'coach' | 'admin';
+  role: 'amateur' | 'rtt_pro' | 'coach' | 'admin' | 'tournament_director';
   rating?: number; // NTRP (converted) or RTT Points (Очки классификации)
   xp?: number; // Experience Points (Gamification)
   rttRank?: number; // RTT Rating/Position (Рейтинг в категории)
@@ -51,7 +51,7 @@ export interface Partner {
   isPro: boolean;
   rttRank?: number;
   rating?: number;
-  role: 'amateur' | 'rtt_pro' | 'coach' | 'admin';
+  role: 'amateur' | 'rtt_pro' | 'coach' | 'admin' | 'tournament_director';
 }
 
 export interface Court {
@@ -394,6 +394,7 @@ export interface TournamentMatch {
 export interface Tournament {
   id: string;
   name: string;
+  user_id?: string;
   groupName?: string;
   group_name?: string;
   prizePool: string;
@@ -427,7 +428,27 @@ export interface Tournament {
   endDate?: string;
   end_date?: string;
   pending_applications_count?: number;
+  approved_applications_count?: number;
+  total_applications_count?: number;
   creator_role?: string;
+  director_name?: string;
+  director_phone?: string;
+  director_email?: string;
+  director_telegram?: string;
+  director_max?: string;
+  entry_fee?: number | null;
+  club_name?: string;
+  court_name?: string;
+  address?: string;
+  surface?: string;
+  has_regulation?: boolean;
+  regulation_file_name?: string | null;
+  regulation_uploaded_at?: string | null;
+}
+
+export interface TournamentRegulationFile {
+  fileName: string;
+  dataUrl: string;
 }
 
 export interface TournamentApplication {

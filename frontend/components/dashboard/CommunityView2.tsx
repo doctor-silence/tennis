@@ -51,8 +51,8 @@ const isTournamentFinished = (tournament: Tournament) => {
     return ['finished', 'завершен', 'завершён', 'турнир завершен', 'турнир завершён', 'completed'].some((value) => stageStatus.includes(value));
 };
 
-const isUpcomingAdminTournament = (tournament: Tournament) => {
-    if (tournament.creator_role !== 'admin') {
+const isUpcomingCommunityTournament = (tournament: Tournament) => {
+    if (!['admin', 'tournament_director'].includes(tournament.creator_role || '')) {
         return false;
     }
 
@@ -187,7 +187,31 @@ const getSystemMultiplier = (systemCode: string) => {
     return 1;
 };
 
+const resolveParsedRttParticipantsCount = (tournamentDetails?: any) => {
+    const parsedParticipantsCount = Array.isArray(tournamentDetails?.participants)
+        ? tournamentDetails.participants.filter(Boolean).length
+        : 0;
+
+    if (Number.isFinite(parsedParticipantsCount) && parsedParticipantsCount > 0) {
+        return parsedParticipantsCount;
+    }
+
+    const directDetailsCount = Number(tournamentDetails?.participantsCount || 0);
+    if (Number.isFinite(directDetailsCount) && directDetailsCount > 0) {
+        return directDetailsCount;
+    }
+
+    return 0;
+};
+
 const resolveTournamentParticipants = (tournament: Tournament, tournamentDetails?: any) => {
+    const hasRttLink = Boolean(tournament?.rtt_link || tournament?.rttLink);
+    const parsedRttParticipantsCount = resolveParsedRttParticipantsCount(tournamentDetails);
+
+    if (hasRttLink && parsedRttParticipantsCount > 0) {
+        return parsedRttParticipantsCount;
+    }
+
     const directValue = Number(tournamentDetails?.participantsCount || tournament.participants_count || tournament.participantsCount || 0);
     if (Number.isFinite(directValue) && directValue > 0) return directValue;
 
@@ -198,6 +222,47 @@ const resolveTournamentParticipants = (tournament: Tournament, tournamentDetails
     }
 
     return 8;
+};
+
+const resolveTournamentParticipantLimit = (tournament: Tournament, tournamentDetails?: any) => {
+    const hasRttLink = Boolean(tournament?.rtt_link || tournament?.rttLink);
+    const parsedRttParticipantsCount = resolveParsedRttParticipantsCount(tournamentDetails);
+
+    if (hasRttLink) {
+        const officialRows = parseOfficialTournamentPointsTable(tournamentDetails);
+        const recommendedOfficialRow = getRecommendedOfficialPointsRow(officialRows, parsedRttParticipantsCount || 0);
+
+        if (recommendedOfficialRow?.drawSize && recommendedOfficialRow.drawSize > 0) {
+            return recommendedOfficialRow.drawSize;
+        }
+
+        if (parsedRttParticipantsCount > 0) {
+            return parsedRttParticipantsCount;
+        }
+    }
+
+    const directValue = Number(tournament.participants_count || tournament.participantsCount || 0);
+    if (Number.isFinite(directValue) && directValue > 0) {
+        return directValue;
+    }
+
+    return resolveTournamentParticipants(tournament, tournamentDetails);
+};
+
+const resolveTournamentApprovedParticipants = (tournament: Tournament, tournamentDetails?: any) => {
+    const hasRttLink = Boolean(tournament?.rtt_link || tournament?.rttLink);
+    const parsedRttParticipantsCount = resolveParsedRttParticipantsCount(tournamentDetails);
+
+    if (hasRttLink && parsedRttParticipantsCount > 0) {
+        return parsedRttParticipantsCount;
+    }
+
+    const approvedCount = Number(tournament.approved_applications_count || 0);
+    if (Number.isFinite(approvedCount) && approvedCount >= 0) {
+        return approvedCount;
+    }
+
+    return 0;
 };
 
 const estimateTournamentPointsByPlace = (tournament: Tournament, place: number, tournamentDetails?: any) => {
@@ -400,6 +465,51 @@ const TournamentDetailsModal = ({
 
     const hasRttLink = Boolean(tournament?.rtt_link || tournament?.rttLink);
     const shouldWaitForRttDetails = hasRttLink && !tournamentDetails;
+    const participantLimit = resolveTournamentParticipantLimit(tournament, tournamentDetails);
+    const approvedParticipantsCount = resolveTournamentApprovedParticipants(tournament, tournamentDetails);
+    const isTournamentFull = participantLimit > 0 && approvedParticipantsCount >= participantLimit;
+    const participantsDisplay = participantLimit > 0
+        ? `${approvedParticipantsCount}/${participantLimit}`
+        : String(approvedParticipantsCount);
+    const statusLabel = getTournamentDisplayStatus(tournament.status);
+    const categoryLabel = cleanTournamentCategoryLabel(tournamentDetails?.category || tournament.category || 'Не указана');
+    const tournamentTypeLabel = tournament.tournament_type || tournament.tournamentType || 'Не указан';
+    const genderLabel = tournament.gender || 'Не указан';
+    const ageLabel = tournamentDetails?.ageGroup || tournament.age_group || tournament.ageGroup || 'Не указана';
+    const systemLabel = tournamentDetails?.system || tournament.system || 'Не указана';
+    const formatLabel = tournament.match_format || tournament.matchFormat || 'Не указан';
+    const startDateLabel = (tournament.start_date || tournament.startDate) && !isNaN(new Date(tournament.start_date || tournament.startDate).getTime())
+        ? new Date(tournament.start_date || tournament.startDate).toLocaleDateString('ru-RU')
+        : 'Не указана';
+    const endDateLabel = (tournament.end_date || tournament.endDate) && !isNaN(new Date(tournament.end_date || tournament.endDate).getTime())
+        ? new Date(tournament.end_date || tournament.endDate).toLocaleDateString('ru-RU')
+        : 'Не указана';
+    const tournamentMeta = getTournamentMetaLabel(tournament.prize_pool || tournament.prizePool);
+    const organizerName = tournament.director_name
+        || tournament.creator_name
+        || getTournamentAnnouncementAuthorName(tournament, tournament.author_name || tournament.authorName || null);
+    const locationLabel = [
+        tournament.club_name,
+        tournament.court_name,
+        tournament.address,
+        tournament.location,
+        tournament.city,
+    ]
+        .map((value) => String(value || '').trim())
+        .filter((value, index, values) => value.length > 0 && values.indexOf(value) === index)
+        .join(' • ') || 'Локация уточняется';
+    const heroBadges = [categoryLabel, tournamentTypeLabel, genderLabel].filter((value) => value && value !== 'Не указан' && value !== 'Не указана');
+    const participantsCardLabel = hasRttLink ? 'Участники RTT' : 'Участники';
+    const slotsLabel = hasRttLink ? 'Мест в сетке RTT' : 'Свободные места';
+    const occupiedLabel = hasRttLink ? 'Участников по RTT' : 'Уже в сетке';
+    const detailCards = [
+        { icon: Calendar, label: 'Даты турнира', value: `${startDateLabel} — ${endDateLabel}`, tone: 'from-blue-500/15 to-cyan-500/10 border-blue-100' },
+        { icon: Users, label: participantsCardLabel, value: participantsDisplay, tone: 'from-emerald-500/15 to-lime-500/10 border-emerald-100' },
+        { icon: Trophy, label: tournamentMeta.label, value: tournamentMeta.value, tone: 'from-amber-500/15 to-orange-500/10 border-amber-100' },
+        { icon: Globe, label: 'Локация', value: locationLabel, tone: 'from-fuchsia-500/15 to-pink-500/10 border-fuchsia-100' },
+        { icon: Swords, label: 'Формат', value: formatLabel, tone: 'from-violet-500/15 to-indigo-500/10 border-violet-100' },
+        { icon: CheckCircle, label: 'Статус', value: statusLabel, tone: 'from-slate-500/12 to-slate-300/8 border-slate-200' },
+    ];
 
     return (
         <Modal
@@ -409,30 +519,109 @@ const TournamentDetailsModal = ({
             maxWidth="max-w-6xl"
             bodyClassName="p-0"
         >
-            <div className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
-                <p className="text-slate-600"><strong>Группа:</strong> {tournament.groupName || tournament.group_name || 'без группы'}</p>
-                <p className="text-slate-600"><strong>Статус:</strong> {getTournamentDisplayStatus(tournament.status)}</p>
-                <p className="text-slate-600 col-span-2"><strong>Категория:</strong> {cleanTournamentCategoryLabel(tournamentDetails?.category || tournament.category || 'Не указана')}</p>
-                <p className="text-slate-600"><strong>Разряд:</strong> {tournament.tournament_type || tournament.tournamentType || 'Не указан'}</p>
-                <p className="text-slate-600"><strong>Пол:</strong> {tournament.gender || 'Не указан'}</p>
-                <p className="text-slate-600 col-span-2"><strong>Возраст:</strong> {tournamentDetails?.ageGroup || tournament.age_group || tournament.ageGroup || 'Не указана'}</p>
-                <p className="text-slate-600"><strong>Система:</strong> {tournamentDetails?.system || tournament.system || 'Не указана'}</p>
-                <p className="text-slate-600"><strong>Формат:</strong> {tournament.match_format || tournament.matchFormat || 'Не указан'}</p>
-                <p className="text-slate-600 col-span-2"><strong>Участники:</strong> {resolveTournamentParticipants(tournament, tournamentDetails)}</p>
-                <p className="text-slate-600"><strong>Начало:</strong> {
-                    (tournament.start_date || tournament.startDate) && !isNaN(new Date(tournament.start_date || tournament.startDate).getTime())
-                        ? new Date(tournament.start_date || tournament.startDate).toLocaleDateString('ru-RU')
-                        : 'Не указана'
-                }</p>
-                <p className="text-slate-600"><strong>Окончание:</strong> {
-                    (tournament.end_date || tournament.endDate) && !isNaN(new Date(tournament.end_date || tournament.endDate).getTime())
-                        ? new Date(tournament.end_date || tournament.endDate).toLocaleDateString('ru-RU')
-                        : 'Не указана'
-                }</p>
-                {(() => {
-                    const tournamentMeta = getTournamentMetaLabel(tournament.prize_pool || tournament.prizePool);
-                    return <p className="text-slate-600 col-span-2"><strong>{tournamentMeta.label}:</strong> {tournamentMeta.value}</p>;
-                })()}
+            <div className="border-b border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.18),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(16,185,129,0.16),_transparent_28%),linear-gradient(135deg,_#0f172a_0%,_#1e293b_52%,_#0f766e_100%)] px-6 pb-6 pt-5 text-white md:px-8 md:pb-8 md:pt-6">
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center rounded-full bg-white/16 px-3 py-1 text-[11px] font-black uppercase tracking-[0.2em] text-white/90 backdrop-blur-sm">
+                        {statusLabel}
+                    </span>
+                    {heroBadges.map((badge) => (
+                        <span key={badge} className="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/85 backdrop-blur-sm">
+                            {badge}
+                        </span>
+                    ))}
+                </div>
+
+                <div className="mt-5 grid gap-5 lg:grid-cols-[1.35fr_0.65fr] lg:items-end">
+                    <div>
+                        <p className="text-sm font-semibold text-white/70">Турнир, в который хочется зайти уже сейчас</p>
+                        <h2 className="mt-2 text-3xl font-black leading-tight md:text-4xl">
+                            {tournament?.name || tournament?.title || 'Турнир'}
+                        </h2>
+                        <p className="mt-3 max-w-3xl text-sm leading-6 text-white/78 md:text-base">
+                            {locationLabel} • {startDateLabel} — {endDateLabel} • {formatLabel}. {isTournamentFull
+                                ? 'Сетка уже заполнена сильными участниками.'
+                                : 'Открытая возможность сыграть, показать уровень и попасть в заметный турнирный состав.'}
+                        </p>
+                    </div>
+
+                    <div className="rounded-[26px] border border-white/12 bg-white/10 p-4 shadow-2xl backdrop-blur-md">
+                        <div className="text-[11px] font-black uppercase tracking-[0.22em] text-white/65">Организатор</div>
+                        <div className="mt-2 text-lg font-black text-white">{organizerName || 'Организатор турнира'}</div>
+                        <div className="mt-1 text-sm text-white/70">{tournament.groupName || tournament.group_name || 'Открытый турнир сообщества'}</div>
+                        <div className="mt-4 flex items-center justify-between rounded-2xl bg-black/15 px-4 py-3">
+                            <div>
+                                <div className="text-[11px] uppercase tracking-[0.16em] text-white/55">{slotsLabel}</div>
+                                <div className="mt-1 text-2xl font-black text-white">
+                                    {participantLimit > 0 ? Math.max(participantLimit - approvedParticipantsCount, 0) : '∞'}
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-[11px] uppercase tracking-[0.16em] text-white/55">{occupiedLabel}</div>
+                                <div className="mt-1 text-xl font-black text-emerald-300">{participantsDisplay}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-slate-50/80 p-6 md:p-8">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {detailCards.map(({ icon: Icon, label, value, tone }) => (
+                        <div key={label} className={`rounded-[24px] border bg-gradient-to-br ${tone} p-4 shadow-sm`}>
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">{label}</div>
+                                    <div className="mt-2 text-lg font-black leading-snug text-slate-900 break-words">{value}</div>
+                                </div>
+                                <div className="rounded-2xl bg-white/80 p-2 text-slate-700 shadow-sm">
+                                    <Icon size={18} />
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <div className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+                        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Турнирная конфигурация</div>
+                        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 text-sm">
+                            <div className="rounded-2xl bg-slate-50 p-3">
+                                <div className="text-slate-400">Возраст</div>
+                                <div className="mt-1 font-bold text-slate-900">{ageLabel}</div>
+                            </div>
+                            <div className="rounded-2xl bg-slate-50 p-3">
+                                <div className="text-slate-400">Система</div>
+                                <div className="mt-1 font-bold text-slate-900">{systemLabel}</div>
+                            </div>
+                            <div className="rounded-2xl bg-slate-50 p-3">
+                                <div className="text-slate-400">Разряд</div>
+                                <div className="mt-1 font-bold text-slate-900">{tournamentTypeLabel}</div>
+                            </div>
+                            <div className="rounded-2xl bg-slate-50 p-3">
+                                <div className="text-slate-400">Пол</div>
+                                <div className="mt-1 font-bold text-slate-900">{genderLabel}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+                        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Почему стоит участвовать</div>
+                        <div className="mt-4 space-y-3 text-sm text-slate-600">
+                            <div className="flex items-start gap-3 rounded-2xl bg-emerald-50 px-4 py-3">
+                                <CheckCircle className="mt-0.5 text-emerald-500" size={18} />
+                                <div><span className="font-bold text-slate-900">Живой соревновательный опыт.</span> Актуальная сетка, понятный формат и быстрый вход в турнир.</div>
+                            </div>
+                            <div className="flex items-start gap-3 rounded-2xl bg-blue-50 px-4 py-3">
+                                <Calendar className="mt-0.5 text-blue-500" size={18} />
+                                <div><span className="font-bold text-slate-900">Удобные даты.</span> Сразу видно сроки проведения и загрузку по участникам.</div>
+                            </div>
+                            <div className="flex items-start gap-3 rounded-2xl bg-amber-50 px-4 py-3">
+                                <Trophy className="mt-0.5 text-amber-500" size={18} />
+                                <div><span className="font-bold text-slate-900">Спортивный интерес.</span> {tournamentMeta.label}: {tournamentMeta.value} и хороший повод проверить себя в игре.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div className="px-6 md:px-8 pb-6 md:pb-8">
@@ -441,29 +630,49 @@ const TournamentDetailsModal = ({
                         <Loader2 className="animate-spin" size={16} /> Загружаю RTT-данные турнира...
                     </div>
                 )}
-                {!shouldWaitForRttDetails && (
+                {!shouldWaitForRttDetails && hasRttLink && (
                     <TournamentPointsPreview tournament={tournament} tournamentDetails={tournamentDetails} />
                 )}
             </div>
 
-            {(canApply || hasApplied) && (
-                <div className="p-4 border-t border-slate-200">
+            {(canApply || hasApplied || isTournamentFull) && (
+                <div className="border-t border-slate-200 bg-white p-4 md:p-5">
                     {applicationStatus && (
                         <div className={`mb-4 text-center p-2 rounded-lg text-sm ${applicationStatus.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                             {applicationStatus.message}
                         </div>
                     )}
-                    <Button
-                        onClick={onApply}
-                        className="w-full"
-                        disabled={isApplying || hasApplied}
-                    >
-                        {isApplying
-                            ? <Loader2 className="animate-spin" />
-                            : hasApplied
-                                ? 'Заявка отправлена'
-                                : 'Подать заявку'}
-                    </Button>
+                    {isTournamentFull && !hasApplied ? (
+                        <div className="w-full rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center text-sm font-bold text-red-700">
+                            Прием заявок не ведется
+                        </div>
+                    ) : (
+                        <div className="rounded-[24px] bg-gradient-to-r from-slate-900 via-blue-900 to-emerald-800 p-[1px] shadow-lg">
+                            <div className="rounded-[23px] bg-white/95 p-4 backdrop-blur-sm md:flex md:items-center md:justify-between md:gap-4">
+                                <div className="mb-4 md:mb-0">
+                                    <div className="text-sm font-black text-slate-900">
+                                        {hasApplied ? 'Вы уже в числе кандидатов на участие' : 'Готовы выйти на корт?'}
+                                    </div>
+                                    <div className="mt-1 text-sm text-slate-500">
+                                        {hasApplied
+                                            ? 'Организатор уже получил вашу заявку и сможет подтвердить участие.'
+                                            : 'Отправьте заявку сейчас, пока в сетке есть свободные места.'}
+                                    </div>
+                                </div>
+                                <Button
+                                    onClick={onApply}
+                                    className="w-full md:w-auto md:min-w-[260px] rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-500 text-white shadow-lg shadow-blue-500/20 hover:opacity-95"
+                                    disabled={isApplying || hasApplied}
+                                >
+                                    {isApplying
+                                        ? <Loader2 className="animate-spin" />
+                                        : hasApplied
+                                            ? 'Заявка отправлена'
+                                            : 'Хочу участвовать'}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </Modal>
@@ -608,7 +817,7 @@ const buildTournamentAnnouncementContent = (tournament: Tournament, announcement
 
 const buildUpcomingAdminTournamentAnnouncementPosts = (tournaments: Tournament[], posts: any[], user: User) => {
     return tournaments
-        .filter((tournament) => isUpcomingAdminTournament(tournament))
+        .filter((tournament) => isUpcomingCommunityTournament(tournament))
         .filter((tournament) => !posts.some((post) => post.type === 'tournament_announcement' && doesAnnouncementKindMatch(post, 'upcoming') && doesPostBelongToTournament(post, tournament)))
         .map((tournament) => {
             const announcementDate = (getTournamentStartDate(tournament) || new Date()).toISOString();
@@ -1861,7 +2070,10 @@ const TournamentsWidget = ({ user, onNavigate, myGroups }: { user: User, onNavig
 
     const isMember = selectedTournament?.target_group_id ? myGroups.some(g => g.id === selectedTournament.target_group_id) : false;
     const hasApplied = selectedTournament ? userApplications.some(app => app.tournament_id === selectedTournament.id) : false;
-    const canApply = selectedTournament && selectedTournament.creator_role !== 'admin' && !hasApplied && selectedTournament.status === 'draft';
+    const selectedTournamentParticipantLimit = selectedTournament ? resolveTournamentParticipantLimit(selectedTournament, selectedTournamentDetails) : 0;
+    const selectedTournamentApprovedCount = selectedTournament ? resolveTournamentApprovedParticipants(selectedTournament, selectedTournamentDetails) : 0;
+    const isSelectedTournamentFull = selectedTournamentParticipantLimit > 0 && selectedTournamentApprovedCount >= selectedTournamentParticipantLimit;
+    const canApply = selectedTournament && selectedTournament.creator_role !== 'admin' && !hasApplied && !isSelectedTournamentFull && selectedTournament.status === 'draft';
 
 
     return (

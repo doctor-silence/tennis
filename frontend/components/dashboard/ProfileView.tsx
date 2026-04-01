@@ -1676,7 +1676,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
                        </div>
                        <div className="mt-2 flex items-center flex-wrap gap-3">
                            <span className="bg-lime-100 text-lime-700 text-xs font-bold px-2 py-1 rounded-md uppercase tracking-wider border border-lime-200">
-                               {user.role === 'coach' ? 'Тренер' : user.role === 'rtt_pro' ? 'Игрок РТТ' : 'Любитель'}
+                               {user.role === 'coach' ? 'Тренер' : user.role === 'rtt_pro' ? 'Игрок РТТ' : user.role === 'tournament_director' ? 'Директор турниров' : 'Любитель'}
                            </span>
                            
                            {(user.rating || user.level) && (

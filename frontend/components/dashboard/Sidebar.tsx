@@ -13,12 +13,13 @@ interface SidebarProps {
   onLogout: () => void;
   unreadCount: number;
   ladderNotifications: number;
+  tournamentOrganizationNotifications: number;
 }
 
 const SidebarItem = ({ icon, label, active, onClick, isSpecial = false, badge, title, inDevelopment = false }: any) => (
   <button
     onClick={inDevelopment ? () => {} : onClick}
-    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 group relative
+    className={`w-full flex items-center gap-3 px-4 pr-5 py-3.5 rounded-xl transition-all duration-200 group relative overflow-visible
       ${active 
         ? isSpecial 
           ? 'bg-gradient-to-r from-lime-400 to-lime-500 text-slate-900 font-bold shadow-lg shadow-lime-900/20' 
@@ -27,8 +28,8 @@ const SidebarItem = ({ icon, label, active, onClick, isSpecial = false, badge, t
     }`}
     disabled={inDevelopment}
   >
-    <span className={active ? 'text-inherit' : 'group-hover:text-white transition-colors'}>{icon}</span>
-    <span className="font-medium">{label}</span>
+    <span className={`shrink-0 ${active ? 'text-inherit' : 'group-hover:text-white transition-colors'}`}>{icon}</span>
+    <span className="flex-1 min-w-0 pr-2 text-left font-medium break-words">{label}</span>
     
     {inDevelopment && (
       <span className="ml-auto bg-gradient-to-r from-lime-400 to-emerald-400 text-slate-900 text-[9px] font-black px-2.5 py-1 rounded-md shadow-lg border border-lime-300">
@@ -39,7 +40,7 @@ const SidebarItem = ({ icon, label, active, onClick, isSpecial = false, badge, t
     {isSpecial && !active && !inDevelopment && <div className="ml-auto w-2 h-2 rounded-full bg-lime-400 animate-pulse"></div>}
     
     {badge && !inDevelopment && (
-      <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">
+      <span className="ml-2 shrink-0 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">
         {badge}
       </span>
     )}
@@ -53,7 +54,7 @@ const SidebarItem = ({ icon, label, active, onClick, isSpecial = false, badge, t
   </button>
 );
 
-const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogout, unreadCount, ladderNotifications }) => {
+const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogout, unreadCount, ladderNotifications, tournamentOrganizationNotifications }) => {
   return (
     <aside className="fixed left-0 top-0 h-screen w-72 bg-slate-900 text-white hidden md:flex flex-col z-20 shadow-2xl">
       <div className="p-5">
@@ -84,6 +85,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogo
               <SidebarItem icon={<Users size={20} />} label="Ученики (CRM)" active={activeTab === 'students'} onClick={() => setActiveTab('students')} />
               <SidebarItem icon={<Trophy size={20} />} label="Мои Турниры" active={activeTab === 'tournaments'} onClick={() => setActiveTab('tournaments')} />
             </>
+          )}
+          {user.role === 'tournament_director' && (
+            <SidebarItem icon={<Trophy size={20} />} label="Организация турнира" active={activeTab === 'tournament_organization'} onClick={() => setActiveTab('tournament_organization')} badge={tournamentOrganizationNotifications > 0 && tournamentOrganizationNotifications} />
           )}
           <SidebarItem icon={<Video size={20} />} label="Видео-анализ" active={activeTab === 'video_analysis'} onClick={() => {}} inDevelopment={true} />
         </nav>

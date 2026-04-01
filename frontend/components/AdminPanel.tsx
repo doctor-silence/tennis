@@ -1521,6 +1521,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout, onImpersonateUs
                                                 <td className="px-6 py-4">
                                                     <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase ${
                                                         u.role === 'admin' ? 'bg-red-100 text-red-700' :
+                                                        u.role === 'tournament_director' ? 'bg-amber-100 text-amber-700' :
                                                         u.role === 'coach' ? 'bg-purple-100 text-purple-700' :
                                                         u.role === 'rtt_pro' ? 'bg-lime-100 text-lime-800' :
                                                         'bg-slate-100 text-slate-600'
@@ -2340,6 +2341,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout, onImpersonateUs
                                         <option value="amateur">Любитель</option>
                                         <option value="rtt_pro">Игрок РТТ</option>
                                         <option value="coach">Тренер</option>
+                                        <option value="tournament_director">Директор турниров</option>
                                         <option value="admin">Администратор</option>
                                     </select>
                             </div>

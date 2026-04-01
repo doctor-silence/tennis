@@ -18,6 +18,7 @@ const app = express();
 const server = http.createServer(app);
 
 const PORT = process.env.PORT || 3001;
+const TOURNAMENT_DIRECTOR_ROLE = 'tournament_director';
 
 app.set('trust proxy', 1);
 
@@ -28,8 +29,8 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'x-admin-id', 'x-user-id']
 }));
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Rate limiting
 const authLimiter = rateLimit({
@@ -769,6 +770,32 @@ const ensureWearableActivitiesTable = async () => {
     `);
 };
 
+const ensureTournamentDirectorTables = async () => {
+    await pool.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS director_name VARCHAR(255);`);
+    await pool.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS director_phone VARCHAR(100);`);
+    await pool.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS director_email VARCHAR(255);`);
+    await pool.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS director_telegram VARCHAR(255);`);
+    await pool.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS director_max VARCHAR(255);`);
+    await pool.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS entry_fee NUMERIC(10, 2);`);
+    await pool.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS club_name VARCHAR(255);`);
+    await pool.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS court_name VARCHAR(255);`);
+    await pool.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS address TEXT;`);
+    await pool.query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS surface VARCHAR(100);`);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS tournament_regulations (
+            id SERIAL PRIMARY KEY,
+            tournament_id INTEGER NOT NULL UNIQUE REFERENCES tournaments(id) ON DELETE CASCADE,
+            file_name VARCHAR(255) NOT NULL,
+            mime_type VARCHAR(100) NOT NULL DEFAULT 'application/pdf',
+            file_size INTEGER NOT NULL DEFAULT 0,
+            file_data TEXT NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    `);
+};
+
 const getFrontendBaseUrl = () => process.env.FRONTEND_URL || 'http://localhost:5173';
 
 const getPublicApiBaseUrl = (req) => {
@@ -1220,6 +1247,126 @@ const normalizeTournamentStageStatus = (value = '') => {
     );
 
     return matchedStage ? matchedStage.label : null;
+};
+
+const normalizeCurrencyNumber = (value) => {
+    if (value === undefined || value === null || value === '') return null;
+    const normalizedValue = Number(String(value).replace(',', '.'));
+    return Number.isFinite(normalizedValue) ? normalizedValue : null;
+};
+
+const normalizeParticipantCount = (value) => {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) return null;
+    return Math.max(2, Math.round(numericValue));
+};
+
+const normalizeDirectorTournamentStatus = (value = '') => {
+    const normalizedValue = String(value || '').trim().toLowerCase();
+    if (['draft', 'open', 'live', 'finished'].includes(normalizedValue)) {
+        return normalizedValue;
+    }
+    return 'draft';
+};
+
+const parsePdfDataUrl = (rawValue) => {
+    if (!rawValue) return null;
+
+    const value = String(rawValue);
+    const match = value.match(/^data:(application\/pdf);base64,([A-Za-z0-9+/=\s]+)$/i);
+    if (!match) return null;
+
+    const fileData = match[2].replace(/\s+/g, '');
+    const buffer = Buffer.from(fileData, 'base64');
+
+    return {
+        mimeType: match[1].toLowerCase(),
+        fileData,
+        fileSize: buffer.length
+    };
+};
+
+const buildDirectorTournamentPayload = (body = {}, fallbackDirector = {}) => ({
+    name: String(body.name || '').trim(),
+    startDate: body.start_date || body.startDate || null,
+    endDate: body.end_date || body.endDate || null,
+    directorName: String(body.director_name || body.directorName || fallbackDirector.name || '').trim(),
+    directorPhone: String(body.director_phone || body.directorPhone || '').trim(),
+    directorEmail: normalizeEmail(body.director_email || body.directorEmail || fallbackDirector.email || ''),
+    directorTelegram: String(body.director_telegram || body.directorTelegram || '').trim(),
+    directorMax: String(body.director_max || body.directorMax || '').trim(),
+    prizePool: String(body.prize_pool || body.prizePool || '').trim(),
+    entryFee: normalizeCurrencyNumber(body.entry_fee || body.entryFee),
+    clubName: String(body.club_name || body.clubName || '').trim(),
+    courtName: String(body.court_name || body.courtName || '').trim(),
+    address: String(body.address || '').trim(),
+    surface: String(body.surface || '').trim(),
+    category: String(body.category || body.ntrp_category || body.ntrpCategory || '').trim(),
+    gender: String(body.gender || '').trim(),
+    participantsCount: normalizeParticipantCount(body.participants_count || body.participantsCount),
+    status: normalizeDirectorTournamentStatus(body.status),
+    tournamentType: String(body.tournament_type || body.tournamentType || 'Одиночный').trim() || 'Одиночный',
+    matchFormat: String(body.match_format || body.matchFormat || '').trim()
+});
+
+const mapDirectorTournamentRow = (row) => ({
+    ...row,
+    id: row.id.toString(),
+    user_id: row.user_id ? row.user_id.toString() : null,
+    entry_fee: row.entry_fee !== null && row.entry_fee !== undefined ? Number(row.entry_fee) : null,
+    participants_count: row.participants_count !== null && row.participants_count !== undefined ? Number(row.participants_count) : null,
+    pending_applications_count: row.pending_applications_count !== null && row.pending_applications_count !== undefined ? Number(row.pending_applications_count) : 0,
+    approved_applications_count: row.approved_applications_count !== null && row.approved_applications_count !== undefined ? Number(row.approved_applications_count) : 0,
+    total_applications_count: row.total_applications_count !== null && row.total_applications_count !== undefined ? Number(row.total_applications_count) : 0,
+    has_regulation: Boolean(row.has_regulation),
+    regulation_file_name: row.regulation_file_name || null,
+    regulation_uploaded_at: row.regulation_uploaded_at || null
+});
+
+const requireTournamentDirector = async (req, res, next) => {
+    const rawId = req.headers['x-user-id'] || req.body?.userId || req.query?.userId;
+    const userId = rawId && /^\d+$/.test(String(rawId)) ? String(rawId) : null;
+
+    if (!userId) {
+        return res.status(401).json({ error: 'User authorization required' });
+    }
+
+    try {
+        const result = await pool.query('SELECT id, name, email, role FROM users WHERE id = $1', [userId]);
+        if (!result.rows.length) {
+            return res.status(401).json({ error: 'User not found' });
+        }
+
+        const actor = result.rows[0];
+        if (actor.role !== TOURNAMENT_DIRECTOR_ROLE && actor.role !== 'admin') {
+            return res.status(403).json({ error: 'Доступ только для директоров турниров' });
+        }
+
+        req.tournamentDirector = {
+            id: String(actor.id),
+            name: actor.name,
+            email: actor.email,
+            role: actor.role
+        };
+        next();
+    } catch (error) {
+        console.error('requireTournamentDirector error:', error.message);
+        return res.status(500).json({ error: 'Auth check failed' });
+    }
+};
+
+const ensureDirectorTournamentAccess = async (tournamentId, actor) => {
+    const result = await pool.query('SELECT id, user_id, name FROM tournaments WHERE id = $1', [tournamentId]);
+    if (!result.rows.length) {
+        return { error: { status: 404, message: 'Tournament not found' } };
+    }
+
+    const tournament = result.rows[0];
+    if (actor.role !== 'admin' && String(tournament.user_id) !== String(actor.id)) {
+        return { error: { status: 403, message: 'Нет доступа к этому турниру' } };
+    }
+
+    return { tournament };
 };
 
 const mapRttLifecycleToTournamentStatus = (value = '') => {
@@ -3401,6 +3548,327 @@ app.delete('/api/admin/tournaments/:id', requireAdmin, async (req, res) => {
     }
 });
 
+app.get('/api/director/tournaments', requireTournamentDirector, async (req, res) => {
+    try {
+        const targetUserId = req.tournamentDirector.role === 'admin' && /^\d+$/.test(String(req.query.userId || ''))
+            ? String(req.query.userId)
+            : req.tournamentDirector.id;
+
+        const result = await pool.query(
+            `SELECT
+                t.*,
+                (SELECT COUNT(*) FROM tournament_applications ta WHERE ta.tournament_id = t.id) AS total_applications_count,
+                (SELECT COUNT(*) FROM tournament_applications ta WHERE ta.tournament_id = t.id AND ta.status = 'pending') AS pending_applications_count,
+                (SELECT COUNT(*) FROM tournament_applications ta WHERE ta.tournament_id = t.id AND ta.status = 'approved') AS approved_applications_count,
+                (tr.id IS NOT NULL) AS has_regulation,
+                tr.file_name AS regulation_file_name,
+                tr.updated_at AS regulation_uploaded_at
+             FROM tournaments t
+             LEFT JOIN tournament_regulations tr ON tr.tournament_id = t.id
+             WHERE t.user_id = $1
+             ORDER BY t.start_date DESC NULLS LAST, t.id DESC`,
+            [targetUserId]
+        );
+
+        res.json(result.rows.map(mapDirectorTournamentRow));
+    } catch (error) {
+        console.error('Director tournaments fetch error:', error);
+        res.status(500).json({ error: 'Не удалось получить турниры директора' });
+    }
+});
+
+app.post('/api/director/tournaments', requireTournamentDirector, async (req, res) => {
+    const payload = buildDirectorTournamentPayload(req.body, req.tournamentDirector);
+    const regulationSource = req.body.regulationFile?.dataUrl || req.body.regulation_file?.dataUrl || null;
+    const regulationFileName = String(req.body.regulationFile?.fileName || req.body.regulation_file?.fileName || '').trim();
+
+    if (!payload.name) {
+        return res.status(400).json({ error: 'Укажите название турнира' });
+    }
+
+    if (!payload.startDate || !payload.endDate) {
+        return res.status(400).json({ error: 'Укажите даты проведения турнира' });
+    }
+
+    if (!payload.directorName || !payload.directorPhone || !payload.directorEmail) {
+        return res.status(400).json({ error: 'Заполните контакты директора турнира' });
+    }
+
+    if (!payload.clubName || !payload.surface || !payload.category || !payload.gender || !payload.participantsCount) {
+        return res.status(400).json({ error: 'Заполните клуб, покрытие, категорию, пол и количество участников' });
+    }
+
+    const parsedRegulation = regulationSource ? parsePdfDataUrl(regulationSource) : null;
+    if (regulationSource && !parsedRegulation) {
+        return res.status(400).json({ error: 'Регламент должен быть загружен в формате PDF' });
+    }
+
+    if (parsedRegulation && parsedRegulation.fileSize > 5 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Размер PDF не должен превышать 5 МБ' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const tournamentResult = await client.query(
+            `INSERT INTO tournaments (
+                user_id, name, prize_pool, status, type, rounds,
+                category, tournament_type, gender, match_format, start_date, end_date, participants_count,
+                director_name, director_phone, director_email, director_telegram, director_max, entry_fee, club_name, court_name, address, surface
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6,
+                $7, $8, $9, $10, $11, $12, $13,
+                $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
+            ) RETURNING *`,
+            [
+                req.tournamentDirector.id,
+                payload.name,
+                payload.prizePool,
+                payload.status,
+                'single_elimination',
+                JSON.stringify([]),
+                payload.category,
+                payload.tournamentType,
+                payload.gender,
+                payload.matchFormat,
+                payload.startDate,
+                payload.endDate,
+                payload.participantsCount,
+                payload.directorName,
+                payload.directorPhone,
+                payload.directorEmail,
+                payload.directorTelegram,
+                payload.directorMax,
+                payload.entryFee,
+                payload.clubName,
+                payload.courtName,
+                payload.address,
+                payload.surface
+            ]
+        );
+
+        const createdTournament = tournamentResult.rows[0];
+
+        if (parsedRegulation) {
+            await client.query(
+                `INSERT INTO tournament_regulations (tournament_id, file_name, mime_type, file_size, file_data)
+                 VALUES ($1, $2, $3, $4, $5)`,
+                [
+                    createdTournament.id,
+                    regulationFileName || `${payload.name}.pdf`,
+                    parsedRegulation.mimeType,
+                    parsedRegulation.fileSize,
+                    parsedRegulation.fileData
+                ]
+            );
+        }
+
+        await client.query('COMMIT');
+        await logSystemEvent('info', `Директор турниров «${req.tournamentDirector.name}» создал турнир «${payload.name}»`, 'Tournaments');
+
+        res.status(201).json(mapDirectorTournamentRow({
+            ...createdTournament,
+            has_regulation: Boolean(parsedRegulation),
+            regulation_file_name: parsedRegulation ? (regulationFileName || `${payload.name}.pdf`) : null,
+            regulation_uploaded_at: parsedRegulation ? new Date().toISOString() : null
+        }));
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Director tournament create error:', error);
+        res.status(500).json({ error: 'Не удалось создать турнир' });
+    } finally {
+        client.release();
+    }
+});
+
+app.put('/api/director/tournaments/:id', requireTournamentDirector, async (req, res) => {
+    const { id } = req.params;
+    const access = await ensureDirectorTournamentAccess(id, req.tournamentDirector);
+    if (access.error) {
+        return res.status(access.error.status).json({ error: access.error.message });
+    }
+
+    const payload = buildDirectorTournamentPayload(req.body, req.tournamentDirector);
+    const regulationSource = req.body.regulationFile?.dataUrl || req.body.regulation_file?.dataUrl || null;
+    const regulationFileName = String(req.body.regulationFile?.fileName || req.body.regulation_file?.fileName || '').trim();
+    const removeRegulation = Boolean(req.body.removeRegulation || req.body.remove_regulation);
+    const parsedRegulation = regulationSource ? parsePdfDataUrl(regulationSource) : null;
+
+    if (!payload.name) {
+        return res.status(400).json({ error: 'Укажите название турнира' });
+    }
+
+    if (!payload.startDate || !payload.endDate) {
+        return res.status(400).json({ error: 'Укажите даты проведения турнира' });
+    }
+
+    if (!payload.directorName || !payload.directorPhone || !payload.directorEmail) {
+        return res.status(400).json({ error: 'Заполните контакты директора турнира' });
+    }
+
+    if (!payload.clubName || !payload.surface || !payload.category || !payload.gender || !payload.participantsCount) {
+        return res.status(400).json({ error: 'Заполните клуб, покрытие, категорию, пол и количество участников' });
+    }
+
+    if (regulationSource && !parsedRegulation) {
+        return res.status(400).json({ error: 'Регламент должен быть загружен в формате PDF' });
+    }
+
+    if (parsedRegulation && parsedRegulation.fileSize > 5 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Размер PDF не должен превышать 5 МБ' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const result = await client.query(
+            `UPDATE tournaments
+             SET name = $1,
+                 prize_pool = $2,
+                 status = $3,
+                 category = $4,
+                 tournament_type = $5,
+                 gender = $6,
+                 match_format = $7,
+                 start_date = $8,
+                 end_date = $9,
+                 participants_count = $10,
+                 director_name = $11,
+                 director_phone = $12,
+                 director_email = $13,
+                 director_telegram = $14,
+                 director_max = $15,
+                 entry_fee = $16,
+                 club_name = $17,
+                 court_name = $18,
+                 address = $19,
+                 surface = $20
+             WHERE id = $21 RETURNING *`,
+            [
+                payload.name,
+                payload.prizePool,
+                payload.status,
+                payload.category,
+                payload.tournamentType,
+                payload.gender,
+                payload.matchFormat,
+                payload.startDate,
+                payload.endDate,
+                payload.participantsCount,
+                payload.directorName,
+                payload.directorPhone,
+                payload.directorEmail,
+                payload.directorTelegram,
+                payload.directorMax,
+                payload.entryFee,
+                payload.clubName,
+                payload.courtName,
+                payload.address,
+                payload.surface,
+                id
+            ]
+        );
+
+        if (removeRegulation) {
+            await client.query('DELETE FROM tournament_regulations WHERE tournament_id = $1', [id]);
+        }
+
+        if (parsedRegulation) {
+            await client.query(
+                `INSERT INTO tournament_regulations (tournament_id, file_name, mime_type, file_size, file_data, updated_at)
+                 VALUES ($1, $2, $3, $4, $5, NOW())
+                 ON CONFLICT (tournament_id)
+                 DO UPDATE SET
+                    file_name = EXCLUDED.file_name,
+                    mime_type = EXCLUDED.mime_type,
+                    file_size = EXCLUDED.file_size,
+                    file_data = EXCLUDED.file_data,
+                    updated_at = NOW()`,
+                [
+                    id,
+                    regulationFileName || `${payload.name}.pdf`,
+                    parsedRegulation.mimeType,
+                    parsedRegulation.fileSize,
+                    parsedRegulation.fileData
+                ]
+            );
+        }
+
+        const regulationMeta = await client.query(
+            `SELECT file_name, updated_at FROM tournament_regulations WHERE tournament_id = $1`,
+            [id]
+        );
+
+        await client.query('COMMIT');
+        await logSystemEvent('info', `Директор турниров «${req.tournamentDirector.name}» обновил турнир «${payload.name || access.tournament.name}»`, 'Tournaments');
+
+        res.json(mapDirectorTournamentRow({
+            ...result.rows[0],
+            has_regulation: regulationMeta.rows.length > 0,
+            regulation_file_name: regulationMeta.rows[0]?.file_name || null,
+            regulation_uploaded_at: regulationMeta.rows[0]?.updated_at || null
+        }));
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Director tournament update error:', error);
+        res.status(500).json({ error: 'Не удалось обновить турнир' });
+    } finally {
+        client.release();
+    }
+});
+
+app.delete('/api/director/tournaments/:id', requireTournamentDirector, async (req, res) => {
+    const { id } = req.params;
+    const access = await ensureDirectorTournamentAccess(id, req.tournamentDirector);
+    if (access.error) {
+        return res.status(access.error.status).json({ error: access.error.message });
+    }
+
+    try {
+        await pool.query('DELETE FROM tournaments WHERE id = $1', [id]);
+        await logSystemEvent('warning', `Директор турниров «${req.tournamentDirector.name}» удалил турнир «${access.tournament.name}»`, 'Tournaments');
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Director tournament delete error:', error);
+        res.status(500).json({ error: 'Не удалось удалить турнир' });
+    }
+});
+
+app.get('/api/director/tournaments/:id/regulation', requireTournamentDirector, async (req, res) => {
+    const { id } = req.params;
+    const access = await ensureDirectorTournamentAccess(id, req.tournamentDirector);
+    if (access.error) {
+        return res.status(access.error.status).json({ error: access.error.message });
+    }
+
+    try {
+        const result = await pool.query(
+            `SELECT file_name, mime_type, file_size, file_data, updated_at
+             FROM tournament_regulations
+             WHERE tournament_id = $1`,
+            [id]
+        );
+
+        if (!result.rows.length) {
+            return res.status(404).json({ error: 'Регламент не найден' });
+        }
+
+        const regulation = result.rows[0];
+        res.json({
+            fileName: regulation.file_name,
+            mimeType: regulation.mime_type,
+            fileSize: regulation.file_size,
+            uploadedAt: regulation.updated_at,
+            dataUrl: `data:${regulation.mime_type};base64,${regulation.file_data}`
+        });
+    } catch (error) {
+        console.error('Director regulation fetch error:', error);
+        res.status(500).json({ error: 'Не удалось получить регламент турнира' });
+    }
+});
+
 // --- COURTSROUTES (Public & Admin) ---
 
 app.get('/api/courts', async (req, res) => {
@@ -4705,23 +5173,30 @@ app.get('/api/tournaments', async (req, res) => {
         const query = `
             SELECT 
                 t.*, 
+                u.name as creator_name,
                 u.role as creator_role, 
                 g.name as "groupName",
-                (SELECT COUNT(*) FROM tournament_applications ta WHERE ta.tournament_id = t.id AND ta.status = 'pending') as pending_applications_count
+                (SELECT COUNT(*) FROM tournament_applications ta WHERE ta.tournament_id = t.id AND ta.status = 'pending') as pending_applications_count,
+                (SELECT COUNT(*) FROM tournament_applications ta WHERE ta.tournament_id = t.id AND ta.status = 'approved') as approved_applications_count
             FROM tournaments t
             JOIN users u ON t.user_id = u.id
             LEFT JOIN groups g ON t.target_group_id IS NOT NULL AND t.target_group_id != '' AND t.target_group_id ~ '^\d+$' AND CAST(t.target_group_id AS INTEGER) = g.id
             LEFT JOIN group_members gm ON g.id = gm.group_id AND gm.user_id = $1
             WHERE
                 t.user_id = $1 -- It's a tournament created by the current user
-                OR u.role = 'admin' -- It's a public tournament from an admin
+                OR u.role IN ('admin', 'tournament_director') -- It's a public tournament from an admin or tournament director
                 OR gm.user_id IS NOT NULL -- The current user is a member of the tournament's target group
-            GROUP BY t.id, u.role, g.name
+            GROUP BY t.id, u.name, u.role, g.name
             ORDER BY t.start_date DESC NULLS LAST, t.id DESC
         `;
         
         const result = await pool.query(query, [userId]);
-        res.json(result.rows.map(t => ({ ...t, id: t.id.toString(), pending_applications_count: parseInt(t.pending_applications_count) })));
+        res.json(result.rows.map(t => ({
+            ...t,
+            id: t.id.toString(),
+            pending_applications_count: parseInt(t.pending_applications_count, 10) || 0,
+            approved_applications_count: parseInt(t.approved_applications_count, 10) || 0,
+        })));
     } catch (err) {
         console.error("Fetch Tournaments Error:", err);
         res.status(500).json({ error: 'Failed to fetch tournaments' });
@@ -4823,11 +5298,33 @@ app.post('/api/tournaments/:id/apply', async (req, res) => {
         await client.query('BEGIN');
 
         // 1. Get tournament and user info
-        const tournamentRes = await client.query('SELECT user_id, name FROM tournaments WHERE id = $1', [tournamentId]);
+        const tournamentRes = await client.query(
+            `SELECT
+                t.user_id,
+                t.name,
+                t.participants_count,
+                (SELECT COUNT(*) FROM tournament_applications ta WHERE ta.tournament_id = t.id AND ta.status = 'approved') AS approved_applications_count
+             FROM tournaments t
+             WHERE t.id = $1`,
+            [tournamentId]
+        );
         if (tournamentRes.rows.length === 0) {
             throw new Error('Tournament not found');
         }
-        const { user_id: coachId, name: tournamentName } = tournamentRes.rows[0];
+        const {
+            user_id: coachId,
+            name: tournamentName,
+            participants_count: participantsCount,
+            approved_applications_count: approvedApplicationsCount,
+        } = tournamentRes.rows[0];
+
+        const normalizedParticipantsCount = Number(participantsCount) || 0;
+        const normalizedApprovedApplicationsCount = Number(approvedApplicationsCount) || 0;
+
+        if (normalizedParticipantsCount > 0 && normalizedApprovedApplicationsCount >= normalizedParticipantsCount) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ error: 'Прием заявок не ведется' });
+        }
 
         const userRes = await client.query('SELECT name FROM users WHERE id = $1', [userId]);
         if (userRes.rows.length === 0) {
@@ -6175,6 +6672,8 @@ server.listen(PORT, async () => {
         console.log('✅ Wearable connections table ready');
         await ensureWearableActivitiesTable();
         console.log('✅ Wearable activities table ready');
+        await ensureTournamentDirectorTables();
+        console.log('✅ Tournament director tables ready');
         setTimeout(() => {
             syncTrackedTournamentStages().catch(err => console.error('Initial RTT tournament sync failed:', err.message));
         }, 15000);

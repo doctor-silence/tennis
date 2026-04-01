@@ -1,4 +1,4 @@
-import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Match, Product, PlayerProfile, Trajectory, Conversation, ChatMessage, MarketplaceItem, CrmStats, Skill, Lesson, Tournament, Group, NewsArticle, PlayerProgressProfile, WearableConnection, WearableProvider, WearableActivitiesResponse, WearableActivity, SamsungBridgeSetup } from '../types';
+import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Match, Product, PlayerProfile, Trajectory, Conversation, ChatMessage, MarketplaceItem, CrmStats, Skill, Lesson, Tournament, Group, NewsArticle, PlayerProgressProfile, WearableConnection, WearableProvider, WearableActivitiesResponse, WearableActivity, SamsungBridgeSetup, TournamentRegulationFile } from '../types';
 import * as THREE from 'three'; // Import THREE for Vector3 deserialization
 
 // Frontend API Service
@@ -1018,6 +1018,79 @@ export const api = {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status, coachId }),
+            });
+            return handleResponse(res);
+        },
+    },
+
+    tournamentDirector: {
+        getAll: async (userId: string): Promise<Tournament[]> => {
+            const res = await fetch(`${API_URL}/director/tournaments?userId=${userId}`, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-id': userId,
+                },
+            });
+            return handleResponse(res);
+        },
+        create: async (userId: string, data: Partial<Tournament> & { regulationFile?: TournamentRegulationFile | null }): Promise<Tournament> => {
+            const res = await fetch(`${API_URL}/director/tournaments`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-id': userId,
+                },
+                body: JSON.stringify({ ...data, userId }),
+            });
+            return handleResponse(res);
+        },
+        update: async (userId: string, tournamentId: string, data: Partial<Tournament> & { regulationFile?: TournamentRegulationFile | null, removeRegulation?: boolean }): Promise<Tournament> => {
+            const res = await fetch(`${API_URL}/director/tournaments/${tournamentId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-id': userId,
+                },
+                body: JSON.stringify({ ...data, userId }),
+            });
+            return handleResponse(res);
+        },
+        delete: async (userId: string, tournamentId: string): Promise<{ success: boolean }> => {
+            const res = await fetch(`${API_URL}/director/tournaments/${tournamentId}?userId=${userId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-id': userId,
+                },
+            });
+            return handleResponse(res);
+        },
+        getRegulation: async (userId: string, tournamentId: string): Promise<{ fileName: string; mimeType: string; fileSize: number; uploadedAt: string; dataUrl: string }> => {
+            const res = await fetch(`${API_URL}/director/tournaments/${tournamentId}/regulation?userId=${userId}`, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-id': userId,
+                },
+            });
+            return handleResponse(res);
+        },
+        getApplications: async (userId: string, tournamentId: string): Promise<any[]> => {
+            const res = await fetch(`${API_URL}/tournaments/${tournamentId}/applications?userId=${userId}`, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-id': userId,
+                },
+            });
+            return handleResponse(res);
+        },
+        updateApplicationStatus: async (userId: string, applicationId: string, status: 'approved' | 'rejected'): Promise<any> => {
+            const res = await fetch(`${API_URL}/applications/${applicationId}/status`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-id': userId,
+                },
+                body: JSON.stringify({ status, coachId: userId }),
             });
             return handleResponse(res);
         },
