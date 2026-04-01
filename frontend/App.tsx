@@ -52,12 +52,14 @@ type SeoConfig = {
   title: string;
   description: string;
   canonicalPath: string;
+  keywords?: string;
 };
 
 const DEFAULT_SEO: SeoConfig = {
-  title: 'НаКорте - Теннисная платформа для поиска партнёров и тренеров',
-  description: 'НаКорте — онлайн-платформа для теннисистов России. Найди партнёра для игры, запишись к тренеру, участвуй в турнирах РТТ и следи за рейтингом.',
+  title: 'НаКорте - Теннисная платформа для игроков, тренеров и организаторов турниров',
+  description: 'НаКорте — онлайн-платформа для теннисистов России. Найди партнёра для игры, запишись к тренеру, создавай любительские турниры и управляй ими через роль Директор турниров.',
   canonicalPath: '/',
+  keywords: 'теннисный турнир, создать турнир по теннису, директор турнира, организация теннисных турниров, теннисная платформа, РТТ, теннисный тренер, поиск партнёра',
 };
 
 const SEO_BY_VIEW: Partial<Record<ViewState, SeoConfig>> = {
@@ -102,6 +104,12 @@ const SEO_BY_VIEW: Partial<Record<ViewState, SeoConfig>> = {
     title: 'CRM для теннисных тренеров — НаКорте',
     description: 'CRM для теннисных тренеров: управление учениками, расписанием, абонементами и прогрессом в одном сервисе.',
     canonicalPath: '/trainer-crm/',
+  },
+  'tournament-director-info': {
+    title: 'Создание теннисных турниров и директор турниров — НаКорте',
+    description: 'Создавайте любительские теннисные турниры на НаКорте. Роль Директор турниров помогает публиковать регламент, принимать заявки, управлять участниками и продвигать соревнование.',
+    canonicalPath: '/tournament-director/',
+    keywords: 'директор турниров, создать турнир по теннису, организация теннисных турниров, любительский теннисный турнир, управление заявками турнира, регламент турнира',
   },
   'rtt-info': {
     title: 'Верификация РТТ — НаКорте',
@@ -159,7 +167,7 @@ const ensureCanonicalLink = () => {
   return element;
 };
 
-const applySeoMetadata = ({ title, description, canonicalPath }: SeoConfig) => {
+const applySeoMetadata = ({ title, description, canonicalPath, keywords }: SeoConfig) => {
   const canonicalUrl = new URL(canonicalPath, SITE_URL).toString();
 
   document.title = title;
@@ -167,6 +175,9 @@ const applySeoMetadata = ({ title, description, canonicalPath }: SeoConfig) => {
   ensureMetaTag('property', 'og:title').setAttribute('content', title);
   ensureMetaTag('property', 'og:description').setAttribute('content', description);
   ensureMetaTag('property', 'og:url').setAttribute('content', canonicalUrl);
+  ensureMetaTag('name', 'twitter:title').setAttribute('content', title);
+  ensureMetaTag('name', 'twitter:description').setAttribute('content', description);
+  ensureMetaTag('name', 'keywords').setAttribute('content', keywords || DEFAULT_SEO.keywords || '');
   ensureCanonicalLink().setAttribute('href', canonicalUrl);
 };
 
@@ -178,7 +189,7 @@ const App = () => {
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(true); // Add loading state
 
-  const validPaths = ['/', '/crm/', '/crm', '/trainer-crm/', '/trainer-crm', '/rtt/', '/rtt', '/news/', '/news', '/privacy/', '/privacy', '/pro/', '/pro', '/shop/', '/shop', '/terms/', '/terms', '/find-partner/', '/find-partner', '/find-courts/', '/find-courts', '/ai-coach/', '/ai-coach', '/amateur-tournaments/', '/amateur-tournaments', '/community/', '/community', '/3d-tactics/', '/3d-tactics', '/tennis-diary/', '/tennis-diary'];
+  const validPaths = ['/', '/crm/', '/crm', '/trainer-crm/', '/trainer-crm', '/tournament-director/', '/tournament-director', '/rtt/', '/rtt', '/news/', '/news', '/privacy/', '/privacy', '/pro/', '/pro', '/shop/', '/shop', '/terms/', '/terms', '/find-partner/', '/find-partner', '/find-courts/', '/find-courts', '/ai-coach/', '/ai-coach', '/amateur-tournaments/', '/amateur-tournaments', '/community/', '/community', '/3d-tactics/', '/3d-tactics', '/tennis-diary/', '/tennis-diary'];
 
   const getPublicRouteState = (pathname: string, search: string) => {
     const isValid = validPaths.some((path) => pathname === path || pathname.startsWith(path + '/'));
@@ -217,6 +228,10 @@ const App = () => {
 
     if (pathname.startsWith('/trainer-crm')) {
       return { isNotFound: false, nextView: 'crm-info' as ViewState, nextAuthMode: 'login' as const };
+    }
+
+    if (pathname.startsWith('/tournament-director')) {
+      return { isNotFound: false, nextView: 'tournament-director-info' as ViewState, nextAuthMode: 'login' as const };
     }
 
     if (pathname.startsWith('/rtt')) {
@@ -277,6 +292,8 @@ const App = () => {
         return '/rtt/';
       case 'crm-info':
         return '/trainer-crm/';
+      case 'tournament-director-info':
+        return '/tournament-director/';
       case 'find-partner':
         return '/find-partner/';
       case 'find-courts':
@@ -497,6 +514,10 @@ const App = () => {
 
       {view === 'crm-info' && (
         <TrainerCRMPage onBack={() => handleNavigate('landing')} onRegister={() => handleAuthNavigate('register')} />
+      )}
+
+      {view === 'tournament-director-info' && (
+          <TournamentDirectorInfoPage onBack={() => handleNavigate('landing')} onRegister={() => handleAuthNavigate('register')} />
       )}
 
       {view === 'shop' && (
@@ -980,7 +1001,11 @@ const FAQ_ITEMS = [
   },
   {
     question: 'Могу ли я создать свой турнир?',
-    answer: 'Да. Любой пользователь может создать любительский турнир, пригласить участников и управлять сеткой прямо в приложении. Тренеры дополнительно могут организовывать закрытые турниры для своих учеников.',
+    answer: 'Да. НаКорте поддерживает создание любительских турниров внутри платформы, а новая роль «Директор турниров» даёт отдельный CRM-инструмент для публикации турнира, загрузки регламента, ведения заявок, общения с участниками и контроля заполнения сетки.',
+  },
+  {
+    question: 'Что даёт роль «Директор турниров»?',
+    answer: 'Роль «Директор турниров» открывает специальный раздел «Организация турнира», где можно оформить турнирную страницу, указать контакты, клуб, покрытие, дату, стоимость участия, загрузить PDF-регламент и управлять заявками участников в одном интерфейсе.',
   },
   {
     question: 'Как удалить аккаунт или свои данные?',
@@ -1329,6 +1354,84 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
         </div>
       </section>
 
+      <section className="py-16 sm:py-24 bg-white overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="rounded-[2.25rem] border border-slate-200 bg-[radial-gradient(circle_at_top_right,_rgba(16,185,129,0.08),_transparent_30%),radial-gradient(circle_at_bottom_left,_rgba(132,204,22,0.08),_transparent_26%),linear-gradient(135deg,_#0f172a_0%,_#172033_52%,_#1f4e53_100%)] p-8 sm:p-12 lg:p-14 shadow-xl shadow-slate-200/70">
+            <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-10 items-start">
+              <div>
+                <span className="inline-flex items-center gap-2 rounded-full border border-lime-400/20 bg-lime-400/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.22em] text-lime-300">
+                  <Trophy size={14} /> Инструменты для организаторов
+                </span>
+                <h2 className="mt-5 text-4xl sm:text-5xl font-black tracking-tight text-white leading-tight">
+                  Создавайте свои турниры<br />
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-lime-300 via-emerald-300 to-cyan-300">и ведите их как директор турнира</span>
+                </h2>
+                <p className="mt-5 max-w-2xl text-base sm:text-lg leading-relaxed text-slate-300">
+                  НаКорте открывает новый сценарий для организаторов: теперь вы можете <strong className="text-white">создать теннисный турнир</strong>, оформить его страницу, принимать заявки и общаться с участниками через специальную роль <strong className="text-white">«Директор турниров»</strong>.
+                </p>
+                <p className="mt-4 max-w-2xl text-sm sm:text-base leading-relaxed text-slate-400">
+                  Это удобный инструмент для клубов, частных организаторов, серий любительских соревнований и локальных теннисных сообществ, которым нужен понятный цифровой контур для <strong className="text-slate-200">организации турниров по теннису</strong>.
+                </p>
+
+                <div className="mt-8 flex flex-wrap gap-3">
+                  <button onClick={onRegisterClick} className="inline-flex items-center gap-2 rounded-xl bg-lime-400 px-6 py-3 text-sm font-black text-slate-950 transition-all hover:bg-lime-300 hover:-translate-y-0.5">
+                    Стать директором турнира <ArrowRight size={16} />
+                  </button>
+                  <a href="/tournament-director/" className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-6 py-3 text-sm font-bold text-white transition-colors hover:border-lime-400/40 hover:text-lime-300">
+                    Создать свой первый турнир <Plus size={16} />
+                  </a>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  {
+                    icon: <Plus size={18} />,
+                    title: 'Быстрый запуск турнира',
+                    desc: 'Название, даты, формат, взнос, покрытие, адрес, клуб и лимит участников в одной форме.'
+                  },
+                  {
+                    icon: <FileText size={18} />,
+                    title: 'Регламент и документы',
+                    desc: 'Загрузите PDF-регламент, чтобы игроки сразу видели правила, детали и условия участия.'
+                  },
+                  {
+                    icon: <Users size={18} />,
+                    title: 'Заявки и участники',
+                    desc: 'Подтверждайте игроков, отслеживайте заполнение сетки и управляйте составом без хаоса в чатах.'
+                  },
+                  {
+                    icon: <MessageSquare size={18} />,
+                    title: 'Связь с игроками',
+                    desc: 'Контакты директора видны в карточке турнира, а участник может быстро перейти к диалогу.'
+                  },
+                ].map((item) => (
+                  <div key={item.title} className="rounded-[1.75rem] border border-white/8 bg-white/[0.04] p-5 backdrop-blur-sm">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-lime-400/10 text-lime-300 border border-lime-400/15">
+                      {item.icon}
+                    </div>
+                    <h3 className="mt-4 text-lg font-black text-white">{item.title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-400">{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                'Публикуйте турнир в сообществе и получайте живой поток заявок.',
+                'Показывайте организатора, контакты и ключевые условия участия прямо в карточке турнира.',
+                'Собирайте вокруг себя локальное теннисное комьюнити и запускайте серию событий на одной платформе.',
+              ].map((point) => (
+                <div key={point} className="rounded-2xl border border-white/8 bg-white/[0.03] px-5 py-4 text-sm font-medium leading-relaxed text-slate-300">
+                  {point}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* News Section */}
       <NewsSection onRegisterClick={onRegisterClick} onNavigateToNews={() => onNavigate('news')} />
 
@@ -1617,6 +1720,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                  <li><a href="/3d-tactics/" className="hover:text-lime-400 transition-colors text-left">3D тактика</a></li>
                  <li><a href="/tennis-diary/" className="hover:text-lime-400 transition-colors text-left">Дневник теннисиста</a></li>
                  <li><a href="/trainer-crm/" className="hover:text-lime-400 transition-colors text-left">CRM для тренеров</a></li>
+                 <li><a href="/tournament-director/" className="hover:text-lime-400 transition-colors text-left">Директор турниров</a></li>
                </ul>
              </div>
 
@@ -1646,7 +1750,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
                Найди <a href="/?auth=register" className="hover:text-slate-400 underline underline-offset-2">партнёра для игры в теннис</a> по уровню NTRP или рейтингу РТТ в своём городе.
                Бронируй <a href="/?auth=register" className="hover:text-slate-400 underline underline-offset-2">теннисные корты</a> онлайн, тренируйся с <a href="/?auth=register" className="hover:text-slate-400 underline underline-offset-2">AI-тренером по теннису</a>,
                участвуй в <a href="/?auth=register" className="hover:text-slate-400 underline underline-offset-2">любительских теннисных турнирах</a> и веди <a href="/?auth=register" className="hover:text-slate-400 underline underline-offset-2">дневник теннисиста</a>.
-               Для профессиональных тренеров доступна <a href="/trainer-crm/" className="hover:text-slate-400 underline underline-offset-2">CRM-система для ведения учеников</a>.
+               Для профессиональных тренеров доступна <a href="/trainer-crm/" className="hover:text-slate-400 underline underline-offset-2">CRM-система для ведения учеников</a>, а для организаторов — роль директора турниров с инструментами, чтобы <a href="/?auth=register" className="hover:text-slate-400 underline underline-offset-2">создавать теннисные турниры</a>, публиковать регламент и управлять заявками участников.
                Верификация игроков <a href="/rtt/" className="hover:text-slate-400 underline underline-offset-2">Российского Теннисного Тура (РТТ)</a>.
              </p>
            </div>
@@ -4458,6 +4562,240 @@ function AmateurTournamentsPage({ onBack, onRegister }: { onBack: () => void, on
           </div>
           <Button size="lg" onClick={onRegister} className="shadow-xl shadow-lime-400/20">
             Перейти к турнирам
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function TournamentDirectorInfoPage({ onBack, onRegister }: { onBack: () => void, onRegister: () => void }) {
+  const benefits = [
+    {
+      icon: <Plus className="text-lime-400" size={22} />,
+      title: 'Создание турнира в одном кабинете',
+      description: 'Оформляйте турнирную страницу: название, даты, формат, взнос, клуб, покрытие, адрес и лимит участников без таблиц и хаотичных чатов.',
+    },
+    {
+      icon: <FileText className="text-lime-400" size={22} />,
+      title: 'Регламент и прозрачные условия',
+      description: 'Загружайте PDF-регламент, чтобы игроки заранее видели правила, сроки, формат, стоимость участия и важные организационные детали.',
+    },
+    {
+      icon: <Users className="text-lime-400" size={22} />,
+      title: 'Управление заявками и составом',
+      description: 'Подтверждайте участников, контролируйте заполнение сетки и ведите турнирный поток в одном интерфейсе директора турниров.',
+    },
+  ];
+
+  const steps = [
+    'Зарегистрируйтесь на НаКорте и выберите сценарий для организаторов турниров.',
+    'Создайте турнир, заполните карточку события и добавьте ключевые параметры участия.',
+    'Загрузите регламент, укажите контакты директора турнира и откройте приём заявок.',
+    'Отслеживайте заявки, подтверждайте участников и общайтесь с игроками через платформу.',
+  ];
+
+  const features = [
+    'Публичная страница турнира с понятным описанием и видимыми условиями участия.',
+    'Контакты организатора и быстрый переход к диалогу для связи с директором турнира.',
+    'Удобный сценарий для клубов, частных организаторов и локальных серий любительских соревнований.',
+    'Показ турниров в сообществе, чтобы собирать заявки и повышать доверие к событию.',
+  ];
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-white font-sans">
+      <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/90 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-2 text-slate-300 hover:text-white transition-colors font-medium text-sm"
+          >
+            <ChevronLeft size={18} /> На главную
+          </button>
+          <img src="/assets/logo.svg" alt="НаКорте" className="h-10 sm:h-12 w-auto" />
+          <Button onClick={onRegister} size="sm" className="text-xs sm:text-sm px-3 sm:px-4">
+            Регистрация
+          </Button>
+        </div>
+      </header>
+
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,197,94,0.16),transparent_28%),radial-gradient(circle_at_left,rgba(59,130,246,0.12),transparent_24%)]" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12 md:pt-24 md:pb-16 grid lg:grid-cols-[1fr_0.95fr] gap-10 items-stretch">
+          <div className="flex flex-col h-full">
+            <span className="inline-flex items-center gap-2 text-lime-400 font-black uppercase tracking-[0.2em] text-xs mb-4">
+              <Trophy size={14} /> Директор турниров
+            </span>
+            <h1 className="text-4xl md:text-6xl font-black italic uppercase tracking-tight leading-none mb-5">
+              Создание
+              <span className="block text-lime-400">теннисных турниров</span>
+            </h1>
+            <p className="text-slate-300 text-base md:text-lg leading-relaxed max-w-2xl mb-8">
+              НаКорте даёт отдельную роль <strong className="text-white">«Директор турниров»</strong> для тех, кто хочет
+              <strong className="text-white"> создавать любительские теннисные турниры</strong>, публиковать регламент,
+              управлять заявками и вести коммуникацию с игроками на одной платформе.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Button size="lg" onClick={onRegister} className="shadow-xl shadow-lime-400/20">
+                Создать турнир
+              </Button>
+              <button
+                onClick={onBack}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-white/15 text-slate-200 hover:bg-white/5 transition-colors"
+              >
+                Вернуться <ArrowRight size={16} />
+              </button>
+            </div>
+
+            <div className="mt-8 rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-sm max-w-xl">
+              <div className="grid grid-cols-3 gap-3 mb-6">
+                <div className="rounded-2xl bg-slate-900/70 border border-white/10 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Роль</div>
+                  <div className="text-lg font-black text-white leading-tight">Director</div>
+                </div>
+                <div className="rounded-2xl bg-slate-900/70 border border-white/10 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Заявки</div>
+                  <div className="text-lg font-black text-white leading-tight">Онлайн</div>
+                </div>
+                <div className="rounded-2xl bg-slate-900/70 border border-white/10 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Регламент</div>
+                  <div className="text-lg font-black text-white leading-tight">PDF</div>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-sm text-slate-300">
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>Создайте страницу турнира с понятной подачей, сроками, параметрами и контактами организатора.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>Принимайте заявки игроков и контролируйте заполнение сетки без ручной рутины.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-lime-400 mt-0.5 shrink-0" size={18} />
+                  <p>Публикуйте турнир в сообществе и быстро собирайте заинтересованных участников.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-5 h-full">
+            <div className="rounded-[32px] border border-white/10 bg-white/5 p-7 shadow-[0_20px_80px_rgba(0,0,0,0.35)]">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.22em] text-lime-400">Кабинет организатора</div>
+                  <h2 className="text-3xl font-black mt-1">CRM турнира</h2>
+                </div>
+                <div className="w-12 h-12 rounded-2xl bg-lime-400 text-slate-950 flex items-center justify-center">
+                  <ShieldCheck size={22} />
+                </div>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Турнир</div>
+                  <div className="font-bold text-white">Весенний Cup</div>
+                  <div className="text-sm text-slate-400 mt-1">31.05 — 02.06 • Хард • NTRP 3.5</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Заявки</div>
+                  <div className="font-bold text-white">14 подтверждено</div>
+                  <div className="text-sm text-slate-400 mt-1">2 на рассмотрении • 2 места свободно</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Регламент</div>
+                  <div className="font-bold text-white">PDF загружен</div>
+                  <div className="text-sm text-slate-400 mt-1">Игроки видят все условия участия</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-2">Связь</div>
+                  <div className="font-bold text-white">Чат с участниками</div>
+                  <div className="text-sm text-slate-400 mt-1">Быстрый контакт прямо из карточки турнира</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[32px] border border-lime-400/20 bg-lime-400/5 p-6">
+              <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Для кого подходит</p>
+              <p className="text-slate-200 leading-relaxed">
+                Для клубов, академий, частных организаторов и локальных сообществ, которым важно профессионально оформить
+                турнир, собрать игроков, показать регламент и вести турнирный процесс без перегруженных таблиц и мессенджеров.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-16 md:pt-10 md:pb-20">
+        <div className="grid md:grid-cols-3 gap-6 mb-16">
+          {benefits.map((benefit) => (
+            <article key={benefit.title} className="rounded-3xl border border-white/10 bg-white/5 p-7">
+              <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-white/10 flex items-center justify-center mb-5">
+                {benefit.icon}
+              </div>
+              <h2 className="text-xl font-bold mb-3">{benefit.title}</h2>
+              <p className="text-slate-300 leading-relaxed">{benefit.description}</p>
+            </article>
+          ))}
+        </div>
+
+        <div className="grid lg:grid-cols-[0.95fr_1.05fr] gap-8 items-stretch">
+          <div className="rounded-[32px] border border-white/10 bg-white/5 p-8 md:p-10 h-full">
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Как это работает</p>
+            <h2 className="text-3xl font-black tracking-tight mb-6">Как создать турнир на НаКорте</h2>
+            <div className="space-y-4">
+              {steps.map((step, index) => (
+                <div key={step} className="flex items-start gap-4">
+                  <div className="w-9 h-9 rounded-full bg-lime-400 text-slate-950 flex items-center justify-center font-black flex-shrink-0">
+                    {index + 1}
+                  </div>
+                  <p className="text-slate-300 leading-relaxed pt-1">{step}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[32px] border border-white/10 bg-slate-900/70 p-8 md:p-10 h-full">
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Возможности сервиса</p>
+            <h2 className="text-3xl font-black tracking-tight mb-6">Что даёт роль директора турниров</h2>
+            <div className="space-y-5 text-slate-300 leading-relaxed">
+              <p>
+                Страница директора турниров на НаКорте нужна тем, кто ищет цифровой инструмент для <strong className="text-white">создания теннисных турниров</strong>
+                и дальнейшего управления ими. Вместо разрозненных форм, PDF в чатах и ручного списка участников организатор получает единый рабочий контур.
+              </p>
+              <p>
+                Платформа помогает публиковать карточку турнира с понятным описанием, параметрами участия, датами, адресом клуба и загруженным регламентом.
+                Это делает турнир более прозрачным для игроков и повышает доверие к событию уже на этапе просмотра карточки.
+              </p>
+              <p>
+                Турнир становится частью открытой экосистемы НаКорте: пользователи видят его в сообществе, открывают страницу,
+                изучают условия участия и могут быстро связаться с организатором. Это особенно полезно для клубов и частных серий, которым нужен устойчивый поток заявок.
+              </p>
+              <div className="space-y-3 pt-2">
+                {features.map((feature) => (
+                  <div key={feature} className="flex items-start gap-3 text-sm">
+                    <Check className="text-lime-400 mt-0.5 shrink-0" size={17} />
+                    <p>{feature}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 grid lg:grid-cols-[1fr_auto] gap-8 items-center">
+          <div>
+            <p className="text-lime-400 text-xs font-black uppercase tracking-[0.2em] mb-3">Готовы запустить свой турнир?</p>
+            <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-3">Создайте страницу турнира и начните собирать участников уже сегодня</h2>
+            <p className="text-slate-400 max-w-2xl leading-relaxed">
+              Зарегистрируйтесь на НаКорте и используйте роль директора турниров, чтобы оформить событие, показать регламент и запустить приём заявок.
+            </p>
+          </div>
+          <Button size="lg" onClick={onRegister} className="shadow-xl shadow-lime-400/20">
+            Открыть роль директора турниров
           </Button>
         </div>
       </section>
