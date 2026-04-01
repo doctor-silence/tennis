@@ -2518,17 +2518,30 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
                     </div>
 
                     {role === 'amateur' && (
-                        <div className="bg-slate-800/30 p-4 rounded-xl border border-slate-700 animate-fade-in-up">
-                            <label className="text-xs font-bold text-lime-400 uppercase tracking-wider mb-2 block flex items-center gap-2"><Activity size={14}/> Уровень игры (NTRP)</label>
-                            <select 
-                                value={level}
-                                onChange={(e) => setLevel(e.target.value)}
-                                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white outline-none focus:border-lime-400"
-                            >
-                                {ntrpLevels.map(l => <option key={l} value={l}>{l}</option>)}
-                            </select>
-                            <p className="text-[10px] text-slate-500 mt-2 leading-tight">Выберите уровень для корректного подбора соперников в лиге.</p>
+                      <div className="bg-gradient-to-br from-lime-400/10 via-slate-800/60 to-slate-800/40 p-4 rounded-2xl border border-lime-400/30 shadow-[0_0_0_1px_rgba(163,230,53,0.08)] animate-fade-in-up">
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                          <label className="text-xs font-bold text-lime-400 uppercase tracking-wider block flex items-center gap-2"><Activity size={14}/> Уровень игры (NTRP)</label>
+                          <span className="px-2.5 py-1 rounded-full bg-lime-400/15 border border-lime-400/30 text-[10px] font-black uppercase tracking-[0.18em] text-lime-300 whitespace-nowrap">
+                            Важно выбрать
+                          </span>
                         </div>
+                        <p className="text-xs text-slate-300 mb-3 leading-relaxed">
+                          Укажите ваш текущий уровень, чтобы мы точнее подбирали соперников, лиги и равные матчи.
+                        </p>
+                        <select 
+                          value={level}
+                          onChange={(e) => setLevel(e.target.value)}
+                          className="w-full bg-slate-900 border-2 border-lime-400/80 rounded-xl px-4 py-3 text-white outline-none focus:border-lime-300 focus:ring-4 focus:ring-lime-400/10"
+                        >
+                          {ntrpLevels.map(l => <option key={l} value={l}>{l}</option>)}
+                        </select>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <span className="px-2.5 py-1 rounded-full bg-slate-900/80 border border-white/10 text-[11px] text-slate-300">Новичок</span>
+                          <span className="px-2.5 py-1 rounded-full bg-slate-900/80 border border-white/10 text-[11px] text-slate-300">Средний</span>
+                          <span className="px-2.5 py-1 rounded-full bg-slate-900/80 border border-white/10 text-[11px] text-slate-300">Продвинутый</span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-3 leading-tight">Если сомневаетесь, выберите ближайший уровень — позже его можно изменить в профиле.</p>
+                      </div>
                     )}
                     
                     {role === 'rtt_pro' && (
