@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
+import React, { useCallback, useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { 
     BookOpen,
     IndianRupee,
@@ -14,7 +14,7 @@ import {
     Dribbble
 } from 'lucide-react';
 import { addDays, getDay } from 'date-fns';
-import { User, Student, ScheduledLesson, LessonType, TrainingNote, PlayerGoal, SkillSet } from '../../types';
+import { User, Student, ScheduledLesson, TrainingNote, PlayerGoal, SkillSet } from '../../types';
 import Button from '../Button';
 import { api } from '../../services/api';
 import { Modal } from '../Shared';
@@ -277,7 +277,7 @@ export const StudentsView = ({ user }: { user: User }) => {
     const reportStats = useMemo(() => {
         if (!selectedStudent) return null;
 
-        const studentLessons = lessons.filter(l => l.studentId === selectedStudent.id);
+        const studentLessons = lessons.filter(l => String(l.studentId) === String(selectedStudent.id));
         const attendedCount = studentLessons.length;
         // Assuming trainingFrequency is per week, for a 4-week month.
         const plannedLessons = (selectedStudent.trainingFrequency || 0) * 4;
@@ -371,6 +371,21 @@ export const StudentsView = ({ user }: { user: User }) => {
             return matchesSearch && matchesDebt;
         });
     }, [students, search, filterDebtOnly]);
+
+    const openStudentFromLesson = useCallback((lesson: ScheduledLesson) => {
+        const lessonStudentId = String(lesson.studentId);
+        const student = students.find((item) => String(item.id) === lessonStudentId)
+            || students.find((item) => item.name === lesson.studentName)
+            || null;
+
+        if (!student) {
+            return;
+        }
+
+        setSelectedStudent(student);
+        setShowStudentDetails(true);
+        setProfileTab('overview');
+    }, [students]);
 
     useEffect(() => {
         const loadInitialData = async () => {
@@ -603,8 +618,8 @@ export const StudentsView = ({ user }: { user: User }) => {
                         console.log('Adding lesson for date:', lessonDate, 'dayOfWeek:', dayOfWeek);
                         
                         const newLesson: Omit<ScheduledLesson, 'id'> = {
-                            coachId: user.id, 
-                            studentId: student.id, 
+                            coachId: Number(user.id), 
+                            studentId: Number(student.id), 
                             studentName: student.name, 
                             type: 'indiv', 
                             startTime: selectedSlot.time, 
@@ -648,7 +663,7 @@ export const StudentsView = ({ user }: { user: User }) => {
                 
                 console.log('Creating single lesson with date:', selectedSlot.date, 'time:', selectedSlot.time, 'dayIndex:', selectedSlot.dayIndex);
                 const newLesson = await apiLessons.add({ // Use apiLessons
-                    coachId: user.id, studentId: student.id, studentName: student.name, type: 'indiv', startTime: selectedSlot.time, dayIndex: selectedSlot.dayIndex, date: selectedSlot.date, duration: 60, status: 'confirmed', courtName: 'ТК Спартак', useCannon, useRacketRental, courtCost: courtRentPrice, lessonPrice: lessonPrice 
+                    coachId: Number(user.id), studentId: Number(student.id), studentName: student.name, type: 'indiv', startTime: selectedSlot.time, dayIndex: selectedSlot.dayIndex, date: selectedSlot.date, duration: 60, status: 'confirmed', courtName: 'ТК Спартак', useCannon, useRacketRental, courtCost: courtRentPrice, lessonPrice: lessonPrice 
                 });
                 console.log('Created lesson:', newLesson);
 
@@ -803,7 +818,7 @@ export const StudentsView = ({ user }: { user: User }) => {
                                                         >
                                                             <X size={14} />
                                                         </button>
-                                                        <div className="p-3 cursor-pointer" onClick={() => { const student = students.find(s => s.id === lesson.studentId); if(student) { setSelectedStudent(student); setShowStudentDetails(true); setProfileTab('overview'); } }}>
+                                                        <div className="p-3 cursor-pointer" onClick={() => openStudentFromLesson(lesson)}>
                                                             <div className="text-[8px] font-black uppercase text-slate-400">{lesson.type}</div>
                                                             <div className="text-xs font-black text-slate-900 truncate">{lesson.studentName}</div>
                                                         </div>

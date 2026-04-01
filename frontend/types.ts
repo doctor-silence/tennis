@@ -204,6 +204,7 @@ export interface ScheduledLesson {
     type: string; // e.g., 'indiv'
     startTime: string; // e.g., '08:00'
     dayIndex: number; // 0 for Monday, 6 for Sunday
+    date?: string;
     duration: number; // in minutes
     status: string; // e.g., 'confirmed'
     courtName: string;
@@ -229,6 +230,7 @@ export interface Student {
   skills: SkillSet;
   badges: string[]; // Array of badge IDs
   racketHours: number;
+  trainingFrequency?: number;
   videos: Video[];
   lastRestringDate?: string; // ISO date string or null
 }
