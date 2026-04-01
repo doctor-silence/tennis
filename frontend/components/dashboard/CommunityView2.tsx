@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import ReactDOM from 'react-dom';
 import { CommunityOnboarding } from './CommunityOnboarding';
-import { Heart, MessageCircle, Calendar, Globe, Swords, Trophy, Users, ShoppingCart, Share2, Loader2, X, PlusCircle, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Heart, MessageCircle, Calendar, Globe, Swords, Trophy, Users, ShoppingCart, Share2, Loader2, X, PlusCircle, CheckCircle, ChevronLeft, ChevronRight, Mail, Phone } from 'lucide-react';
 import { api } from '../../services/api';
 import Button from '../Button';
 import Tooltip from '../Tooltip';
@@ -436,6 +436,20 @@ const getTournamentDisplayStatus = (status?: string | null) => {
     return status || 'Не указан';
 };
 
+const buildTelegramLink = (value?: string | null) => {
+    const normalized = String(value || '').trim();
+    if (!normalized) return '';
+    if (/^https?:\/\//i.test(normalized)) return normalized;
+    const handle = normalized.replace(/^@+/, '');
+    return handle ? `https://t.me/${handle}` : '';
+};
+
+const buildContactLink = (value?: string | null) => {
+    const normalized = String(value || '').trim();
+    if (!normalized) return '';
+    return /^https?:\/\//i.test(normalized) ? normalized : '';
+};
+
 const TournamentDetailsModal = ({
     isOpen,
     onClose,
@@ -488,6 +502,12 @@ const TournamentDetailsModal = ({
     const organizerName = tournament.director_name
         || tournament.creator_name
         || getTournamentAnnouncementAuthorName(tournament, tournament.author_name || tournament.authorName || null);
+    const directorEmail = String(tournament.director_email || '').trim();
+    const directorPhone = String(tournament.director_phone || '').trim();
+    const directorTelegram = String(tournament.director_telegram || '').trim();
+    const directorMax = String(tournament.director_max || '').trim();
+    const telegramLink = buildTelegramLink(directorTelegram);
+    const maxLink = buildContactLink(directorMax);
     const locationLabel = [
         tournament.club_name,
         tournament.court_name,
@@ -560,6 +580,46 @@ const TournamentDetailsModal = ({
                                 <div className="mt-1 text-xl font-black text-emerald-300">{participantsDisplay}</div>
                             </div>
                         </div>
+                        {(directorEmail || directorPhone || directorTelegram || directorMax) && (
+                            <div className="mt-4 flex flex-wrap gap-2">
+                                {directorEmail && (
+                                    <a
+                                        href={`mailto:${directorEmail}`}
+                                        className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold text-white/90 transition-colors hover:bg-white/15"
+                                    >
+                                        <Mail size={14} /> {directorEmail}
+                                    </a>
+                                )}
+                                {directorPhone && (
+                                    <a
+                                        href={`tel:${directorPhone.replace(/\s+/g, '')}`}
+                                        className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold text-white/90 transition-colors hover:bg-white/15"
+                                    >
+                                        <Phone size={14} /> {directorPhone}
+                                    </a>
+                                )}
+                                {directorTelegram && (
+                                    <a
+                                        href={telegramLink || undefined}
+                                        target={telegramLink ? '_blank' : undefined}
+                                        rel={telegramLink ? 'noreferrer' : undefined}
+                                        className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold text-white/90 transition-colors hover:bg-white/15"
+                                    >
+                                        <MessageCircle size={14} /> Telegram: {directorTelegram}
+                                    </a>
+                                )}
+                                {directorMax && (
+                                    <a
+                                        href={maxLink || undefined}
+                                        target={maxLink ? '_blank' : undefined}
+                                        rel={maxLink ? 'noreferrer' : undefined}
+                                        className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold text-white/90 transition-colors hover:bg-white/15"
+                                    >
+                                        <MessageCircle size={14} /> MAX: {directorMax}
+                                    </a>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
