@@ -662,7 +662,6 @@ const NewsSection = ({ onRegisterClick, onNavigateToNews }: { onRegisterClick: (
 
   const [featured, ...orderedArticles] = articles;
   const topColumnArticles = orderedArticles.slice(0, 4);
-  const moreArticles = orderedArticles.slice(4);
 
     return (
         <section className="py-24 bg-slate-50">
@@ -725,27 +724,6 @@ const NewsSection = ({ onRegisterClick, onNavigateToNews }: { onRegisterClick: (
                             </button>
                     </div>
                 </div>
-
-                          {moreArticles.length > 0 && (
-                            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {moreArticles.map(article => (
-                          <div
-                            key={article.id}
-                            className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md cursor-pointer group flex gap-4 p-4 transition-all"
-                            onClick={onNavigateToNews}
-                          >
-                            <img src={article.image} alt={article.title} className="w-24 h-20 object-cover rounded-xl flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mb-1 ${CATEGORY_COLORS_LANDING[article.category] || 'bg-slate-100 text-slate-600'}`}>
-                                {CATEGORY_LABELS_LANDING[article.category] || article.category}
-                              </span>
-                              <h4 className="font-bold text-sm text-slate-900 leading-tight group-hover:text-lime-600 transition-colors line-clamp-3">{article.title}</h4>
-                              <p className="text-slate-400 text-xs mt-2">{new Date(article.published_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
             </div>
         </section>
     );
