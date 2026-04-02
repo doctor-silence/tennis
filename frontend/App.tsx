@@ -226,7 +226,7 @@ const App = () => {
       return { isNotFound: false, nextView: 'tennis-diary-info' as ViewState, nextAuthMode: 'login' as const };
     }
 
-    if (pathname.startsWith('/trainer-crm')) {
+    if (pathname.startsWith('/trainer-crm') || pathname.startsWith('/crm')) {
       return { isNotFound: false, nextView: 'crm-info' as ViewState, nextAuthMode: 'login' as const };
     }
 
@@ -256,10 +256,6 @@ const App = () => {
 
     if (pathname.startsWith('/terms')) {
       return { isNotFound: false, nextView: 'terms' as ViewState, nextAuthMode: 'login' as const };
-    }
-
-    if (pathname.startsWith('/crm')) {
-      return { isNotFound: false, nextView: 'auth' as ViewState, nextAuthMode: 'login' as const };
     }
 
     const params = new URLSearchParams(search);
@@ -381,9 +377,9 @@ const App = () => {
   }, [currentUser]);
 
   useEffect(() => {
-    const seo = currentUser ? DEFAULT_SEO : (SEO_BY_VIEW[view] ?? DEFAULT_SEO);
+    const seo = SEO_BY_VIEW[view] ?? DEFAULT_SEO;
     applySeoMetadata(seo);
-  }, [currentUser, view]);
+  }, [view]);
 
   const handleLoginSuccess = (user: User) => {
     setImpersonationAdmin(null);
