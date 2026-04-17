@@ -258,17 +258,7 @@ export const RttStatsView = ({ user }: { user: User }) => {
         }
 
         if (/^\d+$/.test(query)) {
-            if (query.length < 4) {
-                setError('Введите корректный РНИ (минимум 4 цифры)');
-                return;
-            }
-
             await loadPlayerStats(query);
-            return;
-        }
-
-        if (query.length < 2) {
-            setError('Введите минимум 2 символа для поиска по ФИО');
             return;
         }
 
@@ -287,36 +277,25 @@ export const RttStatsView = ({ user }: { user: User }) => {
         }
 
         if (!query) {
-            lastAutoQueryRef.current = '';
-            setError('');
-            setSearchResults([]);
             return;
         }
 
-        if (query === lastAutoQueryRef.current) {
-            return;
-        }
-
-        if (/^\d+$/.test(query)) {
-            if (query.length < 4) {
-                setSearchResults([]);
-                return;
-            }
-
-            playerSearchDebounceRef.current = setTimeout(() => {
-                loadPlayerStats(query);
-            }, 450);
-            return;
-        }
-
-        if (query.length < 2) {
-            setSearchResults([]);
+        if (lastAutoQueryRef.current === query) {
             return;
         }
 
         playerSearchDebounceRef.current = setTimeout(() => {
-            runPlayerNameSearch(query);
-        }, 450);
+            if (/^\d+$/.test(query)) {
+                if (query.length >= 4) {
+                    loadPlayerStats(query);
+                }
+                return;
+            }
+
+            if (query.length >= 2) {
+                runPlayerNameSearch(query);
+            }
+        }, /^\d+$/.test(query) ? 350 : 450);
 
         return () => {
             if (playerSearchDebounceRef.current) {
@@ -344,15 +323,12 @@ export const RttStatsView = ({ user }: { user: User }) => {
     return (
         <>
             <div className="space-y-6">
-            {/* Header с вкладками */}
             <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-3xl p-8 text-white">
                 <h1 className="text-3xl font-black mb-2">Статистика РТТ</h1>
                 <p className="text-orange-100">Поиск игроков и турниров</p>
             </div>
 
-            {/* Единый контейнер с вкладками */}
             <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-                {/* Таб-панель */}
                 <div className="flex border-b border-slate-200">
                     <button
                         onClick={() => setActiveTab('rni')}
@@ -376,7 +352,6 @@ export const RttStatsView = ({ user }: { user: User }) => {
                     </button>
                 </div>
 
-                {/* Вкладка: Поиск игрока */}
                 {activeTab === 'rni' && (
                     <div className="p-6">
                         <div className="w-full">
@@ -400,7 +375,6 @@ export const RttStatsView = ({ user }: { user: User }) => {
                     </div>
                 )}
 
-                {/* Вкладка: Турниры */}
                 {activeTab === 'tournaments' && <>
             <div className="overflow-hidden">
                 {/* Toolbar */}
@@ -706,71 +680,6 @@ export const RttStatsView = ({ user }: { user: User }) => {
                             )}
                         </div>
                     )}
-
-                    {/* RTT Banner */}
-                    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-green-400 via-lime-400 to-green-500 p-8 shadow-2xl cursor-pointer hover:shadow-3xl transition-all duration-300 transform hover:scale-[1.02] group"
-                         onClick={() => window.open('https://rttstat.ru', '_blank')}>
-                        {/* Animated Background Elements */}
-                        <div className="absolute inset-0 overflow-hidden">
-                            <div className="absolute w-64 h-64 bg-white/10 rounded-full -top-32 -left-32 group-hover:scale-150 transition-transform duration-700"></div>
-                            <div className="absolute w-96 h-96 bg-white/5 rounded-full -bottom-48 -right-48 group-hover:scale-125 transition-transform duration-500"></div>
-                            
-                            {/* Tennis Balls */}
-                            <div className="absolute w-12 h-12 bg-yellow-300 rounded-full top-8 right-24 shadow-lg opacity-70 group-hover:translate-y-2 transition-transform duration-300">
-                                <div className="absolute inset-1 border-2 border-white/40 rounded-full"></div>
-                                <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-white/40"></div>
-                            </div>
-                            <div className="absolute w-8 h-8 bg-yellow-300 rounded-full bottom-16 left-32 shadow-lg opacity-60 group-hover:-translate-y-1 transition-transform duration-500">
-                                <div className="absolute inset-1 border-2 border-white/40 rounded-full"></div>
-                                <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-white/40"></div>
-                            </div>
-                            
-                            {/* Tennis Rackets */}
-                            <div className="absolute top-12 left-1/4 w-16 h-20 opacity-20 group-hover:rotate-12 transition-transform duration-500">
-                                <svg viewBox="0 0 64 80" fill="none" className="w-full h-full">
-                                    <ellipse cx="32" cy="28" rx="22" ry="26" stroke="white" strokeWidth="3" fill="none"/>
-                                    <line x1="32" y1="54" x2="32" y2="75" stroke="white" strokeWidth="4" strokeLinecap="round"/>
-                                    <circle cx="32" cy="28" r="18" stroke="white" strokeWidth="1" opacity="0.3"/>
-                                    <line x1="20" y1="28" x2="44" y2="28" stroke="white" strokeWidth="1" opacity="0.3"/>
-                                    <line x1="32" y1="14" x2="32" y2="42" stroke="white" strokeWidth="1" opacity="0.3"/>
-                                </svg>
-                            </div>
-                            <div className="absolute bottom-20 right-16 w-12 h-16 opacity-15 group-hover:-rotate-12 transition-transform duration-700">
-                                <svg viewBox="0 0 64 80" fill="none" className="w-full h-full">
-                                    <ellipse cx="32" cy="28" rx="22" ry="26" stroke="white" strokeWidth="3" fill="none"/>
-                                    <line x1="32" y1="54" x2="32" y2="75" stroke="white" strokeWidth="4" strokeLinecap="round"/>
-                                </svg>
-                            </div>
-                            
-                            <div className="absolute w-40 h-40 bg-white/10 rounded-full top-1/2 right-1/4 animate-pulse"></div>
-                        </div>
-                        
-                        {/* Content */}
-                        <div className="relative z-10 flex items-center justify-between">
-                            <div className="flex items-center gap-6">
-                                <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
-                                    <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                    </svg>
-                                </div>
-                                <div className="text-white drop-shadow-lg">
-                                    <h3 className="text-2xl font-black mb-1">Больше информации по статистике</h3>
-                                    <p className="text-white/90 text-lg font-semibold">у нашего партнера <span className="font-black">RTTSTAT.RU</span></p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3 text-white">
-                                <span className="text-lg font-bold opacity-0 group-hover:opacity-100 transition-opacity duration-300 drop-shadow-lg">Перейти</span>
-                                <svg className="w-8 h-8 group-hover:translate-x-2 transition-transform duration-300 drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                                </svg>
-                            </div>
-                        </div>
-                        
-                        {/* Shine Effect */}
-                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 translate-x-full group-hover:translate-x-[-200%] transition-transform duration-1000"></div>
-                        </div>
-                    </div>
 
                     {/* Match History */}
                     <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6">

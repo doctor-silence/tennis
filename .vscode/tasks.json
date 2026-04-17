@@ -1,0 +1,17 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run RTT backfill",
+			"type": "shell",
+			"command": "cd /Users/admin/Documents/xxx/tennis/tennis/backend && node backfillFinishedRttPosts.js",
+			"isBackground": false
+		},
+		{
+			"label": "Check RTT posts",
+			"type": "shell",
+			"command": "cd /Users/admin/Documents/xxx/tennis/tennis/backend && node checkRttTournamentPosts.js",
+			"isBackground": false
+		}
+	]
+}

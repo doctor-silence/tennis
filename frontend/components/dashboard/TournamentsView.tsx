@@ -268,28 +268,24 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
 
         // POST TO COMMUNITY FEED
         if (winner && loser && user) {
-            // Определяем название следующего раунда
-            let nextRoundName = '';
-            if (roundIdx < updated.rounds.length - 1) {
-                nextRoundName = updated.rounds[roundIdx + 1].name;
-            }
+            const currentRoundName = updated.rounds[roundIdx]?.name || '';
+            const normalizedRoundName = currentRoundName.includes('ФИНАЛ') ? 'Финал' : currentRoundName;
 
-             await api.posts.create({
+            await api.posts.create({
                 userId: user.id,
-                type: 'match',
+                type: 'match_result',
                 groupId: selectedTournament.target_group_id,
                 content: {
-                    title: selectedTournament.name,
-                    author: user.name,
-                    authorAvatar: user.avatar || `https://ui-avatars.com/api/?name=${user.name}`,
-                    time: 'Только что',
-                    matchData: {
-                        winner: winner.name,
-                        loser: loser.name,
-                        score: matchScore || 'Победа',
-                        groupName: selectedTournament.groupName || 'Общий турнир',
-                        nextRound: nextRoundName || 'Финал завершён'
-                    }
+                    tournamentId: String(selectedTournament.id),
+                    tournamentName: selectedTournament.name,
+                    groupName: selectedTournament.groupName || 'Общий турнир',
+                    round: normalizedRoundName,
+                    player1Name: match.player1?.name,
+                    player2Name: match.player2?.name,
+                    score: matchScore || 'Победа',
+                    winnerName: winner.name,
+                    note: normalizedRoundName === 'Финал' ? 'Результат финала опубликован автоматически' : 'Результат матча опубликован автоматически',
+                    authorLabel: user.role === 'admin' ? 'Администрация' : user.name,
                 }
             });
             onTournamentUpdate();
@@ -303,10 +299,9 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
             nextRound.matches[nextMatchIdx][side] = { ...winner, lastMatchScore: matchScore };
         } else if (roundIdx === updated.rounds.length - 1) {
             updated.status = 'finished';
-            // --- NEW: Create a post for the tournament result ---
             if (winner) {
                 await api.posts.create({
-                    userId: user.id, // Or a system user ID
+                    userId: user.id,
                     type: 'tournament_result',
                     groupId: selectedTournament.target_group_id,
                     content: {
@@ -316,11 +311,11 @@ export const TournamentsView = ({ user, onTournamentUpdate }: { user: User, onTo
                         winnerName: winner.name,
                         winnerAvatar: winner.avatar,
                         authorLabel: user.role === 'admin' ? 'Администрация' : user.name,
+                        note: 'Турнир завершён автоматически после фиксации результата финала.',
                     }
                 });
                 onTournamentUpdate();
             }
-            // --- END NEW ---
         }
 
         const returnedTournament = await syncTournament(updated);

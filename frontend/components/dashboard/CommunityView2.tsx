@@ -1940,10 +1940,24 @@ const Feed: React.FC<FeedProps> = ({ activeTab, feedItems, user, onUpdate, onSta
      const MatchResultsFeed = () => (
          <div className="space-y-4">
             {feedItems
-                .filter(item => item.type === 'match_result' && !item.content?.tournamentName && !item.content?.player1Name)
-                .map(item => (
-                    <MatchResultPost key={item.id} post={item} user={user} onUpdate={onUpdate} />
+                .filter(item => (
+                    item.type === 'match_result'
+                    || item.type === 'tournament_result'
+                    || item.type === 'tournament_stage_update'
                 ))
+                .map(item => {
+                    if (item.type === 'tournament_result') {
+                        return <TournamentResultPost key={item.id} post={item} />;
+                    }
+
+                    if (item.type === 'tournament_stage_update') {
+                        return <TournamentStageUpdatePost key={item.id} post={item} />;
+                    }
+
+                    return (item.content?.tournamentName || item.content?.player1Name)
+                        ? <TournamentMatchResultPost key={item.id} post={item} />
+                        : <MatchResultPost key={item.id} post={item} user={user} onUpdate={onUpdate} />;
+                })
             }
         </div>
     );

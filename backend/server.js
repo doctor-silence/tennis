@@ -1462,12 +1462,93 @@ const hasTournamentPost = async (client, tournamentId, type) => {
     return existingPost.rows.length > 0;
 };
 
-const publishTournamentCompletionPosts = async (client, tournament, completionData) => {
-    if (!tournament.target_group_id || !/^\d+$/.test(String(tournament.target_group_id))) {
-        return { published: 0 };
+const hasTournamentStagePost = async (client, tournamentId, stageLabel) => {
+    const existingPost = await client.query(
+        `SELECT 1
+         FROM posts
+         WHERE type = 'tournament_stage_update'
+           AND content ->> 'tournamentId' = $1
+           AND content ->> 'stageLabel' = $2
+         LIMIT 1`,
+        [String(tournamentId), String(stageLabel || '')]
+    );
+
+    return existingPost.rows.length > 0;
+};
+
+const hasTournamentAnnouncementPost = async (client, tournamentId, announcementKind) => {
+    const existingPost = await client.query(
+        `SELECT 1
+         FROM posts
+         WHERE type = 'tournament_announcement'
+           AND content ->> 'tournamentId' = $1
+           AND content ->> 'announcementKind' = $2
+         LIMIT 1`,
+        [String(tournamentId), String(announcementKind || '')]
+    );
+
+    return existingPost.rows.length > 0;
+};
+
+const resolveTournamentGroupId = (targetGroupId) => {
+    if (!targetGroupId || !/^\d+$/.test(String(targetGroupId))) {
+        return null;
     }
 
-    const numericGroupId = parseInt(String(tournament.target_group_id), 10);
+    return parseInt(String(targetGroupId), 10);
+};
+
+const publishTournamentStartedAnnouncement = async (client, tournament, detailsTournament = {}) => {
+    if (await hasTournamentAnnouncementPost(client, tournament.id, 'started')) {
+        return 0;
+    }
+
+    const numericGroupId = resolveTournamentGroupId(tournament.target_group_id);
+    const groupName = tournament.group_name || tournament.groupName || null;
+    const authorName = 'Администрация';
+    const participantsCount = Array.isArray(detailsTournament.participants)
+        ? detailsTournament.participants.length
+        : Number(detailsTournament.participantsCount || tournament.participants_count || 0) || null;
+
+    await client.query(
+        `INSERT INTO posts (user_id, group_id, type, content)
+         VALUES ($1, $2, $3, $4::jsonb)`,
+        [
+            tournament.user_id,
+            numericGroupId,
+            'tournament_announcement',
+            JSON.stringify({
+                tournamentId: String(tournament.id),
+                announcementKind: 'started',
+                title: tournament.name,
+                name: tournament.name,
+                groupName,
+                prizePool: tournament.prize_pool || null,
+                date: tournament.start_date || tournament.startDate || null,
+                authorName,
+                status: 'live',
+                stageStatus: detailsTournament.statusLabel || detailsTournament.stageStatus || tournament.stage_status || 'Турнир идет',
+                category: detailsTournament.category || tournament.category || null,
+                tournamentType: detailsTournament.type || tournament.tournament_type || tournament.tournamentType || null,
+                gender: detailsTournament.gender || tournament.gender || null,
+                ageGroup: detailsTournament.ageGroup || tournament.age_group || tournament.ageGroup || null,
+                system: detailsTournament.system || tournament.system || null,
+                matchFormat: tournament.match_format || tournament.matchFormat || null,
+                participantsCount,
+                startDate: tournament.start_date || tournament.startDate || null,
+                endDate: tournament.end_date || tournament.endDate || null,
+                creatorRole: tournament.creator_role || 'admin',
+                rttLink: tournament.rtt_link || null,
+                rtt_link: tournament.rtt_link || null,
+            })
+        ]
+    );
+
+    return 1;
+};
+
+const publishTournamentCompletionPosts = async (client, tournament, completionData) => {
+    const numericGroupId = resolveTournamentGroupId(tournament.target_group_id);
     const groupName = tournament.group_name || tournament.groupName || null;
     const authorLabel = 'Администрация';
     const safeWinnerName = isLikelyHumanName(completionData.finalWinnerName) ? extractCleanPlayerName(completionData.finalWinnerName) : '';
@@ -1522,7 +1603,31 @@ const publishTournamentCompletionPosts = async (client, tournament, completionDa
         publishedCount += 1;
     }
 
-    if (publishedCount > 0) {
+    if (!(await hasTournamentStagePost(client, tournament.id, 'Турнир завершён'))) {
+        const finishMessage = `Турнир «${tournament.name}» завершён.${safeWinnerName ? ` Победитель: ${safeWinnerName}.` : ''}`;
+
+        await client.query(
+            `INSERT INTO posts (user_id, group_id, type, content)
+             VALUES ($1, $2, $3, $4::jsonb)`,
+            [
+                tournament.user_id,
+                numericGroupId,
+                'tournament_stage_update',
+                JSON.stringify({
+                    tournamentId: String(tournament.id),
+                    tournamentName: tournament.name,
+                    groupName,
+                    stageLabel: 'Турнир завершён',
+                    message: finishMessage,
+                    winnerName: safeWinnerName || undefined,
+                    rttLink: tournament.rtt_link || null,
+                })
+            ]
+        );
+        publishedCount += 1;
+    }
+
+    if (publishedCount > 0 && numericGroupId) {
         const message = `Турнир «${tournament.name}» завершён. Результаты финала опубликованы автоматически.`;
         await client.query(
             `INSERT INTO notifications (user_id, type, message, reference_id)
@@ -1539,11 +1644,7 @@ const publishTournamentCompletionPosts = async (client, tournament, completionDa
 };
 
 const publishTournamentStageUpdate = async (client, tournament, stageStatus) => {
-    if (!tournament.target_group_id || !/^\d+$/.test(String(tournament.target_group_id))) {
-        return;
-    }
-
-    const numericGroupId = parseInt(String(tournament.target_group_id), 10);
+    const numericGroupId = resolveTournamentGroupId(tournament.target_group_id);
     const groupName = tournament.group_name || tournament.groupName || null;
     const message = buildTournamentStageMessage({
         tournamentName: tournament.name,
@@ -1569,15 +1670,17 @@ const publishTournamentStageUpdate = async (client, tournament, stageStatus) => 
         ]
     );
 
-    await client.query(
-        `INSERT INTO notifications (user_id, type, message, reference_id)
-         SELECT gm.user_id, $1, $2, $3
-         FROM group_members gm
-         JOIN users u ON u.id = gm.user_id
-         WHERE gm.group_id = $4
-           AND COALESCE(u.notifications_enabled, TRUE) = TRUE`,
-        ['tournament_stage_update', message, String(tournament.id), numericGroupId]
-    );
+    if (numericGroupId) {
+        await client.query(
+            `INSERT INTO notifications (user_id, type, message, reference_id)
+             SELECT gm.user_id, $1, $2, $3
+             FROM group_members gm
+             JOIN users u ON u.id = gm.user_id
+             WHERE gm.group_id = $4
+               AND COALESCE(u.notifications_enabled, TRUE) = TRUE`,
+            ['tournament_stage_update', message, String(tournament.id), numericGroupId]
+        );
+    }
 };
 
 let isTournamentStageSyncRunning = false;
@@ -1595,6 +1698,8 @@ const syncTrackedTournamentStages = async () => {
 
         const trackedTournaments = await pool.query(
             `SELECT t.id, t.user_id, t.name, t.group_name, t.target_group_id, t.rtt_link, t.stage_status, t.status,
+                t.start_date, t.end_date, t.prize_pool, t.category, t.tournament_type, t.gender,
+                t.age_group, t.system, t.match_format, t.participants_count, t.creator_role,
                     COALESCE(g.name, t.group_name) AS "groupName"
              FROM tournaments t
              LEFT JOIN groups g
@@ -1603,8 +1708,6 @@ const syncTrackedTournamentStages = async () => {
               AND t.target_group_id ~ '^\\d+$'
               AND CAST(t.target_group_id AS INTEGER) = g.id
              WHERE COALESCE(t.rtt_link, '') != ''
-               AND COALESCE(t.target_group_id, '') != ''
-               AND t.target_group_id ~ '^\\d+$'
              ORDER BY t.id DESC`
         );
 
@@ -1666,8 +1769,20 @@ const syncTrackedTournamentStages = async () => {
                         );
                     }
 
+                    const tournamentForPosting = {
+                        ...tournament,
+                        status: detectedTournamentStatus || tournament.status,
+                        stage_status: nextStageStatus || tournament.stage_status,
+                    };
+
+                    if (detectedTournamentStatus === 'live' && previousTournamentStatus !== 'live') {
+                        publishedCount += await publishTournamentStartedAnnouncement(client, tournamentForPosting, detailsTournament);
+                    }
+
                     if (tournamentCompleted && previousTournamentStatus !== 'finished') {
-                        const completionResult = await publishTournamentCompletionPosts(client, tournament, {
+                        publishedCount += await publishTournamentStartedAnnouncement(client, tournamentForPosting, detailsTournament);
+
+                        const completionResult = await publishTournamentCompletionPosts(client, tournamentForPosting, {
                             finalMatch,
                             finalWinnerName
                         });
@@ -1677,7 +1792,7 @@ const syncTrackedTournamentStages = async () => {
                             'UPDATE tournaments SET stage_status = $1 WHERE id = $2',
                             [detectedStageStatus, tournament.id]
                         );
-                        await publishTournamentStageUpdate(client, tournament, detectedStageStatus);
+                        await publishTournamentStageUpdate(client, tournamentForPosting, detectedStageStatus);
                         publishedCount += 1;
                     }
 
