@@ -484,10 +484,14 @@ class RTTParser {
     });
   }
 
-  mapTourRosterRecord(record = {}, index = 0) {
+  mapTourRosterRecord(record = {}, index = 0, handbookMaps = {}) {
+    const playerAgeMap = handbookMaps.playerAge instanceof Map ? handbookMaps.playerAge : new Map();
+    const tourCategoryMap = handbookMaps.tourCategory instanceof Map ? handbookMaps.tourCategory : new Map();
     const tourId = String(record.tour_id || record.wizard_id || '').trim();
     const begin = record.begin_date || '';
     const end = record.end_date || begin;
+    const playerAgeCode = String(record.player_age || '').trim();
+    const tourCategoryCode = String(record.tour_category || '').trim();
     const mainMembers = Number.parseInt(String(record.ot_member_count || '').trim(), 10);
     const extraMembers = Number.parseInt(String(record.oe_member_count || '').trim(), 10);
     const applicationsCount = (Number.isFinite(mainMembers) ? mainMembers : 0) + (Number.isFinite(extraMembers) ? extraMembers : 0);
@@ -497,9 +501,9 @@ class RTTParser {
     return {
       id: index,
       city: record.location || record.location_full || record.org_short || '',
-      category: record.player_age || record.tour_category || '',
-      ageGroup: record.player_age || '',
-      tournamentCategory: record.tour_category || '',
+      category: playerAgeMap.get(playerAgeCode) || tourCategoryMap.get(tourCategoryCode) || playerAgeCode || tourCategoryCode || '',
+      ageGroup: playerAgeMap.get(playerAgeCode) || playerAgeCode || '',
+      tournamentCategory: tourCategoryMap.get(tourCategoryCode) || tourCategoryCode || '',
       date: this.formatIsoRangeToRu(begin, end),
       applicationsCount: applicationsCount > 0 ? String(applicationsCount) : '',
       avgRating,
@@ -1123,7 +1127,13 @@ class RTTParser {
       });
 
       const rosterRecords = this.dedupeTourRosterRecords(rosterData['tour.roster']?.records || []);
-      const tournaments = rosterRecords.map((row, index) => this.mapTourRosterRecord(row, index));
+      let handbookMaps = {};
+      try {
+        handbookMaps = await this.getTournamentHandbookMaps();
+      } catch (handbookError) {
+        console.warn('Не удалось загрузить справочники РТТ для турниров игрока:', handbookError.message);
+      }
+      const tournaments = rosterRecords.map((row, index) => this.mapTourRosterRecord(row, index, handbookMaps));
 
       const matches = [];
       const finishedTours = rosterRecords
