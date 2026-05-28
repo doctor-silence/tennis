@@ -685,7 +685,7 @@ interface ProfileViewProps {
   onUserUpdate: (data: Partial<User>) => void;
 }
 
-// Виджет ближайших турниров по округу с rttstat.ru
+// Виджет ближайших турниров по данным сервиса РТТ
 const NearbyTournamentsWidget: React.FC<{ userId: string; city: string }> = ({ userId, city }) => {
   const [tournaments, setTournaments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -791,11 +791,11 @@ const NearbyTournamentsWidget: React.FC<{ userId: string; city: string }> = ({ u
   );
 };
 
-// Виджет матчей РТТ с rttstat.ru
+// Виджет матчей РТТ из сервиса РТТ
 const RttMatchesWidget: React.FC<{ matches: any[]; loading: boolean; error: string | null }> = ({ matches, loading, error }) => {
   if (loading) return <div className="flex justify-center py-6"><Loader2 className="animate-spin text-slate-300" /></div>;
   if (error) return <p className="text-slate-400 text-sm py-2">{error}</p>;
-    if (!matches.length) return <p className="text-slate-400 text-sm py-2">Матчи на rttstat.ru не найдены.</p>;
+    if (!matches.length) return <p className="text-slate-400 text-sm py-2">Матчи в сервисе РТТ не найдены.</p>;
 
   return (
     <div className="space-y-2 max-h-80 overflow-y-auto pr-1">

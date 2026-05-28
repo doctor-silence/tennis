@@ -88,6 +88,30 @@ class RTTParser {
     return matched ? String(matched.name || '').trim() : value;
   }
 
+  async getTournamentHandbookMaps() {
+    const [tourTypeItems, playerAgeItems, tourCategoryItems] = await Promise.all([
+      this.getHandbookItems('tour_type'),
+      this.getHandbookItems('player_age'),
+      this.getHandbookItems('tour_category')
+    ]);
+
+    const toMap = (items = []) => {
+      const map = new Map();
+      for (const item of items) {
+        const key = String(item.item_id || item.value || '').trim();
+        const label = String(item.name || '').trim();
+        if (key && label) map.set(key, label);
+      }
+      return map;
+    };
+
+    return {
+      tourType: toMap(tourTypeItems),
+      playerAge: toMap(playerAgeItems),
+      tourCategory: toMap(tourCategoryItems)
+    };
+  }
+
   async getTournamentFilterOptions() {
     if (this._tourFilterCache.data && Date.now() < this._tourFilterCache.expireAt) {
       return this._tourFilterCache.data;
@@ -143,11 +167,22 @@ class RTTParser {
     return result;
   }
 
-  mapTourListRecords(records = []) {
+  mapTourListRecords(records = [], handbookMaps = {}) {
+    const tourTypeMap = handbookMaps.tourType instanceof Map ? handbookMaps.tourType : new Map();
+    const playerAgeMap = handbookMaps.playerAge instanceof Map ? handbookMaps.playerAge : new Map();
+    const tourCategoryMap = handbookMaps.tourCategory instanceof Map ? handbookMaps.tourCategory : new Map();
+
     return records.map((row, index) => {
       const tourId = String(row.tour_id || row.wizard_id || '').trim();
       const startDate = this.formatIsoToRuDate(row.begin_date);
       const endDate = this.formatIsoToRuDate(row.end_date || row.begin_date);
+      const tourTypeCode = String(row.tour_type || '').trim();
+      const playerAgeCode = String(row.player_age || '').trim();
+      const tourCategoryCode = String(row.tour_category || '').trim();
+      const mainMembers = Number.parseInt(String(row.ot_member_count || '').trim(), 10);
+      const extraMembers = Number.parseInt(String(row.oe_member_count || '').trim(), 10);
+      const applications = (Number.isFinite(mainMembers) ? mainMembers : 0) + (Number.isFinite(extraMembers) ? extraMembers : 0);
+
       const avgRatingRaw = Number(String(row.tour_rating || '').replace(',', '.'));
       const avgRating = Number.isFinite(avgRatingRaw) && avgRatingRaw >= 1
         ? String(Math.round(avgRatingRaw))
@@ -156,13 +191,13 @@ class RTTParser {
       return {
         id: index,
         city: row.location || row.location_full || '',
-        type: row.tour_type || '',
-        ageGroup: row.player_age || '',
-        category: row.tour_category || '',
+        type: tourTypeMap.get(tourTypeCode) || tourTypeCode || '',
+        ageGroup: playerAgeMap.get(playerAgeCode) || playerAgeCode || '',
+        category: tourCategoryMap.get(tourCategoryCode) || tourCategoryCode || '',
         startDate,
         endDate,
         surface: Array.isArray(row.covers) ? row.covers.join(', ') : '',
-        applications: row.tour_members || '',
+        applications: applications > 0 ? String(applications) : '',
         avgRating,
         status: String(row.is_finished) === '1' ? 'Завершен' : 'Открыт',
         name: row.name || '',
@@ -453,6 +488,11 @@ class RTTParser {
     const tourId = String(record.tour_id || record.wizard_id || '').trim();
     const begin = record.begin_date || '';
     const end = record.end_date || begin;
+    const mainMembers = Number.parseInt(String(record.ot_member_count || '').trim(), 10);
+    const extraMembers = Number.parseInt(String(record.oe_member_count || '').trim(), 10);
+    const applicationsCount = (Number.isFinite(mainMembers) ? mainMembers : 0) + (Number.isFinite(extraMembers) ? extraMembers : 0);
+    const avgRatingRaw = Number(String(record.tour_rating || record.rating_points || '').replace(',', '.'));
+    const avgRating = Number.isFinite(avgRatingRaw) && avgRatingRaw >= 1 ? String(Math.round(avgRatingRaw)) : '';
 
     return {
       id: index,
@@ -461,8 +501,8 @@ class RTTParser {
       ageGroup: record.player_age || '',
       tournamentCategory: record.tour_category || '',
       date: this.formatIsoRangeToRu(begin, end),
-      applicationsCount: record.tour_members || '',
-      avgRating: record.tour_rating || record.rating_points || '',
+      applicationsCount: applicationsCount > 0 ? String(applicationsCount) : '',
+      avgRating,
       tournament: record.name || '',
       link: this.buildTourLink(tourId),
       status: String(record.is_finished) === '1' ? 'finished' : 'accepted',
@@ -1503,7 +1543,13 @@ class RTTParser {
 
       const { records, totalCount, truncated } = await this.fetchTourRosterRecords(payload);
       const uniqueRecords = this.dedupeTourRosterRecords(records);
-      const tournaments = this.mapTourListRecords(uniqueRecords);
+      let handbookMaps = {};
+      try {
+        handbookMaps = await this.getTournamentHandbookMaps();
+      } catch (handbookError) {
+        console.warn('Не удалось загрузить справочники РТТ для подписей турниров:', handbookError.message);
+      }
+      const tournaments = this.mapTourListRecords(uniqueRecords, handbookMaps);
 
       console.log(`✅ Найдено турниров: ${tournaments.length}${truncated ? ` (из ${totalCount})` : ''}`);
 

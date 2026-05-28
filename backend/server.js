@@ -2311,7 +2311,7 @@ app.get('/api/rtt/search', async (req, res) => {
     }
 });
 
-// Маппинг городов → федеральный округ (district id на rttstat.ru)
+// Маппинг городов → федеральный округ (district id сервиса РТТ)
 const CITY_TO_DISTRICT = {
     // Центральный ФО
     'Москва': '2', 'Московская область': '2', 'Воронеж': '2', 'Ярославль': '2',
@@ -2440,8 +2440,6 @@ app.get('/api/rtt/tournament', async (req, res) => {
         let parsedUrl;
         try { parsedUrl = new URL(url); } catch { return res.status(400).json({ success: false, error: 'Некорректный URL' }); }
         const allowedHosts = [
-            'rttstat.ru',
-            'www.rttstat.ru',
             'rtt.mytennis.online',
             'www.rtt.mytennis.online',
             'apirtt.mytennis.online'
@@ -6328,12 +6326,12 @@ app.post('/api/rtt/sync-matches/:userId', async (req, res) => {
         const rni = userResult.rows[0].rni;
         if (!rni) return res.status(400).json({ error: 'У пользователя не привязан РНИ' });
 
-        // Парсим матчи с rttstat.ru
+        // Парсим матчи из сервиса РТТ
         const statsData = await rttParser.getPlayerTournamentsAndMatches(rni);
         const rttMatches = statsData?.data?.matches || [];
 
         if (!rttMatches.length) {
-            return res.json({ success: true, added: 0, message: 'Матчи на rttstat.ru не найдены' });
+            return res.json({ success: true, added: 0, message: 'Матчи в сервисе РТТ не найдены' });
         }
 
         // Получаем уже существующие матчи пользователя чтобы не дублировать
