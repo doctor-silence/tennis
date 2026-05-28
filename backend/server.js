@@ -2071,9 +2071,11 @@ app.post('/api/auth/login', async (req, res) => {
         await pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
 
         const { password: _, totp_secret: __, ...userInfo } = user;
+        const normalizedUserRole = String(userInfo.role || '').trim().toLowerCase();
         
         res.json({
             ...userInfo,
+            role: normalizedUserRole || userInfo.role,
             id: userInfo.id.toString(),
             rttRank: userInfo.rtt_rank,
             rttCategory: userInfo.rtt_category
@@ -3474,6 +3476,15 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
         const hashedPassword = await bcrypt.hash(plainPassword, 10);
         const defaultAvatar = `https://ui-avatars.com/api/?name=${name.replace(' ', '+')}&background=random&color=fff`;
         
+        const normalizedRole = String(role || 'amateur').trim().toLowerCase();
+        const allowedRoles = new Set(['amateur', 'rtt_pro', 'coach', 'admin', 'tournament_director']);
+        const resolvedRole = allowedRoles.has(normalizedRole) ? normalizedRole : 'amateur';
+        const resolvedLevel = resolvedRole === 'amateur' ? (level || '') : '';
+        const resolvedRating = resolvedRole === 'rtt_pro' ? (rating || 0) : (resolvedRole === 'amateur' ? (rating || 0) : 0);
+        const resolvedRttRank = resolvedRole === 'rtt_pro' ? (rttRank || 0) : 0;
+        const resolvedRttCategory = resolvedRole === 'rtt_pro' ? (rttCategory || null) : null;
+        const resolvedRni = resolvedRole === 'rtt_pro' ? (rni || null) : null;
+
         const result = await pool.query(
             `INSERT INTO users (name, email, password, city, avatar, role, rating, age, level, rtt_rank, rtt_category, rni, xp) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 0) 
@@ -3484,17 +3495,17 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
                 hashedPassword, 
                 city || 'Москва', 
                 defaultAvatar, 
-                role || 'amateur', 
-                rating || 0, 
+                resolvedRole, 
+                resolvedRating, 
                 age || null, 
-                level || '', 
-                rttRank || 0, 
-                rttCategory || null,
-                rni || null
+                resolvedLevel, 
+                resolvedRttRank, 
+                resolvedRttCategory,
+                resolvedRni
             ]
         );
         const user = result.rows[0];
-        await logAdminAction(req, 'info', 'создал', 'пользователя', name || normalizedEmail, `Email: ${normalizedEmail}, роль: ${role || 'amateur'}`);
+        await logAdminAction(req, 'info', 'создал', 'пользователя', name || normalizedEmail, `Email: ${normalizedEmail}, роль: ${resolvedRole}`);
         res.json({ ...user, id: user.id.toString(), rttRank: user.rtt_rank, rttCategory: user.rtt_category, rni: user.rni });
     } catch (err) {
         console.error("Admin Create User Error:", err);
@@ -3527,8 +3538,14 @@ app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
             await client.query('UPDATE users SET email = $1 WHERE id = $2', [emailValidation.normalized, id]);
         }
 
+        const normalizedRole = role !== undefined ? String(role).trim().toLowerCase() : undefined;
+        const allowedRoles = new Set(['amateur', 'rtt_pro', 'coach', 'admin', 'tournament_director']);
+        const resolvedRole = normalizedRole && allowedRoles.has(normalizedRole) ? normalizedRole : undefined;
+
         if (name !== undefined) await client.query('UPDATE users SET name = $1 WHERE id = $2', [name, id]);
-        if (role !== undefined) await client.query('UPDATE users SET role = $1 WHERE id = $2', [role, id]);
+        if (resolvedRole !== undefined) {
+            await client.query('UPDATE users SET role = $1 WHERE id = $2', [resolvedRole, id]);
+        }
         if (city !== undefined) await client.query('UPDATE users SET city = $1 WHERE id = $2', [city, id]);
         if (rating !== undefined) await client.query('UPDATE users SET rating = $1 WHERE id = $2', [rating, id]);
         if (level !== undefined) await client.query('UPDATE users SET level = $1 WHERE id = $2', [level, id]);
@@ -3540,6 +3557,21 @@ app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
         if (avatar !== undefined) await client.query('UPDATE users SET avatar = $1 WHERE id = $2', [avatar, id]);
         if (is_private !== undefined) await client.query('UPDATE users SET is_private = $1 WHERE id = $2', [is_private, id]);
         if (notifications_enabled !== undefined) await client.query('UPDATE users SET notifications_enabled = $1 WHERE id = $2', [notifications_enabled, id]);
+
+        // Keep fields consistent after role change (prevents coach having stale amateur NTRP level).
+        if (resolvedRole === 'coach') {
+            await client.query(
+                'UPDATE users SET level = $1, rating = $2, rtt_rank = $3, rtt_category = $4, rni = $5 WHERE id = $6',
+                ['', 0, 0, null, null, id]
+            );
+        } else if (resolvedRole === 'rtt_pro') {
+            await client.query('UPDATE users SET level = $1 WHERE id = $2', ['', id]);
+        } else if (resolvedRole && resolvedRole !== 'amateur') {
+            await client.query(
+                'UPDATE users SET level = $1, rtt_rank = $2, rtt_category = $3, rni = $4 WHERE id = $5',
+                ['', 0, null, null, id]
+            );
+        }
 
         await client.query('COMMIT');
         await logAdminAction(req, 'info', 'обновил', 'пользователя', name || `#${id}`, `ID: ${id}`);
