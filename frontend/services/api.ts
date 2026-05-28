@@ -1402,6 +1402,18 @@ export const api = {
              }
              return await res.json();
         },
+        deleteLog: async (logId: string, deleteActivity = false): Promise<{ success: boolean; deletedActivity?: boolean }> => {
+            const suffix = deleteActivity ? '?deleteActivity=true' : '';
+            const res = await fetch(`${API_URL}/admin/logs/${logId}${suffix}`, {
+                method: 'DELETE',
+                headers: api.admin._headers()
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: res.statusText }));
+                throw new Error(err.error || 'Failed to delete log');
+            }
+            return await res.json();
+        },
         getStats: async () => {
             try {
                  const res = await fetch(`${API_URL}/admin/stats`, { headers: api.admin._headers() });

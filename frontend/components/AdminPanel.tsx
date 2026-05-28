@@ -661,6 +661,29 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout, onImpersonateUs
         }
     };
 
+    const handleDeleteLog = async (log: SystemLog, deleteActivity = false) => {
+        const actionLabel = deleteActivity
+            ? `Удалить лог и связанную активность (${log.activityDeleteLabel || 'запись пользователя'})?`
+            : 'Удалить эту запись из журнала?';
+        if (!window.confirm(actionLabel)) {
+            return;
+        }
+
+        try {
+            const result = await api.admin.deleteLog(log.id, deleteActivity);
+            setLogs((prev) => prev.filter((item) => item.id !== log.id));
+            if (deleteActivity && result.deletedActivity) {
+                toast('Лог и активность удалены', 'success');
+            } else if (deleteActivity) {
+                toast('Лог удален. Связанная активность не найдена', 'error');
+            } else {
+                toast('Лог удален', 'success');
+            }
+        } catch (error: any) {
+            toast(`Не удалось удалить лог: ${error?.message || 'неизвестная ошибка'}`, 'error');
+        }
+    };
+
 
     // Handlers for Confirmation Modal
     const handleConfirmDelete = async () => {
@@ -1857,6 +1880,26 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout, onImpersonateUs
                                                 <div className={`font-semibold break-words ${panelHeadingClass}`}>{log.message}</div>
                                                 {log.actor && <div className={`text-sm mt-1 ${panelMutedTextClass}`}>Кто: {log.actor}</div>}
                                                 {log.details && <div className={`text-sm mt-1 break-words ${panelMutedTextClass}`}>{log.details}</div>}
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                {log.canDeleteActivity && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteLog(log, true)}
+                                                        className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors"
+                                                        title={`Удалить лог и ${log.activityDeleteLabel || 'активность'}`}
+                                                    >
+                                                        Удалить активность
+                                                    </button>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDeleteLog(log, false)}
+                                                    className="p-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                                                    title="Удалить запись лога"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
                                             </div>
                                         </div>
                                     </div>

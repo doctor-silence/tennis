@@ -773,6 +773,7 @@ const humanizeSystemLog = (row, context = {}) => {
         actor = actorMatch ? actorMatch[1].trim() : 'Администратор';
     }
 
+    const deletableActivity = getActivityDeleteTargetFromLogMessage(row.message);
     return {
         id: row.id.toString(),
         level: row.level,
@@ -783,13 +784,60 @@ const humanizeSystemLog = (row, context = {}) => {
         module: row.module,
         moduleLabel: getLogModuleLabel(row.module),
         timestamp: formatLogTimestamp(row.timestamp),
-        timestampRaw: new Date(row.timestamp).toISOString()
+        timestampRaw: new Date(row.timestamp).toISOString(),
+        canDeleteActivity: Boolean(deletableActivity),
+        activityDeleteLabel: getActivityDeleteLabel(deletableActivity)
     };
 };
 
 const humanizeSystemLogs = async (rows = []) => {
     const context = await buildLogReferenceContext(rows);
     return rows.map((row) => humanizeSystemLog(row, context));
+};
+
+const getActivityDeleteTargetFromLogMessage = (message = '') => {
+    const raw = String(message || '');
+    let matched = raw.match(/added comment (\d+) to post (\d+)/i);
+    if (matched) {
+        return { type: 'post_comment', commentId: Number(matched[1]), postId: Number(matched[2]) };
+    }
+
+    matched = raw.match(/created post (\d+)/i);
+    if (matched) {
+        return { type: 'post', postId: Number(matched[1]) };
+    }
+
+    matched = raw.match(/deleted post (\d+)/i);
+    if (matched) {
+        return { type: 'post', postId: Number(matched[1]) };
+    }
+
+    return null;
+};
+
+const getActivityDeleteLabel = (target) => {
+    if (!target) return '';
+    if (target.type === 'post_comment') return `Комментарий #${target.commentId}`;
+    if (target.type === 'post') return `Пост #${target.postId}`;
+    return 'Активность пользователя';
+};
+
+const deleteActivityByLogTarget = async (client, target) => {
+    if (!target) return { deleted: false, reason: 'unsupported' };
+
+    if (target.type === 'post_comment' && Number.isFinite(target.commentId)) {
+        const result = await client.query('DELETE FROM post_comments WHERE id = $1 RETURNING id', [target.commentId]);
+        return { deleted: result.rows.length > 0, type: 'post_comment', id: target.commentId };
+    }
+
+    if (target.type === 'post' && Number.isFinite(target.postId)) {
+        await client.query('DELETE FROM post_likes WHERE post_id = $1', [target.postId]);
+        await client.query('DELETE FROM post_comments WHERE post_id = $1', [target.postId]);
+        const result = await client.query('DELETE FROM posts WHERE id = $1 RETURNING id', [target.postId]);
+        return { deleted: result.rows.length > 0, type: 'post', id: target.postId };
+    }
+
+    return { deleted: false, reason: 'unsupported' };
 };
 
 const ensureSystemLogsTable = async () => {
@@ -3465,6 +3513,50 @@ app.get('/api/admin/logs', requireAdmin, async (req, res) => {
     }
 });
 
+app.delete('/api/admin/logs/:id', requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    const deleteActivity = String(req.query.deleteActivity || '').toLowerCase() === 'true';
+    const logId = parseInt(id, 10);
+    if (!Number.isFinite(logId)) {
+        return res.status(400).json({ error: 'Invalid log id' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const logResult = await client.query('SELECT id, message FROM system_logs WHERE id = $1 FOR UPDATE', [logId]);
+        if (!logResult.rows.length) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Log not found' });
+        }
+
+        const logRow = logResult.rows[0];
+        let activityResult = { deleted: false };
+
+        if (deleteActivity) {
+            const target = getActivityDeleteTargetFromLogMessage(logRow.message);
+            activityResult = await deleteActivityByLogTarget(client, target);
+        }
+
+        await client.query('DELETE FROM system_logs WHERE id = $1', [logId]);
+        await client.query('COMMIT');
+
+        return res.json({
+            success: true,
+            deletedLogId: logId,
+            deletedActivity: Boolean(activityResult.deleted),
+            activityType: activityResult.type || null
+        });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Delete admin log error:', err.message);
+        return res.status(500).json({ error: 'Failed to delete log' });
+    } finally {
+        client.release();
+    }
+});
+
 app.get('/api/admin/users', requireAdmin, async (req, res) => {
     try {
         const result = await pool.query('SELECT id, name, email, role, city, avatar, rating, level, age, rtt_rank, rtt_category, rni, xp FROM users ORDER BY id DESC');
@@ -5198,6 +5290,7 @@ app.post('/api/posts', async (req, res) => {
             'INSERT INTO posts (user_id, type, content, group_id) VALUES ($1, $2, $3, $4) RETURNING id',
             [userId, type, content, groupId]
         );
+        await logSystemEvent('info', `User ${userId} created post ${result.rows[0].id} (${type})`, 'Community');
         res.status(201).json({ success: true, postId: result.rows[0].id });
     } catch (err) {
         console.error("Create Post Error:", err);
@@ -5276,6 +5369,7 @@ app.post('/api/posts/:id/comments', async (req, res) => {
                  RETURNING *`,
                 [ghostPostId, userId, text]
             );
+            await logSystemEvent('info', `User ${userId} added ghost comment ${result.rows[0].id} to post ${ghostPostId}`, 'Community');
             return res.status(201).json(result.rows[0]);
         }
 
@@ -5283,6 +5377,7 @@ app.post('/api/posts/:id/comments', async (req, res) => {
             'INSERT INTO post_comments (post_id, user_id, text) VALUES ($1, $2, $3) RETURNING *',
             [id, userId, text]
         );
+        await logSystemEvent('info', `User ${userId} added comment ${result.rows[0].id} to post ${id}`, 'Community');
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error('Add Comment Error:', err);
@@ -5318,6 +5413,7 @@ app.delete('/api/posts/:id', async (req, res) => {
         await pool.query('DELETE FROM post_likes WHERE post_id = $1', [id]);
         await pool.query('DELETE FROM post_comments WHERE post_id = $1', [id]);
         await pool.query('DELETE FROM posts WHERE id = $1', [id]);
+        await logSystemEvent('warning', `User ${userId} deleted post ${id}`, 'Community');
         
         res.json({ success: true });
     } catch (err) {

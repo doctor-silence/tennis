@@ -282,6 +282,8 @@ export interface SystemLog {
   moduleLabel?: string;
   details?: string;
   actor?: string;
+  canDeleteActivity?: boolean;
+  activityDeleteLabel?: string;
 }
 
 export interface LadderPlayer {
