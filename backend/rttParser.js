@@ -19,6 +19,7 @@ class RTTParser {
     this._tourDetailsCache = new Map();
     this._tourDetailsCacheTTL = Number(process.env.RTT_TOUR_DETAILS_CACHE_TTL_MS || 30 * 60 * 1000);
     this._tourFilterCache = { data: null, expireAt: 0 };
+    this._handbookCache = new Map();
     this._playerIdCache = new Map();
   }
 
@@ -55,6 +56,36 @@ class RTTParser {
 
     if (!values.length) return '';
     return String(Math.round(values.reduce((sum, value) => sum + value, 0) / values.length));
+  }
+
+  async getHandbookItems(handbookName) {
+    const key = String(handbookName || '').trim();
+    if (!key) return [];
+
+    const cached = this._handbookCache.get(key);
+    if (cached && Date.now() < cached.expireAt) {
+      return cached.items;
+    }
+
+    const data = await mytennis.callPublic({
+      'method[0]': 'handbook.items',
+      'handbooks[0]': key
+    });
+    const items = Array.isArray(data?.handbooks?.[key]) ? data.handbooks[key] : [];
+    this._handbookCache.set(key, {
+      items,
+      expireAt: Date.now() + 12 * 60 * 60 * 1000
+    });
+    return items;
+  }
+
+  async resolveHandbookLabel(handbookName, rawValue) {
+    const value = String(rawValue || '').trim();
+    if (!value || value === '0') return '';
+
+    const items = await this.getHandbookItems(handbookName);
+    const matched = items.find((item) => String(item.item_id) === value || String(item.value || '') === value);
+    return matched ? String(matched.name || '').trim() : value;
   }
 
   async getTournamentFilterOptions() {
@@ -117,6 +148,10 @@ class RTTParser {
       const tourId = String(row.tour_id || row.wizard_id || '').trim();
       const startDate = this.formatIsoToRuDate(row.begin_date);
       const endDate = this.formatIsoToRuDate(row.end_date || row.begin_date);
+      const avgRatingRaw = Number(String(row.tour_rating || '').replace(',', '.'));
+      const avgRating = Number.isFinite(avgRatingRaw) && avgRatingRaw >= 1
+        ? String(Math.round(avgRatingRaw))
+        : '';
 
       return {
         id: index,
@@ -128,7 +163,7 @@ class RTTParser {
         endDate,
         surface: Array.isArray(row.covers) ? row.covers.join(', ') : '',
         applications: row.tour_members || '',
-        avgRating: row.tour_rating || '',
+        avgRating,
         status: String(row.is_finished) === '1' ? 'Завершен' : 'Открыт',
         name: row.name || '',
         link: this.buildTourLink(tourId)
@@ -1338,6 +1373,11 @@ class RTTParser {
 
       const org = main.org || {};
       const contacts = main.contacts || {};
+      const [categoryLabel, typeLabel, ageLabel] = await Promise.all([
+        this.resolveHandbookLabel('tour_category', main.tour_category),
+        this.resolveHandbookLabel('tour_type', main.tour_type),
+        this.resolveHandbookLabel('player_age', main.player_age)
+      ]);
 
       const tournamentInfo = {
         date: this.formatIsoRangeToRu(main.begin_date, main.end_date),
@@ -1350,10 +1390,10 @@ class RTTParser {
         organizerEmail: contacts.email || '',
         organizerContacts: contacts.address || '',
         surface: Array.isArray(main.covers) ? main.covers.map((c) => c.name || c).filter(Boolean).join(', ') : '',
-        ageGroup: main.player_age || '',
+        ageGroup: ageLabel || main.player_age || '',
         gender: main.tour_gender || '',
-        type: main.tour_type || '',
-        category: main.tour_category || '',
+        type: typeLabel || main.tour_type || '',
+        category: categoryLabel || main.tour_category || '',
         participantsCount: String((main.players || main.members || []).length || main.tour_members || ''),
         avgRating: ''
       };
