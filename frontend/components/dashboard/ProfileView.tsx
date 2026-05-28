@@ -321,12 +321,11 @@ const buildRttDerivedSkills = (user: User, rttStatsData?: any): SkillRadarValues
     const decidingWins = decidingMatches.filter((match: any) => match.decisiveWin).length;
     const dominantWonSets = parsedMatches.reduce((sum: number, match: any) => sum + match.dominantWonSets, 0);
     const oneSidedLostSets = parsedMatches.reduce((sum: number, match: any) => sum + match.oneSidedLostSets, 0);
-    const opponentRatings = parsedMatches
+    const opponentRniValues = parsedMatches
         .map((match: any) => Number(match?.opponentPoints || 0))
         .filter((value: number) => Number.isFinite(value) && value > 0);
-    const averageOpponentRating = average(opponentRatings);
-    const currentRating = Number(user.rating || 0);
-    const strongOppMatches = parsedMatches.filter((match: any) => Number(match?.opponentPoints || 0) >= Math.max(currentRating - 25, 1));
+    const averageOpponentRni = average(opponentRniValues);
+    const strongOppMatches = parsedMatches.filter((match: any) => Number(match?.opponentPoints || 0) > 0);
     const winsAgainstStrongOpponents = strongOppMatches.filter((match: any) => match.result === 'win').length;
 
     const setWinRatio = totalSets > 0 ? totalWonSets / totalSets : winRateRatio;
@@ -336,9 +335,8 @@ const buildRttDerivedSkills = (user: User, rttStatsData?: any): SkillRadarValues
     const lowCollapseRatio = totalSets > 0 ? Math.max(0, 1 - oneSidedLostSets / totalSets) : winRateRatio;
     const strongOpponentWinRatio = strongOppMatches.length > 0 ? winsAgainstStrongOpponents / strongOppMatches.length : winRateRatio;
     const experienceFactor = Math.min(totalMatches / 18, 1);
-    const competitionFactor = averageOpponentRating > 0 && currentRating > 0
-        ? Math.min(averageOpponentRating / Math.max(currentRating, 1), 1.15)
-        : 0.8;
+    // opponentPoints in RTT parser is opponent RNI, not rating points.
+    const competitionFactor = averageOpponentRni > 0 ? 1 : 0.8;
 
     const serveScore = 18 + winRateRatio * 24 + dominantSetRatio * 22 + lowCollapseRatio * 14 + competitionFactor * 12 + experienceFactor * 10;
     const forehandScore = 16 + setWinRatio * 24 + dominantSetRatio * 20 + strongOpponentWinRatio * 18 + experienceFactor * 12 + closeSetWinRatio * 10;
@@ -1213,7 +1211,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
               ? Math.round((wins / totalMatches) * 100)
               : 0;
       const parsedMatches = Array.isArray(rttPlayerStats.matches) ? rttPlayerStats.matches : [];
-      const averageOpponent = average(parsedMatches.map((match: any) => Number(match.opponentPoints || 0)).filter((value: number) => Number.isFinite(value) && value > 0));
+      const averageOpponentRni = average(parsedMatches.map((match: any) => Number(match.opponentPoints || 0)).filter((value: number) => Number.isFinite(value) && value > 0));
       const decidingMatches = parsedMatches.filter((match: any) => parseScoreSets(match.score).length >= 3);
       const decidingWins = decidingMatches.filter((match: any) => match.result === 'win').length;
       const decidingRate = decidingMatches.length > 0 ? Math.round((decidingWins / decidingMatches.length) * 100) : null;
@@ -1221,7 +1219,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
       return {
           totalMatches,
           winRate,
-          averageOpponent: averageOpponent > 0 ? Math.round(averageOpponent) : null,
+          averageOpponentRni: averageOpponentRni > 0 ? Math.round(averageOpponentRni) : null,
           decidingRate,
       };
   }, [isRttPlayer, rttPlayerStats]);
@@ -1434,7 +1432,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUserUpdate }) => {
                               <div className="font-bold text-slate-900 mb-1">Анализ RTT</div>
                               <p>
                                   Основано на {rttAnalysisSummary.totalMatches} матчах RTT: побед {rttAnalysisSummary.winRate}%
-                                  {rttAnalysisSummary.averageOpponent ? `, средний рейтинг соперников около ${rttAnalysisSummary.averageOpponent}` : ''}
+                                  {rttAnalysisSummary.averageOpponentRni ? `, средний РНИ соперников около ${rttAnalysisSummary.averageOpponentRni}` : ''}
                                   {rttAnalysisSummary.decidingRate !== null ? `, в решающих матчах успешность ${rttAnalysisSummary.decidingRate}%` : ''}.
                               </p>
                           </div>

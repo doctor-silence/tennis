@@ -801,7 +801,7 @@ export const RttStatsView = ({ user }: { user: User }) => {
                                                 <div className="font-bold text-base text-slate-900 leading-tight">vs {match.opponent}</div>
                                                 {match.opponentPoints && (
                                                     <span className="text-xs px-2 py-0.5 bg-slate-200 text-slate-700 rounded font-medium shrink-0">
-                                                        {match.opponentPoints} очков
+                                                        РНИ: {match.opponentPoints}
                                                     </span>
                                                 )}
                                             </div>
