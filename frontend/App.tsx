@@ -34,6 +34,7 @@ import {
   Newspaper,
   Clock,
   Eye,
+  EyeOff,
   ChevronLeft,
   ChevronDown,
   MessageSquare,
@@ -2120,6 +2121,9 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
   // Registration States
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
   const [age, setAge] = useState('');
@@ -2229,6 +2233,10 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
           setError('Пароль должен быть не менее 6 символов');
           return;
       }
+      if (password !== confirmPassword) {
+          setError('Пароли не совпадают');
+          return;
+      }
       setEmail(emailValidation.normalized);
       setError('');
       setRegisterStep(2);
@@ -2326,14 +2334,24 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
                 </div>
                 <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Пароль</label>
-                    <input 
-                    type="password" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-lime-400 focus:border-transparent outline-none transition-all placeholder:text-slate-600" 
-                    placeholder="••••••••" 
-                    required
-                    />
+                    <div className="relative">
+                        <input
+                            type={showPassword ? 'text' : 'password'}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 pr-11 text-white focus:ring-2 focus:ring-lime-400 focus:border-transparent outline-none transition-all placeholder:text-slate-600"
+                            placeholder="••••••••"
+                            required
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword((prev) => !prev)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                            aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                        >
+                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                    </div>
                 </div>
                 <Button variant="secondary" className="w-full mt-6 text-base" type="submit" disabled={loading}>
                     {loading ? <Loader2 className="animate-spin" size={20} /> : 'Войти'}
@@ -2341,7 +2359,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
                 
                 <div className="mt-8 pt-6 border-t border-slate-800 text-center text-sm text-slate-400">
                     Впервые у нас? 
-                    <button type="button" onClick={() => { setAuthMode('register'); setRegisterStep(1); setError(''); }} className="ml-2 text-lime-400 font-bold hover:text-lime-300 transition-colors">
+                    <button type="button" onClick={() => { setAuthMode('register'); setRegisterStep(1); setError(''); setConfirmPassword(''); }} className="ml-2 text-lime-400 font-bold hover:text-lime-300 transition-colors">
                         Регистрация
                     </button>
                 </div>
@@ -2399,14 +2417,45 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
                 </div>
                 <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Придумайте пароль</label>
-                    <input 
-                    type="password" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-lime-400 focus:border-transparent outline-none transition-all placeholder:text-slate-600" 
-                    placeholder="Минимум 6 символов" 
-                    required
-                    />
+                    <div className="relative">
+                        <input
+                            type={showPassword ? 'text' : 'password'}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 pr-11 text-white focus:ring-2 focus:ring-lime-400 focus:border-transparent outline-none transition-all placeholder:text-slate-600"
+                            placeholder="Минимум 6 символов"
+                            required
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword((prev) => !prev)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                            aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                        >
+                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                    </div>
+                </div>
+                <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Подтвердите пароль</label>
+                    <div className="relative">
+                        <input
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 pr-11 text-white focus:ring-2 focus:ring-lime-400 focus:border-transparent outline-none transition-all placeholder:text-slate-600"
+                            placeholder="Повторите пароль"
+                            required
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword((prev) => !prev)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                            aria-label={showConfirmPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                        >
+                            {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                    </div>
                 </div>
                 <div className="mt-4 flex items-start gap-3">
                     <input
@@ -2430,7 +2479,7 @@ const AuthPage = ({ onBack, onComplete, initialMode = 'login', onNavigate }: { o
 
                 <div className="mt-8 pt-6 border-t border-slate-800 text-center text-sm text-slate-400">
                     Уже есть профиль? 
-                    <button type="button" onClick={() => { setAuthMode('login'); setError(''); }} className="ml-2 text-lime-400 font-bold hover:text-lime-300 transition-colors">
+                    <button type="button" onClick={() => { setAuthMode('login'); setError(''); setConfirmPassword(''); }} className="ml-2 text-lime-400 font-bold hover:text-lime-300 transition-colors">
                         Войти
                     </button>
                 </div>
