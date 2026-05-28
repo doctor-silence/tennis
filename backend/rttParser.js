@@ -1,27 +1,515 @@
-const axios = require('axios');
 const cheerio = require('cheerio');
+const mytennis = require('./rttMytennisClient');
+const { WEB_ORIGIN } = require('./rttMytennisClient');
 
 /**
- * RTT Parser - для получения данных спортсменов из rttstat.ru
- * Сайт: https://rttstat.ru/
+ * RTT Parser — данные игроков и турниров из rtt.mytennis.online (API apirtt.mytennis.online).
  */
 
 class RTTParser {
   constructor() {
-    this.baseURL = 'https://rttstat.ru';
-    this.requestTimeout = 15000;
-    this.axios = axios.create({
-      baseURL: this.baseURL,
-      timeout: this.requestTimeout,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml',
-        'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7'
-      }
-    });
+    this.baseURL = WEB_ORIGIN;
+    this.requestTimeout = Number(process.env.RTT_MYTENNIS_TIMEOUT_MS || 20000);
+    this.source = 'rtt.mytennis.online';
     // Кэш для списка турниров: key → { data, expireAt }
     this._tourCache = new Map();
-    this._tourCacheTTL = 5 * 60 * 1000; // 5 минут
+    this._tourCacheTTL = Number(process.env.RTT_TOUR_CACHE_TTL_MS || 15 * 60 * 1000);
+    this._tourStaleTTL = 60 * 60 * 1000; // устаревший кэш — отдаём при таймауте API
+    this._tourInFlight = new Map();
+    this._tourDetailsCache = new Map();
+    this._tourDetailsCacheTTL = Number(process.env.RTT_TOUR_DETAILS_CACHE_TTL_MS || 30 * 60 * 1000);
+    this._tourFilterCache = { data: null, expireAt: 0 };
+    this._playerIdCache = new Map();
+  }
+
+  getTourListTimeoutMs() {
+    return Number(process.env.RTT_MYTENNIS_TOUR_TIMEOUT_MS || 45000);
+  }
+
+  getTourListPeriod() {
+    const now = new Date();
+    return {
+      begin: this.addMonthsIso(now, -1),
+      end: this.addMonthsIso(now, 3)
+    };
+  }
+
+  applyTourLocationFilters(payload, filters = {}) {
+    if (filters.city) {
+      payload.location_id = filters.city;
+    } else if (filters.subject) {
+      payload.location_id = filters.subject;
+    } else if (filters.district) {
+      payload.location_id = filters.district;
+    }
+  }
+
+  sortFilterOptions(options = []) {
+    return [...options].sort((left, right) => left.label.localeCompare(right.label, 'ru'));
+  }
+
+  calculateAverageParticipantRating(participants = []) {
+    const values = participants
+      .map((participant) => parseInt(String(participant.rating || participant.points || '').replace(/[^\d]/g, ''), 10))
+      .filter((value) => Number.isFinite(value) && value > 0);
+
+    if (!values.length) return '';
+    return String(Math.round(values.reduce((sum, value) => sum + value, 0) / values.length));
+  }
+
+  async getTournamentFilterOptions() {
+    if (this._tourFilterCache.data && Date.now() < this._tourFilterCache.expireAt) {
+      return this._tourFilterCache.data;
+    }
+
+    const limit = Number(process.env.RTT_LOCATION_FILTER_LIMIT || 3000);
+    const timeout = Number(process.env.RTT_LOCATION_FILTER_TIMEOUT_MS || 25000);
+    const data = await mytennis.callPublic(
+      { 'method[0]': 'location.search.term', term: '', limit },
+      { timeout }
+    );
+    const rows = Array.isArray(data['location.search.term']) ? data['location.search.term'] : [];
+
+    const districts = new Map();
+    const subjects = new Map();
+    const cities = new Map();
+
+    for (const row of rows) {
+      const id = String(row.location_id || '').trim();
+      const label = String(row.name || '').trim();
+      const type = String(row.type || '').trim();
+      const path = String(row.path || '').trim();
+      const parentIds = String(row.parents || '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      if (!id || !label) continue;
+      if (path && !path.includes('Россия') && !path.includes('RUS')) continue;
+
+      if (type === '1') {
+        districts.set(id, { value: id, label });
+      } else if (type === '2') {
+        const parent = parentIds[0] || '';
+        subjects.set(id, { value: id, label, parent });
+      } else if (type === '5') {
+        const parent = parentIds[0] || '';
+        cities.set(id, { value: id, label, parent });
+      }
+    }
+
+    const result = {
+      districts: this.sortFilterOptions([...districts.values()]),
+      subjects: this.sortFilterOptions([...subjects.values()]),
+      cities: this.sortFilterOptions([...cities.values()])
+    };
+
+    this._tourFilterCache = {
+      data: result,
+      expireAt: Date.now() + Number(process.env.RTT_LOCATION_FILTER_TTL_MS || 12 * 60 * 60 * 1000)
+    };
+
+    return result;
+  }
+
+  mapTourListRecords(records = []) {
+    return records.map((row, index) => {
+      const tourId = String(row.tour_id || row.wizard_id || '').trim();
+      const startDate = this.formatIsoToRuDate(row.begin_date);
+      const endDate = this.formatIsoToRuDate(row.end_date || row.begin_date);
+
+      return {
+        id: index,
+        city: row.location || row.location_full || '',
+        type: row.tour_type || '',
+        ageGroup: row.player_age || '',
+        category: row.tour_category || '',
+        startDate,
+        endDate,
+        surface: Array.isArray(row.covers) ? row.covers.join(', ') : '',
+        applications: row.tour_members || '',
+        avgRating: row.tour_rating || '',
+        status: String(row.is_finished) === '1' ? 'Завершен' : 'Открыт',
+        name: row.name || '',
+        link: this.buildTourLink(tourId)
+      };
+    }).filter((row) => row.name && row.city);
+  }
+
+  async fetchTourRosterRecords(payload, options = {}) {
+    const timeout = options.timeout ?? this.getTourListTimeoutMs();
+    const maxPages = Number(options.maxPages || process.env.RTT_TOUR_LIST_MAX_PAGES || 3);
+    const perPage = Number(options.perPage || process.env.RTT_TOUR_LIST_PER_PAGE || 50);
+
+    const first = await mytennis.callPublic(
+      { ...payload, page_no: 1, per_page: perPage },
+      { timeout }
+    );
+    const roster = first['tour.roster'] || {};
+    let records = roster.records || [];
+    const navigator = roster.navigator || {};
+    const pageMax = Number(navigator.page_max || 1);
+    const totalCount = Number(navigator.count || records.length);
+
+    const pagesToFetch = Math.min(pageMax, Math.max(1, maxPages));
+    if (pagesToFetch > 1) {
+      const pageRequests = [];
+      for (let pageNo = 2; pageNo <= pagesToFetch; pageNo += 1) {
+        pageRequests.push(
+          mytennis.callPublic({ ...payload, page_no: pageNo, per_page: perPage }, { timeout })
+        );
+      }
+      const pages = await Promise.all(pageRequests);
+      for (const pageData of pages) {
+        records = records.concat(pageData['tour.roster']?.records || []);
+      }
+    }
+
+    return {
+      records,
+      totalCount,
+      truncated: pageMax > pagesToFetch,
+      pageMax,
+      pagesLoaded: pagesToFetch
+    };
+  }
+
+  formatIsoToRuDate(value = '') {
+    const matched = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!matched) {
+      return String(value || '').trim();
+    }
+    return `${matched[3]}.${matched[2]}.${matched[1]}`;
+  }
+
+  formatIsoRangeToRu(begin = '', end = '') {
+    const start = this.formatIsoToRuDate(begin);
+    const finish = this.formatIsoToRuDate(end || begin);
+    if (start && finish && start !== finish) {
+      return `${start} - ${finish}`;
+    }
+    return start || finish || '';
+  }
+
+  addMonthsIso(date, months) {
+    const copy = new Date(date.getTime());
+    copy.setMonth(copy.getMonth() + months);
+    return copy.toISOString().slice(0, 10);
+  }
+
+  extractTourIdFromUrl(tournamentUrl = '') {
+    const raw = String(tournamentUrl || '').trim();
+    if (!raw) return null;
+
+    const mytennisMatch = raw.match(/\/tours\/(\d{4,})/i);
+    if (mytennisMatch) return mytennisMatch[1];
+
+    const legacyMatch = raw.match(/\/tour\/(\d{4,})/i);
+    if (legacyMatch) return legacyMatch[1];
+
+    const digits = raw.match(/\d{5,}/);
+    return digits ? digits[0] : null;
+  }
+
+  buildTourLink(tourId) {
+    return tourId ? `${WEB_ORIGIN}/public/tours/${tourId}/dashboard` : null;
+  }
+
+  buildPlayerLink(playerId, rni) {
+    if (playerId) {
+      return `${WEB_ORIGIN}/players/${playerId}`;
+    }
+    return rni ? `${WEB_ORIGIN}/public/ranking/solo` : null;
+  }
+
+  computeAgeFromBirthDate(birthDate = '') {
+    const matched = String(birthDate || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!matched) return null;
+    const birth = new Date(`${matched[1]}-${matched[2]}-${matched[3]}T00:00:00Z`);
+    const now = new Date();
+    let age = now.getUTCFullYear() - birth.getUTCFullYear();
+    const monthDiff = now.getUTCMonth() - birth.getUTCMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && now.getUTCDate() < birth.getUTCDate())) {
+      age -= 1;
+    }
+    return age >= 0 ? age : null;
+  }
+
+  normalizeRatingRosterKey(ratingItem = {}) {
+    if (ratingItem.rating_date) {
+      return String(ratingItem.rating_date).replace(/-/g, '');
+    }
+
+    const ratingId = String(ratingItem.rating_id || '');
+    if (ratingId.length === 9) {
+      return ratingId.slice(0, 8);
+    }
+
+    return ratingId;
+  }
+
+  async getLatestRatingContext() {
+    const data = await mytennis.callPublic({ 'method[0]': 'rating.list' });
+    const list = data['rating.list'] || [];
+    const preferred = list.find((item) => String(item.rank) === '1') || list[0];
+
+    if (!preferred) {
+      return { ratingId: null, rosterKey: null, rank: 1 };
+    }
+
+    return {
+      ratingId: preferred.rating_id || null,
+      rosterKey: this.normalizeRatingRosterKey(preferred),
+      rank: parseInt(preferred.rank, 10) || 1
+    };
+  }
+
+  async getLatestRatingId() {
+    const context = await this.getLatestRatingContext();
+    return context.ratingId;
+  }
+
+  async resolvePlayerByRni(rni) {
+    const normalizedRni = String(rni || '').trim();
+    if (!normalizedRni) return null;
+
+    const cached = this._playerIdCache.get(normalizedRni);
+    if (cached && Date.now() < cached.expireAt) {
+      return cached.data;
+    }
+
+    try {
+      const linked = await mytennis.callEntry({ 'method[0]': 'player.list' });
+      const linkedPlayers = linked['player.list'] || [];
+      const linkedRecord = linkedPlayers.find((row) => String(row.rtt_number) === normalizedRni);
+      if (linkedRecord) {
+        const mapped = {
+          player_id: linkedRecord.player_id,
+          rtt_number: linkedRecord.rtt_number,
+          name: [linkedRecord.name_f, linkedRecord.name_i, linkedRecord.name_o].filter(Boolean).join(' '),
+          birth_date: linkedRecord.birth_date,
+          city: ''
+        };
+        this._playerIdCache.set(normalizedRni, {
+          data: mapped,
+          expireAt: Date.now() + 10 * 60 * 1000
+        });
+        return mapped;
+      }
+    } catch (linkedError) {
+      console.warn('player.list недоступен:', linkedError.message);
+    }
+
+    const { ratingId, rosterKey, rank } = await this.getLatestRatingContext();
+    if (!rosterKey) return null;
+
+    const data = await mytennis.callPublic({
+      'method[0]': 'rating.roster',
+      page_no: 1,
+      per_page: 10,
+      rating: rosterKey,
+      rank,
+      rtt_number: normalizedRni,
+      name: ''
+    });
+
+    const records = data['rating.roster']?.records || [];
+    const record = records.find((row) => String(row.rtt_number) === normalizedRni) || records[0] || null;
+
+    if (record) {
+      record.rating_id = record.rating_id || ratingId;
+      this._playerIdCache.set(normalizedRni, {
+        data: record,
+        expireAt: Date.now() + 10 * 60 * 1000
+      });
+    }
+
+    return record;
+  }
+
+  mapPlayerSearchRecord(record = {}) {
+    const name = String(record.name || '').trim();
+    const rni = String(record.rtt_number || '').trim();
+    const points = parseInt(record.points, 10) || 0;
+    const rank = parseInt(record.position, 10) || 0;
+    const age = record.age ? `${record.age} лет` : '—';
+
+    return {
+      name,
+      rni,
+      city: record.city || '—',
+      points,
+      rank,
+      category: age,
+      link: this.buildPlayerLink(record.player_id, rni)
+    };
+  }
+
+  getTourRosterDedupeKey(record = {}) {
+    const wizardId = String(record.wizard_id || '').trim();
+    if (wizardId && wizardId !== '0') {
+      return `w:${wizardId}`;
+    }
+
+    const tourId = String(record.tour_id || '').trim();
+    if (tourId) {
+      return `t:${tourId}`;
+    }
+
+    const name = this.normalizeComparableText(record.name || '');
+    const begin = String(record.begin_date || '').trim();
+    return `n:${name}|${begin}`;
+  }
+
+  pickPreferredTourRosterRecord(current, candidate) {
+    if (!current) return candidate;
+    if (!candidate) return current;
+
+    const currentFinished = String(current.is_finished) === '1';
+    const candidateFinished = String(candidate.is_finished) === '1';
+    if (currentFinished !== candidateFinished) {
+      return candidateFinished ? candidate : current;
+    }
+
+    const currentTourId = Number(current.tour_id) || 0;
+    const candidateTourId = Number(candidate.tour_id) || 0;
+    return candidateTourId >= currentTourId ? candidate : current;
+  }
+
+  dedupeTourRosterRecords(records = []) {
+    const byKey = new Map();
+
+    for (const row of records) {
+      const key = this.getTourRosterDedupeKey(row);
+      if (!key) continue;
+      byKey.set(key, this.pickPreferredTourRosterRecord(byKey.get(key), row));
+    }
+
+    return [...byKey.values()];
+  }
+
+  dedupePlayerMatches(matches = []) {
+    const seen = new Set();
+    const unique = [];
+
+    for (const match of matches) {
+      const key = match.matchKey
+        || [
+          match.tourId || '',
+          match.matchId || '',
+          match.date || '',
+          this.normalizeComparableText(match.opponent || ''),
+          match.score || '',
+          this.normalizeComparableText(match.tournament || '')
+        ].join('\0');
+
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(match);
+    }
+
+    return unique.map((match, index) => {
+      const { matchKey, matchId, tourId, ...rest } = match;
+      return { ...rest, id: index };
+    });
+  }
+
+  mapTourRosterRecord(record = {}, index = 0) {
+    const tourId = String(record.tour_id || record.wizard_id || '').trim();
+    const begin = record.begin_date || '';
+    const end = record.end_date || begin;
+
+    return {
+      id: index,
+      city: record.location || record.location_full || record.org_short || '',
+      category: record.player_age || record.tour_category || '',
+      ageGroup: record.player_age || '',
+      tournamentCategory: record.tour_category || '',
+      date: this.formatIsoRangeToRu(begin, end),
+      applicationsCount: record.tour_members || '',
+      avgRating: record.tour_rating || record.rating_points || '',
+      tournament: record.name || '',
+      link: this.buildTourLink(tourId),
+      status: String(record.is_finished) === '1' ? 'finished' : 'accepted',
+      tourId
+    };
+  }
+
+  mapScheduleCellToMatch(cell = {}, rni, tournamentMeta = {}) {
+    const normalizedRni = String(rni || '').trim();
+    const playerIsM1 = String(cell.m1p1_number || '') === normalizedRni;
+    const playerIsM2 = String(cell.m2p1_number || '') === normalizedRni;
+
+    if (!playerIsM1 && !playerIsM2) {
+      return null;
+    }
+
+    if (String(cell.match_finished) !== '1' || !cell.score) {
+      return null;
+    }
+
+    const opponent = playerIsM1
+      ? (cell.m2p1_name || cell.m2name || '')
+      : (cell.m1p1_name || cell.m1name || '');
+    const opponentPoints = playerIsM1 ? cell.m2p1_number : cell.m1p1_number;
+    const opponentCity = playerIsM1 ? cell.m2p1_city : cell.m1p1_city;
+    const score1 = parseInt(cell.score1, 10) || 0;
+    const score2 = parseInt(cell.score2, 10) || 0;
+    const isWin = playerIsM1 ? score1 > score2 : score2 > score1;
+
+    const tourId = String(tournamentMeta.tourId || '').trim();
+    const matchId = String(cell.match_id || cell.cell_id || '').trim();
+
+    return {
+      tourId,
+      matchId,
+      matchKey: `${tourId}:${matchId}`,
+      opponent: this.extractCleanPlayerName(opponent),
+      opponentPoints: opponentPoints ? parseInt(opponentPoints, 10) || null : null,
+      opponentAge: '',
+      opponentCity: opponentCity || '',
+      score: String(cell.score || '').trim(),
+      result: isWin ? 'win' : 'loss',
+      date: this.formatIsoToRuDate(cell.match_date),
+      ageGroup: tournamentMeta.ageGroup || '',
+      tournament: tournamentMeta.name || '',
+      city: tournamentMeta.city || ''
+    };
+  }
+
+  mapTourCardParticipant(player = {}, index = 0) {
+    return {
+      place: String(player.tour_pos1 || player.tour_pos2 || index + 1),
+      name: this.extractCleanPlayerName(player.name || ''),
+      rating: String(player.rating_points || player.entry_points || '').trim(),
+      city: player.doc_city || '',
+      age: this.computeAgeFromBirthDate(player.birth_date) ? `${this.computeAgeFromBirthDate(player.birth_date)} лет` : '',
+      points: String(player.rating_points || player.entry_points || '').trim(),
+      rni: String(player.rtt_number || '').trim()
+    };
+  }
+
+  buildStageStatusFromTourCard(main = {}) {
+    const stages = Array.isArray(main.stages) ? main.stages : [];
+    const fragments = [];
+
+    if (String(main.is_finished) === '1') {
+      fragments.push('турнир завершен');
+    }
+
+    for (const stage of stages) {
+      if (stage.pub_schedule_dt) {
+        fragments.push('расписание на основной этап турнира');
+      }
+      if (stage.pub_entry_dt) {
+        fragments.push('начало регистрации на основной этап турнира');
+      }
+      if (stage.run_dt) {
+        fragments.push('жеребьевка на основной этап турнира');
+      }
+    }
+
+    return this.detectTournamentStageStatus(fragments.join(' '));
   }
 
   normalizeComparableText(value = '') {
@@ -444,9 +932,8 @@ class RTTParser {
    */
   async getPlayerByRNI(rni) {
     try {
-      console.log(`Запрос данных для РНИ: ${rni} с сайта ${this.baseURL}/player/${rni}`);
-      
-      // Валидация РНИ (только цифры)
+      console.log(`Запрос данных для РНИ: ${rni} (${this.source})`);
+
       if (!this.validateRNI(rni)) {
         return {
           success: false,
@@ -454,14 +941,26 @@ class RTTParser {
         };
       }
 
-      // Запрос к rttstat.ru
-      const response = await this.axios.get(`/player/${rni}`);
-      const html = response.data;
-      const $ = cheerio.load(html);
+      const record = await this.resolvePlayerByRni(rni);
+      if (!record?.player_id) {
+        return {
+          success: false,
+          error: 'Спортсмен с таким РНИ не найден в базе РТТ'
+        };
+      }
 
-      // Парсинг данных со страницы
-      const name = $('h1').first().text().replace('Теннисист: ', '').replace('Теннисистка: ', '').replace('Добавить в избранное', '').trim();
-      
+      const ratingId = record.rating_id || await this.getLatestRatingId();
+      const detailsData = await mytennis.callPublic({
+        'method[0]': 'rating.details',
+        rating_id: ratingId,
+        player_id: record.player_id
+      });
+
+      const details = detailsData['rating.details'] || {};
+      const player = details.player || record;
+      const rating = details.rating || record;
+      const name = String(player.name || record.name || '').trim();
+
       if (!name || name.length < 3) {
         return {
           success: false,
@@ -469,79 +968,36 @@ class RTTParser {
         };
       }
 
-      // Извлекаем данные из текста на странице
-      const pageText = $('body').text();
-      
-      // РНИ
-      const rniMatch = pageText.match(/РНИ:\s*(\d+)/);
-      const playerRNI = rniMatch ? rniMatch[1] : rni;
+      const age = this.computeAgeFromBirthDate(player.birth_date || record.birth_date);
+      const category = rating.age ? `${rating.age} лет` : (record.age ? `${record.age} лет` : '');
 
-      // Очки РТТ (одиночный разряд)
-      const pointsMatch = pageText.match(/Одиночный\s+Очки:\s*([\d]+)/);
-      const points = pointsMatch ? parseInt(pointsMatch[1]) : 0;
-
-      // Позиция (рейтинг) в возрастной группе
-      const rankMatch = pageText.match(/Одиночный[\s\S]*?Рейтинг:\s*([\d]+)/);
-      const rank = rankMatch ? parseInt(rankMatch[1]) : 0;
-
-      // Возраст
-      const ageMatch = pageText.match(/Возраст РТТ:\s*(\d+)\s*лет/);
-      const age = ageMatch ? parseInt(ageMatch[1]) : null;
-
-      // Возрастная категория
-      const categoryMatch = pageText.match(/Возрастная группа:\s*([^\n]+)/);
-      const category = categoryMatch ? categoryMatch[1].trim() : '';
-
-      // Город
-      const cityMatch = pageText.match(/Город:\s*([^\n]+)/);
-      const city = cityMatch ? cityMatch[1].trim() : '';
-
-      // Процент побед в матчах (если есть на странице)
-      const winRateMatch = pageText.match(/Побед в матчах:\s*(\d+)%\s*\((\d+)\s*из\s*(\d+)\)/);
-      let winRate = null;
-      let wins = null;
-      let totalMatches = null;
-      
-      if (winRateMatch) {
-        winRate = parseInt(winRateMatch[1]);
-        wins = parseInt(winRateMatch[2]);
-        totalMatches = parseInt(winRateMatch[3]);
-        console.log(`📊 Найдена статистика матчей: ${winRate}% (${wins} из ${totalMatches})`);
-      }
-
-      console.log(`✅ Найден игрок: ${name}, город: ${city}, очки: ${points}, позиция: ${rank}`);
+      console.log(`✅ Найден игрок: ${name}, очки: ${rating.points}, позиция: ${rating.position}`);
 
       return {
         success: true,
         data: {
-          rni: playerRNI,
-          name: name,
-          age: age,
-          city: city,
-          points: points,
-          rank: rank,
-          category: category,
-          winRate: winRate,
-          wins: wins,
-          totalMatches: totalMatches,
+          rni: String(player.rtt_number || record.rtt_number || rni),
+          name,
+          age,
+          city: player.city || record.city || '',
+          points: parseInt(rating.points, 10) || parseInt(record.points, 10) || 0,
+          rank: parseInt(rating.position, 10) || parseInt(record.position, 10) || 0,
+          category,
+          winRate: null,
+          wins: null,
+          totalMatches: null,
           verified: true,
-          source: 'rttstat.ru'
+          source: this.source
         }
       };
-
     } catch (error) {
       console.error('Ошибка при получении данных РТТ:', error.message);
-      
-      if (error.response && error.response.status === 404) {
-        return {
-          success: false,
-          error: 'Спортсмен с таким РНИ не найден в базе РТТ'
-        };
-      }
-      
+
       return {
         success: false,
-        error: 'Ошибка соединения с сервером РТТ'
+        error: error.message?.includes('RTT_MYTENNIS')
+          ? 'Сервис РТТ не настроен (учётные данные)'
+          : 'Ошибка соединения с сервером РТТ'
       };
     }
   }
@@ -566,181 +1022,87 @@ class RTTParser {
   async getPlayerTournamentsAndMatches(rni) {
     try {
       console.log(`🎾 Запрос турниров и матчей для РНИ: ${rni}`);
-      
-      const response = await this.axios.get(`/player/${rni}`);
-      const html = response.data;
-      const $ = cheerio.load(html);
 
-      console.log(`📄 HTML получен, длина: ${html.length} символов`);
-      console.log(`📊 Всего таблиц на странице: ${$('table').length}`);
+      const record = await this.resolvePlayerByRni(rni);
+      if (!record?.player_id) {
+        return {
+          success: true,
+          data: { tournaments: [], matches: [] }
+        };
+      }
 
-      // Парсим турниры (заявки) из таблицы "Заявки на турниры"
-      const tournaments = [];
-      
-      // Ищем заголовок "Заявки на турниры" и берем первую таблицу после него
-      let foundTournamentsTable = false;
-      
-      $('*').each((index, element) => {
-        if (foundTournamentsTable) return;
-        
-        const $el = $(element);
-        const text = $el.text().trim();
-        
-        // Ищем заголовок "Заявки на турниры" (может быть с лишними пробелами)
-        if (text.includes('Заявки на турниры')) {
-          console.log(`✅ Найден заголовок с текстом: "${text}"`);
-          
-          // Ищем ближайшую таблицу после этого элемента
-          let $table = $el.next('table');
-          
-          // Если таблица не сразу после, ищем в следующих элементах
-          if ($table.length === 0) {
-            $table = $el.nextAll('table').first();
-          }
-          
-          // Если не нашли, возможно таблица внутри следующего элемента
-          if ($table.length === 0) {
-            $table = $el.next().find('table').first();
-          }
-          
-          if ($table.length > 0) {
-            console.log(`✅ Найдена таблица турниров, строк: ${$table.find('tr').length}`);
-            foundTournamentsTable = true;
-            
-            // Парсим строки таблицы
-            $table.find('tr').each((i, row) => {
-              const $row = $(row);
-              const cells = $row.find('td');
-              
-              console.log(`  Строка ${i}: ${cells.length} ячеек`);
-              
-              if (cells.length >= 6) {
-                // Структура: [Город, Возрастная группа, Категория, Дата, Заявок, Средний рейтинг, Название]
-                const city = cells.eq(0).text().trim();
-                const ageGroup = cells.eq(1).text().trim();
-                const category = cells.eq(2).text().trim();
-                const date = cells.eq(3).text().trim();
-                const applicationsCount = cells.eq(4).text().trim();
-                const avgRating = cells.eq(5).text().trim();
-                const tournamentName = cells.eq(6).text().trim();
-                const tournamentLink = cells.eq(6).find('a').attr('href');
-                
-                console.log(`    ${city} | ${ageGroup} | ${date} | ${applicationsCount} | ${avgRating} | ${tournamentName}`);
-                
-                // Проверяем, что это не заголовок и есть название турнира
-                if (tournamentName && tournamentName !== 'Название' && tournamentName !== 'НАЗВАНИЕ' && tournamentName !== 'Средний рейтинг' && tournamentName.length > 3) {
-                  tournaments.push({
-                    id: tournaments.length,
-                    city: city,
-                    category: ageGroup,
-                    ageGroup: ageGroup,
-                    tournamentCategory: category,
-                    date: date,
-                    applicationsCount: applicationsCount,
-                    avgRating: avgRating,
-                    tournament: tournamentName,
-                    link: tournamentLink ? `https://rttstat.ru${tournamentLink}` : null,
-                    status: 'accepted'
-                  });
-                  console.log(`    ✅ Добавлен турнир: ${tournamentName}`);
-                }
-              }
-            });
-          } else {
-            console.log(`❌ Таблица не найдена после заголовка`);
-          }
-        }
+      const now = new Date();
+      const begin = this.addMonthsIso(now, -24);
+      const end = this.addMonthsIso(now, 6);
+
+      const rosterData = await mytennis.callPublic({
+        'method[0]': 'tour.roster',
+        page_no: 1,
+        per_page: 50,
+        sort_field: 'begin_date',
+        sort_order: 'DESC',
+        range: 'period',
+        begin,
+        end,
+        forplayer_id: record.player_id
       });
 
-      // Парсим матчи из таблицы "Матчи РТТ"
+      const rosterRecords = this.dedupeTourRosterRecords(rosterData['tour.roster']?.records || []);
+      const tournaments = rosterRecords.map((row, index) => this.mapTourRosterRecord(row, index));
+
       const matches = [];
-      
-      // Ищем таблицу с матчами
-      $('table').each((tableIndex, table) => {
-        const $table = $(table);
-        const tableText = $table.text();
-        
-        // Проверяем, что это таблица с матчами (содержит колонки Соперник, Очки, Счет, Результат, Дата)
-        if (tableText.includes('Соперник') && tableText.includes('Результат') && tableText.includes('Счет')) {
-          console.log(`✅ Найдена таблица матчей (таблица ${tableIndex + 1})`);
-          
-          // Парсим строки таблицы
-          $table.find('tr').each((i, row) => {
-            const $row = $(row);
-            const cells = $row.find('td');
-            
-            if (cells.length >= 5) {
-              // Структура: [Соперник, Очки, Возраст РТТ, Город, Счет, Результат, Дата, Возрастная группа, Турнир, Город]
-              const opponent = cells.eq(0).text().trim();
-              const opponentPoints = cells.eq(1).text().trim();
-              const opponentAge = cells.eq(2).text().trim();
-              const opponentCity = cells.eq(3).text().trim();
-              const score = cells.eq(4).text().trim();
-              const result = cells.eq(5).text().trim();
-              const date = cells.eq(6).text().trim();
-              const ageGroup = cells.eq(7).text().trim();
-              const tournament = cells.eq(8).text().trim();
-              const city = cells.eq(9).text().trim();
-              
-              console.log(`  Строка ${i}: ${opponent} | ${score} | ${result} | ${date}`);
-              
-              // Проверяем, что это не заголовок и есть имя соперника
-              if (opponent && opponent !== 'Соперник' && opponent.length > 3) {
-                const isWin = result.toLowerCase().includes('побед');
-                
-                matches.push({
-                  id: matches.length,
-                  opponent: opponent,
-                  opponentPoints: opponentPoints ? parseInt(opponentPoints) : null,
-                  opponentAge: opponentAge,
-                  opponentCity: opponentCity,
-                  score: score,
-                  result: isWin ? 'win' : 'loss',
-                  date: date,
-                  ageGroup: ageGroup,
-                  tournament: tournament,
-                  city: city
-                });
-                console.log(`  ✅ Добавлен матч: ${opponent} (${result})`);
-              }
+      const finishedTours = rosterRecords
+        .filter((row) => String(row.is_finished) === '1' && row.tour_id)
+        .slice(0, 15);
+
+      for (const tour of finishedTours) {
+        const tourId = String(tour.tour_id);
+        const tournamentMeta = {
+          tourId,
+          name: tour.name || '',
+          city: tour.location || tour.location_full || '',
+          ageGroup: tour.player_age || ''
+        };
+
+        try {
+          const scheduleData = await mytennis.callPublic({
+            'method[0]': 'tour.card.schedule.main',
+            tour_id: tourId,
+            for_referee: '',
+            'part[0]': 'courts',
+            'part[1]': 'cells',
+            'part[2]': 'days'
+          });
+
+          const cells = scheduleData['tour.card.schedule.main']?.cells || [];
+          for (const cell of cells) {
+            const mapped = this.mapScheduleCellToMatch(cell, rni, tournamentMeta);
+            if (mapped) {
+              matches.push({ id: matches.length, ...mapped });
             }
-          });
-        }
-      });
-
-      console.log(`📊 Итого найдено турниров: ${tournaments.length}`);
-      console.log(`🎾 Итого найдено матчей: ${matches.length}`);
-
-      // Если данные не найдены через таблицы, парсим текст страницы
-      if (tournaments.length === 0 && matches.length === 0) {
-        console.log('⚠️ Таблицы не найдены, пробуем парсить текст страницы...');
-        const pageText = $('body').text();
-        
-        // Ищем упоминания турниров в тексте
-        const tournamentMatches = pageText.match(/Турнир[:\s]+([^\n]+)/gi);
-        if (tournamentMatches) {
-          tournamentMatches.forEach((match, i) => {
-            tournaments.push({
-              id: i,
-              tournament: match.replace(/Турнир[:\s]+/i, '').trim(),
-              date: 'Уточняется',
-              status: 'accepted',
-              category: ''
-            });
-          });
+          }
+        } catch (scheduleError) {
+          console.warn(`Не удалось загрузить матчи турнира ${tourId}:`, scheduleError.message);
         }
       }
 
-      console.log(`✅ Найдено турниров: ${tournaments.length}, матчей: ${matches.length}`);
+      const uniqueMatches = this.dedupePlayerMatches(matches);
+
+      uniqueMatches.sort((left, right) => {
+        const leftTs = this.parseRuDateToTimestamp(left.date);
+        const rightTs = this.parseRuDateToTimestamp(right.date);
+        return rightTs - leftTs;
+      });
+
+      console.log(`✅ Найдено турниров: ${tournaments.length}, матчей: ${uniqueMatches.length}`);
 
       return {
         success: true,
         data: {
-          tournaments: tournaments,
-          matches: matches
+          tournaments,
+          matches: uniqueMatches
         }
       };
-
     } catch (error) {
       console.error('Ошибка при получении турниров и матчей:', error.message);
       return {
@@ -780,43 +1142,73 @@ class RTTParser {
 
   async getRecentMatches(limit = 200) {
     try {
-      const response = await this.axios.get('/');
-      const $ = cheerio.load(response.data);
+      const now = new Date();
+      const begin = this.addMonthsIso(now, -3);
+      const end = this.addMonthsIso(now, 1);
+
+      const rosterData = await mytennis.callPublic({
+        'method[0]': 'tour.roster',
+        page_no: 1,
+        per_page: 30,
+        sort_field: 'begin_date',
+        sort_order: 'DESC',
+        range: 'period',
+        begin,
+        end
+      });
+
+      const rosterRecords = this.dedupeTourRosterRecords(rosterData['tour.roster']?.records || [])
+        .filter((row) => String(row.is_finished) === '1')
+        .slice(0, 12);
+
       const matches = [];
 
-      $('table').each((tableIndex, table) => {
-        if (matches.length >= limit) return false;
+      for (const tour of rosterRecords) {
+        if (matches.length >= limit) break;
 
-        $(table).find('tr').each((rowIndex, row) => {
-          if (matches.length >= limit) return false;
+        const tourId = String(tour.tour_id || '');
+        if (!tourId) continue;
 
-          const cells = $(row).find('td');
-          if (cells.length < 6) return;
+        const tournamentMeta = {
+          name: tour.name || '',
+          city: tour.location || tour.location_full || '',
+          ageGroup: tour.player_age || ''
+        };
 
-          const rawPlayer1 = cells.eq(0).text().trim();
-          const rawPlayer2 = cells.eq(1).text().trim();
-          const score = cells.eq(2).text().trim();
-          const date = cells.eq(3).text().trim();
-          const ageGroup = cells.eq(4).text().trim();
-          const tournament = cells.eq(5).text().trim();
-
-          if (!rawPlayer1 || !rawPlayer2 || !score || !date || !tournament) return;
-          if (!/(\d+[:\-–]\d+|\[\d+[-–:]\d+\])/.test(score) || !/\d{2}\.\d{2}\.\d{4}/.test(date)) return;
-
-          matches.push({
-            id: `${tableIndex}-${rowIndex}`,
-            player1Raw: rawPlayer1,
-            player2Raw: rawPlayer2,
-            player1Name: this.extractCleanPlayerName(rawPlayer1),
-            player2Name: this.extractCleanPlayerName(rawPlayer2),
-            score,
-            date,
-            ageGroup,
-            tournament,
-            city: this.extractTournamentCity(tournament)
+        try {
+          const scheduleData = await mytennis.callPublic({
+            'method[0]': 'tour.card.schedule.main',
+            tour_id: tourId,
+            for_referee: '',
+            'part[0]': 'cells'
           });
-        });
-      });
+
+          const cells = scheduleData['tour.card.schedule.main']?.cells || [];
+          for (const cell of cells) {
+            if (matches.length >= limit) break;
+            if (String(cell.match_finished) !== '1' || !cell.score) continue;
+
+            const rawPlayer1 = cell.m1p1_name || cell.m1name || '';
+            const rawPlayer2 = cell.m2p1_name || cell.m2name || '';
+            if (!rawPlayer1 || !rawPlayer2) continue;
+
+            matches.push({
+              id: `${tourId}-${cell.match_id || matches.length}`,
+              player1Raw: rawPlayer1,
+              player2Raw: rawPlayer2,
+              player1Name: this.extractCleanPlayerName(rawPlayer1),
+              player2Name: this.extractCleanPlayerName(rawPlayer2),
+              score: String(cell.score || '').trim(),
+              date: this.formatIsoToRuDate(cell.match_date),
+              ageGroup: tournamentMeta.ageGroup,
+              tournament: tournamentMeta.name,
+              city: tournamentMeta.city || this.extractTournamentCity(tournamentMeta.name)
+            });
+          }
+        } catch (scheduleError) {
+          console.warn(`getRecentMatches: турнир ${tourId}:`, scheduleError.message);
+        }
+      }
 
       return {
         success: true,
@@ -853,10 +1245,30 @@ class RTTParser {
       let players = [];
       let matchedQuery = normalizedQuery;
       let bestScore = -1;
+      const { ratingId, rosterKey, rank } = await this.getLatestRatingContext();
 
       for (const candidateQuery of queriesToTry) {
-        const response = await this.axios.get(`/search/${encodeURIComponent(candidateQuery)}`);
-        const candidatePlayers = this.extractPlayersFromSearchHtml(response.data);
+        let candidatePlayers = [];
+
+        if (/^\d{4,10}$/.test(candidateQuery)) {
+          const record = await this.resolvePlayerByRni(candidateQuery);
+          if (record) {
+            candidatePlayers = [this.mapPlayerSearchRecord({ ...record, rating_id: ratingId })];
+          }
+        } else if (rosterKey) {
+          const data = await mytennis.callPublic({
+            'method[0]': 'rating.roster',
+            page_no: 1,
+            per_page: 20,
+            rating: rosterKey,
+            rank,
+            name: candidateQuery,
+            rtt_number: ''
+          });
+          const records = data['rating.roster']?.records || [];
+          candidatePlayers = records.map((record) => this.mapPlayerSearchRecord(record));
+        }
+
         const candidateScore = this.scorePlayersForQuery(candidatePlayers, candidateQuery);
 
         if (
@@ -874,7 +1286,7 @@ class RTTParser {
         data: players,
         query: normalizedQuery,
         effectiveQuery: matchedQuery,
-        source: 'rttstat.ru'
+        source: this.source
       };
 
     } catch (error) {
@@ -894,310 +1306,108 @@ class RTTParser {
   async getTournamentDetails(tournamentUrl) {
     try {
       console.log(`🎾 Запрос детальной информации о турнире: ${tournamentUrl}`);
-      
-      // Если передан полный URL, извлекаем путь
-      let path = tournamentUrl;
-      if (tournamentUrl.startsWith('http')) {
-        const url = new URL(tournamentUrl);
-        path = url.pathname;
+
+      const tourId = this.extractTourIdFromUrl(tournamentUrl);
+      if (!tourId) {
+        return {
+          success: false,
+          error: 'Не удалось определить ID турнира из ссылки'
+        };
       }
 
-      // Запрос к странице турнира
-      const response = await this.axios.get(path);
-      const html = response.data;
-      const $ = cheerio.load(html);
-
-      console.log('📄 HTML страницы получен, начинаем парсинг...');
-
-      // Получаем название турнира
-      const tournamentName = $('h1').first().text().trim();
-      console.log(`📌 Название турнира: ${tournamentName}`);
-
-      // Информация о турнире из блоков
-      let tournamentInfo = {};
-      const allText = $('body').text();
-      const normalizedText = allText.replace(/\s+/g, ' ').trim();
-      const metaStopLabels = [
-        'Организатор',
-        'Проводящая организация',
-        'Контакты',
-        'Телефон',
-        'E-mail',
-        'Email',
-        'Город',
-        'Покрытие',
-        'Дата',
-        'Дата начала',
-        'Дата окончания',
-        'Сроки проведения',
-        'Период проведения',
-        'Возрастная группа',
-        'Пол',
-        'Тип',
-        'Категория',
-        'Категория турнира',
-        'Заявок',
-        'Количество участников',
-        'Средний рейтинг',
-        'Сайт РТТ',
-        'Таблица очков',
-        'Название'
-      ];
-
-      const explicitStartDate = this.extractLabeledValue(normalizedText, ['Дата начала'], metaStopLabels).match(/\d{2}\.\d{2}\.\d{4}/)?.[0] || '';
-      const explicitEndDate = this.extractLabeledValue(normalizedText, ['Дата окончания'], metaStopLabels).match(/\d{2}\.\d{2}\.\d{4}/)?.[0] || '';
-      const rangeFromMeta = this.extractLabeledValue(normalizedText, ['Дата', 'Сроки проведения', 'Период проведения', 'Сроки'], metaStopLabels);
-
-      let startDate = explicitStartDate;
-      let endDate = explicitEndDate;
-
-      if (!startDate || !endDate) {
-        const rangeDates = rangeFromMeta.match(/\d{2}\.\d{2}\.\d{4}/g) || [];
-        if (!startDate) startDate = rangeDates[0] || '';
-        if (!endDate) endDate = rangeDates[1] || rangeDates[0] || '';
+      const cached = this._tourDetailsCache.get(String(tourId));
+      if (cached && Date.now() < cached.expireAt) {
+        return cached.data;
       }
 
-      if (explicitStartDate && explicitEndDate) {
-        tournamentInfo.date = `${explicitStartDate} - ${explicitEndDate}`;
-      } else if (rangeFromMeta) {
-        tournamentInfo.date = rangeFromMeta;
-      }
+      const cardData = await mytennis.callPublic({
+        'method[0]': 'tour.card.main',
+        tour_id: tourId,
+        'part[0]': 'members',
+        'part[1]': 'players',
+        'part[2]': 'stages',
+        'part[3]': 'contacts',
+        'part[4]': 'org'
+      });
 
-      if (startDate) tournamentInfo.startDate = startDate;
-      if (endDate) tournamentInfo.endDate = endDate;
+      const main = cardData['tour.card.main'] || {};
+      const tournamentName = String(main.name || main.original || '').trim();
+      const startDate = this.formatIsoToRuDate(main.begin_date);
+      const endDate = this.formatIsoToRuDate(main.end_date || main.begin_date);
+      const stageStatus = this.buildStageStatusFromTourCard(main);
 
-      const detectedStageStatus = this.detectTournamentStageStatus(normalizedText);
-      if (detectedStageStatus) tournamentInfo.stageStatus = detectedStageStatus;
+      const org = main.org || {};
+      const contacts = main.contacts || {};
 
-      const cityValue = this.sanitizeTournamentMetaValue(
-        this.extractLabeledValue(normalizedText, ['Город'], metaStopLabels.filter(label => label !== 'Город')),
-        metaStopLabels.filter(label => label !== 'Город')
-      );
-      if (cityValue) tournamentInfo.city = cityValue;
+      const tournamentInfo = {
+        date: this.formatIsoRangeToRu(main.begin_date, main.end_date),
+        startDate,
+        endDate,
+        stageStatus,
+        city: main.location || main.location_full || '',
+        organizerName: org.org_full || org.org_short || '',
+        organizerPhone: contacts.phone || contacts.tel || '',
+        organizerEmail: contacts.email || '',
+        organizerContacts: contacts.address || '',
+        surface: Array.isArray(main.covers) ? main.covers.map((c) => c.name || c).filter(Boolean).join(', ') : '',
+        ageGroup: main.player_age || '',
+        gender: main.tour_gender || '',
+        type: main.tour_type || '',
+        category: main.tour_category || '',
+        participantsCount: String((main.players || main.members || []).length || main.tour_members || ''),
+        avgRating: ''
+      };
 
-      const organizerValue = this.sanitizeTournamentMetaValue(
-        this.extractLabeledValue(normalizedText, ['Организатор', 'Проводящая организация'], metaStopLabels.filter(label => label !== 'Организатор' && label !== 'Проводящая организация')),
-        metaStopLabels.filter(label => label !== 'Организатор' && label !== 'Проводящая организация')
-      );
-      if (organizerValue) tournamentInfo.organizerName = organizerValue;
-
-      const organizerPhoneValue = this.sanitizeTournamentMetaValue(
-        this.extractLabeledValue(normalizedText, ['Телефон'], metaStopLabels.filter(label => label !== 'Телефон')),
-        metaStopLabels.filter(label => label !== 'Телефон')
-      );
-      if (organizerPhoneValue) tournamentInfo.organizerPhone = organizerPhoneValue;
-
-      const organizerEmailValue = this.sanitizeTournamentMetaValue(
-        this.extractLabeledValue(normalizedText, ['E-mail', 'Email'], metaStopLabels.filter(label => label !== 'E-mail' && label !== 'Email')),
-        metaStopLabels.filter(label => label !== 'E-mail' && label !== 'Email')
-      );
-      if (organizerEmailValue) tournamentInfo.organizerEmail = organizerEmailValue;
-
-      const contactsValue = this.sanitizeTournamentMetaValue(
-        this.extractLabeledValue(normalizedText, ['Контакты'], metaStopLabels.filter(label => label !== 'Контакты')),
-        metaStopLabels.filter(label => label !== 'Контакты')
-      );
-      if (contactsValue) tournamentInfo.organizerContacts = contactsValue;
-
-      const surfaceValue = this.sanitizeTournamentMetaValue(
-        this.extractLabeledValue(normalizedText, ['Покрытие'], metaStopLabels.filter(label => label !== 'Покрытие')),
-        metaStopLabels.filter(label => label !== 'Покрытие')
-      );
-      if (surfaceValue) tournamentInfo.surface = surfaceValue;
-
-      const ageGroupValue = this.sanitizeTournamentMetaValue(
-        this.extractLabeledValue(normalizedText, ['Возрастная группа'], metaStopLabels.filter(label => label !== 'Возрастная группа')),
-        metaStopLabels.filter(label => label !== 'Возрастная группа')
-      );
-      if (ageGroupValue) tournamentInfo.ageGroup = ageGroupValue;
-
-      const genderValue = this.sanitizeTournamentMetaValue(
-        this.extractLabeledValue(normalizedText, ['Пол'], metaStopLabels.filter(label => label !== 'Пол')),
-        metaStopLabels.filter(label => label !== 'Пол')
-      );
-      if (genderValue) tournamentInfo.gender = genderValue;
-
-      const typeValue = this.sanitizeTournamentMetaValue(
-        this.extractLabeledValue(normalizedText, ['Тип'], metaStopLabels.filter(label => label !== 'Тип')),
-        metaStopLabels.filter(label => label !== 'Тип')
-      );
-      if (typeValue) tournamentInfo.type = typeValue;
-
-      const categoryValue = this.sanitizeTournamentMetaValue(
-        this.extractLabeledValue(normalizedText, ['Категория турнира', 'Категория'], metaStopLabels.filter(label => label !== 'Категория турнира' && label !== 'Категория')),
-        metaStopLabels.filter(label => label !== 'Категория турнира' && label !== 'Категория')
-      );
-      if (categoryValue) tournamentInfo.category = categoryValue;
-
-      const participantsMetaValue = this.sanitizeTournamentMetaValue(
-        this.extractLabeledValue(normalizedText, ['Количество участников', 'Заявок'], metaStopLabels.filter(label => label !== 'Количество участников' && label !== 'Заявок')),
-        metaStopLabels.filter(label => label !== 'Количество участников' && label !== 'Заявок')
-      );
-      const participantsCount = participantsMetaValue.match(/\d+/)?.[0] || '';
-      if (participantsCount) tournamentInfo.participantsCount = participantsCount;
-
-      const avgRatingValue = this.sanitizeTournamentMetaValue(
-        this.extractLabeledValue(normalizedText, ['Средний рейтинг'], metaStopLabels.filter(label => label !== 'Средний рейтинг')),
-        metaStopLabels.filter(label => label !== 'Средний рейтинг')
-      );
-      if (avgRatingValue) tournamentInfo.avgRating = avgRatingValue.match(/\d+/)?.[0] || avgRatingValue;
+      const normalizedText = [
+        tournamentName,
+        stageStatus,
+        String(main.is_finished) === '1' ? 'турнир завершен' : ''
+      ].join(' ');
 
       const lifecycle = this.deriveTournamentLifecycle({
         normalizedText,
         startDate,
         endDate,
-        stageStatus: tournamentInfo.stageStatus || ''
+        stageStatus
       });
 
-      if (lifecycle.status) {
-        tournamentInfo.lifecycleStatus = lifecycle.status;
-      }
+      if (lifecycle.status) tournamentInfo.lifecycleStatus = lifecycle.status;
+      if (lifecycle.label) tournamentInfo.statusLabel = lifecycle.label;
 
-      if (lifecycle.label) {
-        tournamentInfo.statusLabel = lifecycle.label;
-      }
+      const players = Array.isArray(main.players) ? main.players : [];
+      const members = Array.isArray(main.members) ? main.members : [];
+      const sourceList = players.length >= members.length ? players : members;
+      const participants = sourceList.map((player, index) => this.mapTourCardParticipant(player, index));
+      const avgRatingFromParticipants = this.calculateAverageParticipantRating(participants);
+      tournamentInfo.avgRating = avgRatingFromParticipants || '';
 
-      console.log('📋 Информация о турнире:', tournamentInfo);
-
-      // Парсим ВСЕ таблицы на странице
-      let participants = [];
       const pointsTable = [];
-      const participantTableCandidates = [];
-      let tablesParsed = 0;
-
-      $('table').each((tableIndex, table) => {
-        const $table = $(table);
-        const headers = [];
-        
-        // Собираем заголовки таблицы
-        $table.find('thead th, thead td, tr:first-child th, tr:first-child td').each((i, th) => {
-          headers.push($(th).text().trim().toLowerCase());
-        });
-
-        console.log(`📊 Таблица ${tableIndex + 1}, заголовки:`, headers.join(', '));
-
-        // Если нет явных заголовков в thead, пробуем первую строку
-        if (headers.length === 0) {
-          $table.find('tr:first-child td').each((i, td) => {
-            headers.push($(td).text().trim().toLowerCase());
-          });
+      const stages = Array.isArray(main.stages) ? main.stages : [];
+      for (const stage of stages) {
+        const drawSize = parseInt(stage.member_count, 10);
+        if (Number.isFinite(drawSize) && drawSize > 0) {
+          pointsTable.push({ stage: String(drawSize), points: '', description: stage.name || '' });
         }
-
-        const headerText = headers.join(' ');
-        const isParticipantsLikeTable =
-          headerText.includes('рни') ||
-          headerText.includes('фио') ||
-          headerText.includes('участник') ||
-          headerText.includes('игрок') ||
-          headerText.includes('возраст') ||
-          headerText.includes('город');
-
-        if (this.isApplicationsTable(headers)) {
-          const parsedApplicants = this.parseApplicationsTable($table, headers, $);
-
-          if (parsedApplicants.length > 0) {
-            participantTableCandidates.push({
-              headers,
-              participants: parsedApplicants,
-              tableIndex,
-            });
-            console.log(`👥 Найдена валидная таблица заявок (таблица ${tableIndex + 1}): ${parsedApplicants.length} игроков`);
-          }
-        }
-
-        // Парсинг таблицы очков/этапов турнира
-        if (!isParticipantsLikeTable && (headerText.includes('этап') || headerText.includes('раунд') || headerText.includes('место') ||
-          headerText.includes('очки') || headerText.includes('1/2') || headerText.includes('1/4'))) {
-          
-          console.log(`🏆 Найдена таблица очков (таблица ${tableIndex + 1})`);
-          
-          $table.find('tbody tr, tr').each((rowIndex, row) => {
-            const $row = $(row);
-            const cells = [];
-            $row.find('th, td').each((i, cell) => {
-              cells.push($(cell).text().trim());
-            });
-
-            // Для таблицы очков первая ячейка - название сетки (32, 24, 16, 8)
-            // Остальные ячейки - очки для каждого места
-            if (cells.length >= 2 && cells[0]) {
-              const firstCell = cells[0].toLowerCase();
-              const drawSize = parseInt(String(cells[0]).replace(/\D/g, ''), 10);
-              
-              // Пропускаем строки-заголовки
-              if (firstCell.includes('этап') || firstCell.includes('место') || firstCell === 'п' || firstCell === 'ф') {
-                return;
-              }
-
-              // Для таблицы очков берем только строки, где первый столбец — размер сетки
-              if (!Number.isFinite(drawSize) || drawSize <= 0) {
-                return;
-              }
-
-              // Собираем все очки из ячеек в одну строку через запятую
-              const allPoints = cells.slice(1).filter(c => c && c.length > 0).join(',');
-
-              if (allPoints) {
-                pointsTable.push({
-                  stage: String(drawSize),
-                  points: allPoints,
-                  description: ''
-                });
-                console.log(`📊 Сетка ${drawSize}: ${allPoints}`);
-              }
-            }
-          });
-        }
-
-        tablesParsed++;
-      });
-
-      if (participantTableCandidates.length > 0) {
-        const bestCandidate = [...participantTableCandidates].sort((left, right) => right.participants.length - left.participants.length)[0];
-        participants = bestCandidate.participants;
-        console.log(`✅ Выбрана таблица заявок ${bestCandidate.tableIndex + 1}: ${participants.length} игроков`);
       }
 
-      console.log(`✅ Обработано таблиц: ${tablesParsed}`);
-      console.log(`👥 Найдено участников: ${participants.length}`);
-      console.log(`🏆 Найдено этапов: ${pointsTable.length}`);
-
-      // Если участников не найдено, парсим списки <ul>, <ol>
-      if (participants.length === 0) {
-        console.log('🔍 Ищем участников в списках...');
-        $('ul, ol').each((i, list) => {
-          $(list).find('li').each((j, item) => {
-            const text = $(item).text().trim();
-            if (text.length > 5) {
-              participants.push({
-                place: (j + 1).toString(),
-                name: text,
-                rating: '',
-                city: '',
-                age: '',
-                points: ''
-              });
-            }
-          });
-        });
-        console.log(`📝 Найдено участников в списках: ${participants.length}`);
-      }
-
-      return {
+      const result = {
         success: true,
         tournament: {
           name: tournamentName,
           ...tournamentInfo,
-          participants: participants,
-          pointsTable: pointsTable,
+          participants,
+          pointsTable,
           participantsCount: participants.length,
-          url: path
+          url: this.buildTourLink(tourId)
         }
       };
-
+      this._tourDetailsCache.set(String(tourId), {
+        data: result,
+        expireAt: Date.now() + this._tourDetailsCacheTTL
+      });
+      return result;
     } catch (error) {
       console.error('❌ Ошибка при получении данных турнира:', error.message);
-      console.error('Stack trace:', error.stack);
       return {
         success: false,
         error: 'Не удалось загрузить информацию о турнире: ' + error.message
@@ -1211,149 +1421,92 @@ class RTTParser {
    * @returns {Promise<Object>} Список турниров
    */
   async getTournamentsList(filters = {}) {
+    const cacheKey = JSON.stringify(filters || {});
+
+    if (this._tourInFlight.has(cacheKey)) {
+      return this._tourInFlight.get(cacheKey);
+    }
+
+    const task = this._loadTournamentsList(filters, cacheKey);
+    this._tourInFlight.set(cacheKey, task);
+
+    try {
+      return await task;
+    } finally {
+      this._tourInFlight.delete(cacheKey);
+    }
+  }
+
+  async _loadTournamentsList(filters = {}, cacheKey = '') {
     try {
       console.log('🎾 Запрос списка турниров с фильтрами:', filters);
 
-      // Строим параметры запроса к rttstat.ru/tours/
-      const params = new URLSearchParams();
-      if (filters.age)      params.set('age', filters.age);
-      if (filters.gender)   params.set('g', filters.gender);
-      if (filters.district) params.set('l1', filters.district);
-      if (filters.subject)  params.set('l2', filters.subject);
-      if (filters.city)     params.set('l3', filters.city);
-
-      const cacheKey = params.toString();
-
-      // Проверяем кэш
       const cached = this._tourCache.get(cacheKey);
       if (cached && Date.now() < cached.expireAt) {
         console.log('✅ Турниры из кэша:', cached.data.tournaments.length);
-        return { success: true, data: cached.data };
+        return { success: true, data: cached.data, cached: true };
       }
 
-      const url = `/tours/${cacheKey ? '?' + cacheKey : ''}`;
-      console.log('📡 URL запроса:', url);
-
-      const response = await this.axios.get(url);
-      const html = response.data;
-      const $ = cheerio.load(html);
-
-      const tournaments = [];
-
-      // Парсим опции фильтров из формы
-      const districts = [];
-      const subjects = [];
-      const cities = [];
-      $('select[name="l1"] option').each((i, el) => {
-        const val = $(el).attr('value');
-        const text = $(el).text().trim();
-        if (val) districts.push({ value: val, label: text });
-      });
-      $('select[name="l2"] option').each((i, el) => {
-        const val = $(el).attr('value');
-        const text = $(el).text().trim();
-        const parent = $(el).attr('data-parent');
-        if (val) subjects.push({ value: val, label: text, parent });
-      });
-      $('select[name="l3"] option').each((i, el) => {
-        const val = $(el).attr('value');
-        const text = $(el).text().trim();
-        const parent = $(el).attr('data-parent');
-        if (val) cities.push({ value: val, label: text, parent });
-      });
-
-      // Парсим строки таблицы .tours-table
-      const $toursTable = $('table.tours-table').first();
-      const headerMap = new Map();
-
-      $toursTable.find('thead tr').first().find('td, th').each((index, cell) => {
-        const header = this.normalizeTournamentTableHeader($(cell).text());
-        if (header) {
-          headerMap.set(header, index);
-        }
-      });
-
-      const getCellTextByHeader = (cells, ...headerVariants) => {
-        for (const variant of headerVariants) {
-          const normalizedHeader = this.normalizeTournamentTableHeader(variant);
-          const cellIndex = headerMap.get(normalizedHeader);
-          if (cellIndex === undefined) {
-            continue;
-          }
-
-          const cell = cells.eq(cellIndex);
-          if (!cell.length) {
-            continue;
-          }
-
-          const text = cell.text().replace(/\s+/g, ' ').trim();
-          if (text) {
-            return text;
-          }
-        }
-
-        return '';
+      const period = this.getTourListPeriod();
+      const payload = {
+        'method[0]': 'tour.roster',
+        sort_field: 'begin_date',
+        sort_order: 'ASC',
+        range: 'period',
+        begin: period.begin,
+        end: period.end
       };
 
-      $toursTable.find('tr').slice(1).each((i, row) => {
-        const cells = $(row).find('td');
-        if (cells.length < 10) return;
+      if (filters.age) payload.player_age = filters.age;
+      if (filters.gender) payload.tour_gender = filters.gender;
+      this.applyTourLocationFilters(payload, filters);
 
-        const city = getCellTextByHeader(cells, 'Город');
-        const type = getCellTextByHeader(cells, 'Тип');
-        const ageGroup = getCellTextByHeader(cells, 'Возраст');
-        const category = getCellTextByHeader(cells, 'Категория');
-        const startDate = getCellTextByHeader(cells, 'Начало');
-        const endDate = getCellTextByHeader(cells, 'До');
-        const surface = getCellTextByHeader(cells, 'Корты');
-        const applications = getCellTextByHeader(cells, 'Заявок');
-        const avgRating = getCellTextByHeader(cells, 'Средний рейтинг');
-        const status = getCellTextByHeader(cells, 'Статус');
-        const nameCellIndex = headerMap.get(this.normalizeTournamentTableHeader('Название'));
-        const nameCell = nameCellIndex === undefined ? $() : cells.eq(nameCellIndex);
-        const name = nameCell.text().replace(/\s+/g, ' ').trim();
-        const link = nameCell.find('a').attr('href');
+      const { records, totalCount, truncated } = await this.fetchTourRosterRecords(payload);
+      const uniqueRecords = this.dedupeTourRosterRecords(records);
+      const tournaments = this.mapTourListRecords(uniqueRecords);
 
-        if (city && name && name.length > 2) {
-          tournaments.push({
-            id: tournaments.length,
-            city,
-            type,
-            ageGroup,
-            category,
-            startDate,
-            endDate,
-            surface,
-            applications,
-            avgRating,
-            status,
-            name,
-            link: link ? (link.startsWith('http') ? link : `https://rttstat.ru${link}`) : null
-          });
-        }
-      });
+      console.log(`✅ Найдено турниров: ${tournaments.length}${truncated ? ` (из ${totalCount})` : ''}`);
 
-      console.log(`✅ Найдено турниров: ${tournaments.length}`);
+      let filterOptions = { districts: [], subjects: [], cities: [] };
+      try {
+        filterOptions = await this.getTournamentFilterOptions();
+      } catch (filtersError) {
+        console.warn('Не удалось загрузить справочник гео-фильтров РТТ:', filtersError.message);
+      }
 
-      const resultData = { tournaments, filters: { districts, subjects, cities } };
-
-      // Сохраняем в кэш
+      const resultData = {
+        tournaments,
+        filters: filterOptions,
+        totalCount,
+        truncated: Boolean(truncated)
+      };
       this._tourCache.set(cacheKey, { data: resultData, expireAt: Date.now() + this._tourCacheTTL });
 
       return {
         success: true,
         data: resultData
       };
-
     } catch (error) {
+      const timeoutMs = this.getTourListTimeoutMs();
       const timeoutMessage = error.code === 'ECONNABORTED'
-        ? `RTT не ответил за ${Math.round(this.requestTimeout / 1000)} сек.`
+        ? `RTT не ответил за ${Math.round(timeoutMs / 1000)} сек.`
         : error.message;
       console.error('❌ Ошибка при получении списка турниров:', error.message);
+
+      const stale = this._tourCache.get(cacheKey);
+      if (stale && Date.now() < stale.expireAt + this._tourStaleTTL) {
+        console.warn('⚠️ Отдаём устаревший кэш турниров после ошибки API');
+        return {
+          success: true,
+          data: { ...stale.data, stale: true },
+          warning: 'Показаны сохранённые данные — РТТ ответил с задержкой'
+        };
+      }
+
       return {
         success: false,
         error: 'Ошибка при получении списка турниров: ' + timeoutMessage,
-        data: { tournaments: [], filters: {} }
+        data: { tournaments: [], filters: {}, totalCount: 0, truncated: false }
       };
     }
   }
@@ -1364,8 +1517,8 @@ class RTTParser {
    */
   async checkAvailability() {
     try {
-      const response = await this.axios.get('/');
-      return response.status === 200;
+      await mytennis.ping();
+      return true;
     } catch (error) {
       console.error('RTT сервис недоступен:', error.message);
       return false;
@@ -1374,3 +1527,4 @@ class RTTParser {
 }
 
 module.exports = new RTTParser();
+

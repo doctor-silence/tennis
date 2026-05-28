@@ -139,14 +139,15 @@ export const RttStatsView = ({ user }: { user: User }) => {
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [error, setError] = useState('');
     const [showAllMatches, setShowAllMatches] = useState(false);
-    const [showAllTournaments, setShowAllTournaments] = useState(false);
     const [selectedTournament, setSelectedTournament] = useState<any>(null);
     const [tournamentModalOpen, setTournamentModalOpen] = useState(false);
 
     // Турниры РТТ
     const [tourList, setTourList] = useState<any[]>([]);
     const [tourLoading, setTourLoading] = useState(false);
+    const [tourFiltersLoading, setTourFiltersLoading] = useState(false);
     const [tourError, setTourError] = useState('');
+    const [tourNotice, setTourNotice] = useState('');
     const [tourFilters, setTourFilters] = useState({ age: '', gender: '', district: '', subject: '', city: '' });
     const [tourFilterOptions, setTourFilterOptions] = useState<{districts: any[], subjects: any[], cities: any[]}>({ districts: [], subjects: [], cities: [] });
     const [tourHasSearched, setTourHasSearched] = useState(false);
@@ -158,6 +159,7 @@ export const RttStatsView = ({ user }: { user: User }) => {
 
         setTourLoading(true);
         setTourError('');
+        setTourNotice('');
         setTourHasSearched(true);
         try {
             const res = await api.rtt.getTournamentsList(filters);
@@ -165,6 +167,11 @@ export const RttStatsView = ({ user }: { user: User }) => {
                 setTourList(res.data.tournaments || []);
                 if (res.data.filters && tourFilterOptions.districts.length === 0) {
                     setTourFilterOptions(res.data.filters);
+                }
+                if (res.warning) {
+                    setTourNotice(res.warning);
+                } else if (res.data.truncated && res.data.totalCount > (res.data.tournaments?.length || 0)) {
+                    setTourNotice(`Показаны первые ${res.data.tournaments.length} из ${res.data.totalCount}. Уточните округ или город.`);
                 }
             } else {
                 setTourError(res.error || 'Не удалось загрузить турниры');
@@ -176,12 +183,38 @@ export const RttStatsView = ({ user }: { user: User }) => {
         }
     };
 
+    const loadTourFilterOptions = async () => {
+        if (tourFiltersLoading || tourFilterOptions.districts.length > 0) return;
+
+        setTourFiltersLoading(true);
+        try {
+            const res = await api.rtt.getTournamentFilters();
+            if (res.success && res.data) {
+                setTourFilterOptions({
+                    districts: res.data.districts || [],
+                    subjects: res.data.subjects || [],
+                    cities: res.data.cities || []
+                });
+            }
+        } catch (err) {
+            console.error('Не удалось загрузить RTT фильтры:', err);
+        } finally {
+            setTourFiltersLoading(false);
+        }
+    };
+
     const handleTourFilterChange = (key: string, value: string) => {
         const newFilters = { ...tourFilters, [key]: value };
+        if (key === 'district') {
+            newFilters.subject = '';
+            newFilters.city = '';
+        } else if (key === 'subject') {
+            newFilters.city = '';
+        }
         setTourFilters(newFilters);
         // Дебаунс: ждём 300мс после последнего изменения фильтра
         if (tournamentDebounceRef.current) clearTimeout(tournamentDebounceRef.current);
-        tournamentDebounceRef.current = setTimeout(() => loadTournaments(newFilters), 300);
+        tournamentDebounceRef.current = setTimeout(() => loadTournaments(newFilters), 600);
     };
 
     const resetTourFilters = () => {
@@ -189,6 +222,7 @@ export const RttStatsView = ({ user }: { user: User }) => {
         setTourFilters(empty);
         setTourList([]);
         setTourError('');
+        setTourNotice('');
         setTourHasSearched(false);
     };
 
@@ -305,6 +339,12 @@ export const RttStatsView = ({ user }: { user: User }) => {
     }, [activeTab, searchQuery]);
 
     useEffect(() => {
+        if (activeTab === 'tournaments') {
+            loadTourFilterOptions();
+        }
+    }, [activeTab]);
+
+    useEffect(() => {
         return () => {
             if (tournamentDebounceRef.current) {
                 clearTimeout(tournamentDebounceRef.current);
@@ -319,6 +359,42 @@ export const RttStatsView = ({ user }: { user: User }) => {
     const lossCount = playerData?.data?.matches?.filter((m: any) => m.result === 'loss').length || 0;
     const totalMatches = playerData?.data?.totalMatches ?? (winCount + lossCount);
     const winRate = playerData?.data?.winRate ?? (totalMatches > 0 ? Math.round((winCount / totalMatches) * 100) : 0);
+    const parseTournamentStartDate = (rawDate: string) => {
+        const matched = String(rawDate || '').match(/(\d{2})\.(\d{2})\.(\d{4})/);
+        if (!matched) return null;
+        const ts = Date.UTC(Number(matched[3]), Number(matched[2]) - 1, Number(matched[1]));
+        return Number.isFinite(ts) ? ts : null;
+    };
+    const nearestTournaments = (() => {
+        const source = Array.isArray(playerData?.data?.tournaments) ? playerData.data.tournaments : [];
+        if (!source.length) return [];
+
+        const today = new Date();
+        const todayStartTs = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+        const withDate = source.map((tournament: any, index: number) => ({
+            tournament,
+            index,
+            startTs: parseTournamentStartDate(tournament?.date || '')
+        }));
+
+        const upcoming = withDate
+            .filter((item) => item.startTs !== null && item.startTs >= todayStartTs)
+            .sort((left, right) => {
+                if (left.startTs === right.startTs) return left.index - right.index;
+                return (left.startTs as number) - (right.startTs as number);
+            });
+
+        const fallbackPast = withDate
+            .filter((item) => item.startTs === null || item.startTs < todayStartTs)
+            .sort((left, right) => {
+                if (left.startTs === null && right.startTs === null) return left.index - right.index;
+                if (left.startTs === null) return 1;
+                if (right.startTs === null) return -1;
+                return right.startTs - left.startTs;
+            });
+
+        return [...upcoming, ...fallbackPast].slice(0, 6).map((item) => item.tournament);
+    })();
 
     return (
         <>
@@ -370,6 +446,12 @@ export const RttStatsView = ({ user }: { user: User }) => {
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-orange-400 outline-none text-lg"
                             />
                             <p className="text-xs text-slate-400 mt-2">Поиск запускается автоматически и по ФИО, и по РНИ. Для РНИ карточка откроется после короткой паузы или по Enter.</p>
+                            {loading && (
+                                <div className="mt-3 inline-flex items-center gap-2 text-sm text-orange-600 bg-orange-50 border border-orange-200 rounded-lg px-3 py-1.5">
+                                    <Loader2 size={14} className="animate-spin" />
+                                    <span>Загружаем данные РТТ...</span>
+                                </div>
+                            )}
                             {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
                         </div>
                     </div>
@@ -431,7 +513,8 @@ export const RttStatsView = ({ user }: { user: User }) => {
                     <div>
                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Округ</label>
                         <select value={tourFilters.district} onChange={(e) => handleTourFilterChange('district', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-orange-400 outline-none">
+                            disabled={tourFiltersLoading}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-orange-400 outline-none disabled:bg-slate-100 disabled:text-slate-400">
                             <option value="">Не выбрано</option>
                             {tourFilterOptions.districts.map((d: any) => (
                                 <option key={d.value} value={d.value}>{d.label}</option>
@@ -442,7 +525,8 @@ export const RttStatsView = ({ user }: { user: User }) => {
                     <div>
                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Субъект</label>
                         <select value={tourFilters.subject} onChange={(e) => handleTourFilterChange('subject', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-orange-400 outline-none">
+                            disabled={tourFiltersLoading}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-orange-400 outline-none disabled:bg-slate-100 disabled:text-slate-400">
                             <option value="">Не выбрано</option>
                             {tourFilterOptions.subjects
                                 .filter((s: any) => !tourFilters.district || s.parent === tourFilters.district)
@@ -453,7 +537,8 @@ export const RttStatsView = ({ user }: { user: User }) => {
                     <div>
                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Город</label>
                         <select value={tourFilters.city} onChange={(e) => handleTourFilterChange('city', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-orange-400 outline-none">
+                            disabled={tourFiltersLoading}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-orange-400 outline-none disabled:bg-slate-100 disabled:text-slate-400">
                             <option value="">Не выбрано</option>
                             {tourFilterOptions.cities
                                 .filter((c: any) => !tourFilters.subject || c.parent === tourFilters.subject)
@@ -461,6 +546,12 @@ export const RttStatsView = ({ user }: { user: User }) => {
                         </select>
                     </div>
                 </div>
+                {tourFiltersLoading && (
+                    <div className="px-6 py-2 text-xs text-slate-500 bg-slate-50 border-b border-slate-200 inline-flex items-center gap-2">
+                        <Loader2 size={13} className="animate-spin" />
+                        <span>Подгружаем округа, субъекты и города...</span>
+                    </div>
+                )}
 
                 {/* Таблица */}
                 {tourLoading ? (
@@ -480,6 +571,9 @@ export const RttStatsView = ({ user }: { user: User }) => {
                     <div className="py-12 text-center text-slate-400 font-medium">Турниры не найдены</div>
                 ) : (
                     <div className="overflow-x-auto">
+                        {tourNotice && (
+                            <div className="px-6 py-2 text-sm text-amber-700 bg-amber-50 border-b border-amber-100">{tourNotice}</div>
+                        )}
                         <table className="w-full text-sm">
                             <thead className="bg-slate-50 border-b-2 border-slate-200">
                                 <tr>
@@ -647,7 +741,7 @@ export const RttStatsView = ({ user }: { user: User }) => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {(showAllTournaments ? playerData.data.tournaments : playerData.data.tournaments.slice(0, 4)).map((tournament: any, index: number) => (
+                                        {nearestTournaments.map((tournament: any, index: number) => (
                                             <tr key={tournament.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-slate-25'}`}>
                                                 <td className="px-4 py-3 text-sm text-slate-900">{tournament.city || '—'}</td>
                                                 <td className="px-4 py-3 text-sm text-slate-900">{tournament.category || tournament.ageGroup || '—'}</td>
@@ -668,14 +762,9 @@ export const RttStatsView = ({ user }: { user: User }) => {
                                     </tbody>
                                 </table>
                             </div>
-                            {playerData.data.tournaments.length > 4 && (
-                                <div className="px-6 py-4 bg-slate-50 border-t border-slate-200">
-                                    <Button
-                                        onClick={() => setShowAllTournaments(!showAllTournaments)}
-                                        className="w-full bg-slate-600 hover:bg-slate-700"
-                                    >
-                                        {showAllTournaments ? 'Свернуть' : `Показать все (${playerData.data.tournaments.length})`}
-                                    </Button>
+                            {playerData.data.tournaments.length > nearestTournaments.length && (
+                                <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 text-xs text-slate-500">
+                                    Показаны ближайшие 6 турниров
                                 </div>
                             )}
                         </div>
@@ -751,6 +840,14 @@ export const RttStatsView = ({ user }: { user: User }) => {
             )}
 
             {/* Empty State */}
+            {!playerData && loading && (
+                <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-12 text-center">
+                    <Loader2 size={36} className="animate-spin text-orange-500 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold text-slate-900 mb-2">Получаем данные игрока</h3>
+                    <p className="text-slate-500">Обычно занимает несколько секунд</p>
+                </div>
+            )}
+
             {!playerData && !loading && (
                 <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-12 text-center">
                     <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -776,9 +873,11 @@ export const RttStatsView = ({ user }: { user: User }) => {
 
 const TournamentModal = ({ isOpen, onClose, tournament }: { isOpen: boolean; onClose: () => void; tournament: any }) => {
     const elRef = useRef<HTMLDivElement | null>(null);
+    const detailsCacheRef = useRef<Map<string, any>>(new Map());
     const modalRoot = document.getElementById('modal-root');
     const [tournamentDetails, setTournamentDetails] = useState<any>(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
+    const [detailsError, setDetailsError] = useState('');
 
     const displayTitle = tournamentDetails?.name || tournament?.name || tournament?.tournament || 'Турнир РТТ';
     const displayCity = tournamentDetails?.city || tournament?.city || '—';
@@ -793,7 +892,14 @@ const TournamentModal = ({ isOpen, onClose, tournament }: { isOpen: boolean; onC
     const displaySurface = tournamentDetails?.surface || tournament?.surface || '—';
     const displayGender = tournamentDetails?.gender || '—';
     const displayApplications = tournamentDetails?.participantsCount || tournament?.applicationsCount || tournament?.applications || '—';
-    const displayAvgRating = tournamentDetails?.avgRating || tournament?.avgRating || '—';
+    const rawAvgRating = tournamentDetails?.avgRating || tournament?.avgRating || '';
+    const displayAvgRating = (() => {
+        const numeric = Number(String(rawAvgRating).replace(',', '.'));
+        if (Number.isFinite(numeric) && numeric > 0) {
+            return numeric >= 1 ? String(Math.round(numeric)) : '—';
+        }
+        return '—';
+    })();
     const participants = Array.isArray(tournamentDetails?.participants) ? tournamentDetails.participants : [];
     
     if (!elRef.current) {
@@ -806,20 +912,38 @@ const TournamentModal = ({ isOpen, onClose, tournament }: { isOpen: boolean; onC
             modalRoot.appendChild(el);
             document.body.style.overflow = 'hidden';
             setTournamentDetails(null);
+            setDetailsError('');
             
             // Загрузка детальной информации о турнире
-            if (tournament?.link) {
+            const fallbackTourId = String(tournament?.tourId || tournament?.id || '').trim();
+            const detailUrl = tournament?.link
+                || tournament?.url
+                || tournament?.rtt_link
+                || (fallbackTourId ? `https://rtt.mytennis.online/public/tours/${fallbackTourId}/dashboard` : '');
+            if (detailUrl) {
+                if (detailsCacheRef.current.has(detailUrl)) {
+                    setTournamentDetails(detailsCacheRef.current.get(detailUrl));
+                    setLoadingDetails(false);
+                    return;
+                }
                 setLoadingDetails(true);
-                api.rtt.getTournamentDetails(tournament.link)
+                api.rtt.getTournamentDetails(detailUrl)
                     .then(data => {
                         if (data.success) {
                             setTournamentDetails(data.tournament);
+                            detailsCacheRef.current.set(detailUrl, data.tournament);
+                        } else {
+                            setDetailsError(data.error || 'Не удалось загрузить детали турнира');
                         }
                     })
-                    .catch(err => console.error('Error loading tournament details:', err))
+                    .catch(err => {
+                        console.error('Error loading tournament details:', err);
+                        setDetailsError('Ошибка загрузки информации о турнире');
+                    })
                     .finally(() => setLoadingDetails(false));
             } else {
                 setLoadingDetails(false);
+                setDetailsError('Ссылка на турнир отсутствует');
             }
         }
         return () => {
@@ -868,6 +992,11 @@ const TournamentModal = ({ isOpen, onClose, tournament }: { isOpen: boolean; onC
                         </div>
                     ) : (
                         <>
+                            {detailsError && (
+                                <div className="mb-4 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm">
+                                    {detailsError}
+                                </div>
+                            )}
                             {/* Tournament Info */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
                                 <div className="min-w-0 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-4 border border-blue-200">

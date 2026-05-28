@@ -274,6 +274,11 @@ GARMIN_OAUTH_TOKEN_URL=https://connectapi.garmin.com/oauth-service/oauth/token
 GARMIN_OAUTH_CALLBACK_URL=https://yourdomain.com/api/integrations/garmin/callback
 GARMIN_OAUTH_SCOPE=activity wellness
 GARMIN_ACTIVITIES_URL=https://your-garmin-activity-endpoint
+
+# RTT (rtt.mytennis.online) — логин личного кабинета для парсера
+RTT_MYTENNIS_USER=your_rtt_login
+RTT_MYTENNIS_PASSWORD=your_rtt_password
+# RTT_MYTENNIS_TIMEOUT_MS=20000
 ```
 
 Сохраняем (`Ctrl+O`, `Enter`, `Ctrl+X`).

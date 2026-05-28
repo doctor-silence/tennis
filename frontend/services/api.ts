@@ -586,7 +586,12 @@ export const api = {
         // Получить детальную информацию о турнире
         getTournamentDetails: async (url: string): Promise<any> => {
             try {
-                const res = await fetch(`${API_URL}/rtt/tournament?url=${encodeURIComponent(url)}`);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 20000);
+                const res = await fetch(`${API_URL}/rtt/tournament?url=${encodeURIComponent(url)}`, {
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
                 const data = await res.json();
                 return data;
             } catch (error) {
@@ -619,6 +624,21 @@ export const api = {
             } catch (error) {
                 console.error('RTT tournaments list error:', error);
                 return { success: false, error: 'Ошибка получения списка турниров' };
+            }
+        },
+
+        getTournamentFilters: async (): Promise<any> => {
+            try {
+                const res = await fetch(`${API_URL}/rtt/tournament-filters`);
+                const data = await res.json();
+                return data;
+            } catch (error) {
+                console.error('RTT tournament filters error:', error);
+                return {
+                    success: false,
+                    error: 'Ошибка получения фильтров РТТ',
+                    data: { districts: [], subjects: [], cities: [] }
+                };
             }
         }
     },

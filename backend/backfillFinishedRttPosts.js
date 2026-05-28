@@ -121,12 +121,14 @@ async function main() {
   const recentMatches = recentMatchesResult?.success ? recentMatchesResult.data : [];
 
   const tournamentsResult = await pool.query(`
-    SELECT id, user_id, name, group_name, target_group_id, rtt_link, status, stage_status,
-           start_date, end_date, prize_pool, category, tournament_type, gender,
-           age_group, system, match_format, participants_count, creator_role
-    FROM tournaments
-    WHERE COALESCE(rtt_link, '') != ''
-    ORDER BY id DESC
+    SELECT t.id, t.user_id, t.name, t.group_name, t.target_group_id, t.rtt_link, t.status, t.stage_status,
+           t.start_date, t.end_date, t.prize_pool, t.category, t.tournament_type, t.gender,
+           t.age_group, t.system, t.match_format, t.participants_count,
+           COALESCE(u.role, 'admin') AS creator_role
+    FROM tournaments t
+    LEFT JOIN users u ON t.user_id = u.id
+    WHERE COALESCE(t.rtt_link, '') != ''
+    ORDER BY t.id DESC
   `);
 
   let changed = 0;

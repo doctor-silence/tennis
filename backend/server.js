@@ -1699,9 +1699,11 @@ const syncTrackedTournamentStages = async () => {
         const trackedTournaments = await pool.query(
             `SELECT t.id, t.user_id, t.name, t.group_name, t.target_group_id, t.rtt_link, t.stage_status, t.status,
                 t.start_date, t.end_date, t.prize_pool, t.category, t.tournament_type, t.gender,
-                t.age_group, t.system, t.match_format, t.participants_count, t.creator_role,
-                    COALESCE(g.name, t.group_name) AS "groupName"
+                t.age_group, t.system, t.match_format, t.participants_count,
+                COALESCE(u.role, 'admin') AS creator_role,
+                COALESCE(g.name, t.group_name) AS "groupName"
              FROM tournaments t
+             LEFT JOIN users u ON t.user_id = u.id
              LEFT JOIN groups g
                ON t.target_group_id IS NOT NULL
               AND t.target_group_id != ''
@@ -2245,7 +2247,14 @@ app.get('/api/rtt/tournament', async (req, res) => {
 
         let parsedUrl;
         try { parsedUrl = new URL(url); } catch { return res.status(400).json({ success: false, error: 'Некорректный URL' }); }
-        if (!['rttstat.ru', 'www.rttstat.ru'].includes(parsedUrl.hostname)) {
+        const allowedHosts = [
+            'rttstat.ru',
+            'www.rttstat.ru',
+            'rtt.mytennis.online',
+            'www.rtt.mytennis.online',
+            'apirtt.mytennis.online'
+        ];
+        if (!allowedHosts.includes(parsedUrl.hostname)) {
             return res.status(400).json({ success: false, error: 'Недопустимый домен' });
         }
 
@@ -2263,6 +2272,7 @@ app.get('/api/rtt/tournament', async (req, res) => {
 
 // Get tournaments list with filters
 app.get('/api/rtt/tournaments', async (req, res) => {
+    const httpTimeoutMs = Number(process.env.RTT_TOUR_LIST_HTTP_TIMEOUT_MS || 55000);
     const timeout = setTimeout(() => {
         if (!res.headersSent) {
             res.status(504).json({
@@ -2271,7 +2281,7 @@ app.get('/api/rtt/tournaments', async (req, res) => {
                 data: { tournaments: [], filters: {} }
             });
         }
-    }, 20000);
+    }, httpTimeoutMs);
 
     try {
         const { age, g, l1, l2, l3 } = req.query;
@@ -2288,6 +2298,21 @@ app.get('/api/rtt/tournaments', async (req, res) => {
                 data: { tournaments: [], filters: {} }
             });
         }
+    }
+});
+
+// Get RTT geo filter options (district/subject/city)
+app.get('/api/rtt/tournament-filters', async (req, res) => {
+    try {
+        const filters = await rttParser.getTournamentFilterOptions();
+        res.json({ success: true, data: filters });
+    } catch (err) {
+        console.error('❌ RTT Tournament Filters Error:', err.message);
+        res.status(500).json({
+            success: false,
+            error: 'Ошибка при получении фильтров РТТ',
+            data: { districts: [], subjects: [], cities: [] }
+        });
     }
 });
 
@@ -4186,8 +4211,14 @@ app.get('/api/partners', async (req, res) => {
             query += ` AND city = $${queryParams.length}`;
         }
         if (level && level !== 'all') {
-            queryParams.push(level);
-            query += ` AND level = $${queryParams.length}`;
+            const normalizedLevel = String(level).trim();
+            queryParams.push(normalizedLevel);
+            const levelParamIndex = queryParams.length;
+            query += ` AND (
+                level = $${levelParamIndex}
+                OR level ILIKE ('NTRP ' || $${levelParamIndex} || '%')
+                OR level ILIKE ($${levelParamIndex} || '%')
+            )`;
         }
         if (search) {
             queryParams.push(`%${search}%`);
@@ -4207,8 +4238,14 @@ app.get('/api/partners', async (req, res) => {
             ghostQuery += ` AND city = $${ghostParams.length}`;
         }
         if (level && level !== 'all') {
-            ghostParams.push(level);
-            ghostQuery += ` AND level = $${ghostParams.length}`;
+            const normalizedLevel = String(level).trim();
+            ghostParams.push(normalizedLevel);
+            const levelParamIndex = ghostParams.length;
+            ghostQuery += ` AND (
+                level = $${levelParamIndex}
+                OR level ILIKE ('NTRP ' || $${levelParamIndex} || '%')
+                OR level ILIKE ($${levelParamIndex} || '%')
+            )`;
         }
         if (search) {
             ghostParams.push(`%${search}%`);
@@ -6789,6 +6826,8 @@ server.listen(PORT, async () => {
         console.log('✅ Wearable activities table ready');
         await ensureTournamentDirectorTables();
         console.log('✅ Tournament director tables ready');
+        const mytennis = require('./rttMytennisClient');
+        mytennis.warmup().then(() => console.log('✅ RTT API session ready')).catch(() => {});
         setTimeout(() => {
             syncTrackedTournamentStages().catch(err => console.error('Initial RTT tournament sync failed:', err.message));
         }, 15000);
