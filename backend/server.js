@@ -179,15 +179,17 @@ const ensureDailyGhostCommunityPost = async () => {
             ? buildGhostDailyEmotionPost(ghost)
             : buildGhostDailyPartnerPost(ghost);
 
-        await pool.query(
+        const inserted = await pool.query(
             `INSERT INTO ghost_posts (ghost_user_id, type, content)
-             VALUES ($1, $2, $3::jsonb)`,
+             VALUES ($1, $2, $3::jsonb)
+             RETURNING id`,
             [ghost.id, postPayload.type, JSON.stringify(postPayload.content)]
         );
+        const ghostPostId = inserted.rows[0]?.id;
 
         await logSystemEvent(
             'info',
-            `Создан ежедневный ghost-пост: ${ghost.name} (${postPayload.type})`,
+            `Создан ежедневный ghost-пост #${ghostPostId}: ${ghost.name} (${postPayload.type})`,
             'Community'
         );
     } catch (error) {
@@ -802,9 +804,24 @@ const getActivityDeleteTargetFromLogMessage = (message = '') => {
         return { type: 'post_comment', commentId: Number(matched[1]), postId: Number(matched[2]) };
     }
 
+    matched = raw.match(/added ghost comment (\d+) to ghost post (\d+)/i);
+    if (matched) {
+        return { type: 'ghost_post_comment', commentId: Number(matched[1]), postId: Number(matched[2]) };
+    }
+
     matched = raw.match(/created post (\d+)/i);
     if (matched) {
         return { type: 'post', postId: Number(matched[1]) };
+    }
+
+    matched = raw.match(/created ghost post (\d+)/i);
+    if (matched) {
+        return { type: 'ghost_post', postId: Number(matched[1]) };
+    }
+
+    matched = raw.match(/ghost-пост.*#(\d+)/i);
+    if (matched) {
+        return { type: 'ghost_post', postId: Number(matched[1]) };
     }
 
     matched = raw.match(/deleted post (\d+)/i);
@@ -819,6 +836,8 @@ const getActivityDeleteLabel = (target) => {
     if (!target) return '';
     if (target.type === 'post_comment') return `Комментарий #${target.commentId}`;
     if (target.type === 'post') return `Пост #${target.postId}`;
+    if (target.type === 'ghost_post_comment') return `Ghost-комментарий #${target.commentId}`;
+    if (target.type === 'ghost_post') return `Ghost-пост #${target.postId}`;
     return 'Активность пользователя';
 };
 
@@ -830,11 +849,23 @@ const deleteActivityByLogTarget = async (client, target) => {
         return { deleted: result.rows.length > 0, type: 'post_comment', id: target.commentId };
     }
 
+    if (target.type === 'ghost_post_comment' && Number.isFinite(target.commentId)) {
+        const result = await client.query('DELETE FROM ghost_post_comments WHERE id = $1 RETURNING id', [target.commentId]);
+        return { deleted: result.rows.length > 0, type: 'ghost_post_comment', id: target.commentId };
+    }
+
     if (target.type === 'post' && Number.isFinite(target.postId)) {
         await client.query('DELETE FROM post_likes WHERE post_id = $1', [target.postId]);
         await client.query('DELETE FROM post_comments WHERE post_id = $1', [target.postId]);
         const result = await client.query('DELETE FROM posts WHERE id = $1 RETURNING id', [target.postId]);
         return { deleted: result.rows.length > 0, type: 'post', id: target.postId };
+    }
+
+    if (target.type === 'ghost_post' && Number.isFinite(target.postId)) {
+        await client.query('DELETE FROM ghost_post_likes WHERE ghost_post_id = $1', [target.postId]);
+        await client.query('DELETE FROM ghost_post_comments WHERE ghost_post_id = $1', [target.postId]);
+        const result = await client.query('DELETE FROM ghost_posts WHERE id = $1 RETURNING id', [target.postId]);
+        return { deleted: result.rows.length > 0, type: 'ghost_post', id: target.postId };
     }
 
     return { deleted: false, reason: 'unsupported' };
