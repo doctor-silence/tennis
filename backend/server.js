@@ -7075,6 +7075,122 @@ app.get('/api/admin/news', requireAdmin, async (req, res) => {
     }
 });
 
+// --- TENNIIX PRO RENTAL BOOKINGS ---
+
+const TENNIIX_RENTAL_CITY = 'Новосибирск';
+const TENNIIX_BOOKING_STATUSES = ['new', 'contacted', 'confirmed', 'cancelled'];
+
+const ensureTenniixRentalBookingsTable = async () => {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS tenniix_rental_bookings (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(200) NOT NULL,
+            phone VARCHAR(80) NOT NULL,
+            city VARCHAR(120) NOT NULL DEFAULT '${TENNIIX_RENTAL_CITY}',
+            club VARCHAR(300) NOT NULL,
+            preferred_date VARCHAR(120),
+            plan VARCHAR(120) NOT NULL,
+            comment TEXT,
+            status VARCHAR(30) NOT NULL DEFAULT 'new',
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    `);
+};
+
+const mapTenniixBookingRow = (row) => ({
+    id: row.id.toString(),
+    name: row.name,
+    phone: row.phone,
+    city: row.city,
+    club: row.club,
+    preferred_date: row.preferred_date || null,
+    plan: row.plan,
+    comment: row.comment || null,
+    status: row.status,
+    created_at: row.created_at,
+});
+
+app.post('/api/tenniix-rental/bookings', async (req, res) => {
+    const name = String(req.body?.name || '').trim();
+    const phone = String(req.body?.phone || '').trim();
+    const club = String(req.body?.club || '').trim();
+    const preferredDate = String(req.body?.preferred_date || req.body?.date || '').trim() || null;
+    const plan = String(req.body?.plan || '').trim();
+    const comment = String(req.body?.comment || '').trim() || null;
+
+    if (!name || name.length < 2) {
+        return res.status(400).json({ error: 'Укажите имя' });
+    }
+    if (!phone || phone.length < 6) {
+        return res.status(400).json({ error: 'Укажите телефон' });
+    }
+    if (!club || club.length < 2) {
+        return res.status(400).json({ error: 'Укажите клуб' });
+    }
+    if (!plan) {
+        return res.status(400).json({ error: 'Выберите тариф' });
+    }
+
+    try {
+        const result = await pool.query(
+            `INSERT INTO tenniix_rental_bookings (name, phone, city, club, preferred_date, plan, comment, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 'new')
+             RETURNING *`,
+            [name.slice(0, 200), phone.slice(0, 80), TENNIIX_RENTAL_CITY, club.slice(0, 300), preferredDate, plan.slice(0, 120), comment]
+        );
+        await logSystemEvent('info', `Новая заявка на аренду Tenniix Pro: ${name}, ${club}`, 'tenniix_rental');
+        res.status(201).json(mapTenniixBookingRow(result.rows[0]));
+    } catch (err) {
+        console.error('Create Tenniix booking error:', err);
+        res.status(500).json({ error: 'Не удалось отправить заявку' });
+    }
+});
+
+app.get('/api/admin/tenniix-rental-bookings', requireAdmin, async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT * FROM tenniix_rental_bookings ORDER BY created_at DESC`
+        );
+        res.json(result.rows.map(mapTenniixBookingRow));
+    } catch (err) {
+        console.error('Get Tenniix bookings error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.patch('/api/admin/tenniix-rental-bookings/:id', requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    const status = String(req.body?.status || '').trim();
+    if (!TENNIIX_BOOKING_STATUSES.includes(status)) {
+        return res.status(400).json({ error: 'Некорректный статус' });
+    }
+    try {
+        const result = await pool.query(
+            `UPDATE tenniix_rental_bookings SET status = $1 WHERE id = $2 RETURNING *`,
+            [status, id]
+        );
+        if (!result.rows.length) return res.status(404).json({ error: 'Заявка не найдена' });
+        await logAdminAction(req, 'info', 'обновил статус', 'заявку Tenniix', result.rows[0].name, `Статус: ${status}`);
+        res.json(mapTenniixBookingRow(result.rows[0]));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/admin/tenniix-rental-bookings/:id', requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const existing = await pool.query('SELECT name FROM tenniix_rental_bookings WHERE id = $1', [id]);
+        await pool.query('DELETE FROM tenniix_rental_bookings WHERE id = $1', [id]);
+        if (existing.rows.length) {
+            await logAdminAction(req, 'warning', 'удалил', 'заявку Tenniix', existing.rows[0].name, `ID: ${id}`);
+        }
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 // Start Server and Init DB
 server.listen(PORT, async () => {
@@ -7084,6 +7200,8 @@ server.listen(PORT, async () => {
         console.log('✅ System logs table ready');
         await ensureNewsTable();
         console.log('✅ News table ready');
+        await ensureTenniixRentalBookingsTable();
+        console.log('✅ Tenniix rental bookings table ready');
         await ensureGhostCommunityTables();
         console.log('✅ Ghost community tables ready');
         setTimeout(() => {

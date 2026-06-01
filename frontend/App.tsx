@@ -6,6 +6,7 @@ import Shop from './components/Shop';
 import AdminPanel from './components/AdminPanel';
 import SupportChatWidget from './components/SupportChatWidget'; // Import the new component
 import TrainerCRMPage from './components/TrainerCRMPage';
+import TenniixRentalPage from './components/TenniixRentalPage';
 import Tooltip from './components/Tooltip';
 import { api } from './services/api';
 import { normalizeEmail, validateEmailAddress } from './utils/emailValidation';
@@ -43,7 +44,8 @@ import {
   Target,
   TrendingUp,
   FileText,
-  Plus
+  Plus,
+  Sparkles,
 } from 'lucide-react';
 
 const IMPERSONATION_ADMIN_STORAGE_KEY = 'impersonationAdminUser';
@@ -142,6 +144,12 @@ const SEO_BY_VIEW: Partial<Record<ViewState, SeoConfig>> = {
     description: 'Купить теннисные ракетки, кроссовки, мячи и аксессуары с доставкой по России. Подбор экипировки для тренировок и матчей.',
     canonicalPath: '/shop/',
   },
+  'tenniix-rental': {
+    title: 'Аренда теннисной пушки Tenniix Pro — НаКорте',
+    description: 'Аренда умной теннисной пушки Tenniix Pro: AI-робот с vision-трекингом, голосовым управлением, скоростью до 120 км/ч и тысячами тренировочных программ.',
+    canonicalPath: '/tenniix-rental/',
+    keywords: 'аренда теннисной пушки, Tenniix Pro, теннисный робот, умная пушка, ball machine аренда',
+  },
 };
 
 const ensureMetaTag = (attributeName: 'name' | 'property', attributeValue: string) => {
@@ -190,7 +198,7 @@ const App = () => {
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(true); // Add loading state
 
-  const validPaths = ['/', '/crm/', '/crm', '/trainer-crm/', '/trainer-crm', '/tournament-director/', '/tournament-director', '/rtt/', '/rtt', '/news/', '/news', '/privacy/', '/privacy', '/pro/', '/pro', '/shop/', '/shop', '/terms/', '/terms', '/find-partner/', '/find-partner', '/find-courts/', '/find-courts', '/ai-coach/', '/ai-coach', '/amateur-tournaments/', '/amateur-tournaments', '/community/', '/community', '/3d-tactics/', '/3d-tactics', '/tennis-diary/', '/tennis-diary'];
+  const validPaths = ['/', '/crm/', '/crm', '/trainer-crm/', '/trainer-crm', '/tournament-director/', '/tournament-director', '/rtt/', '/rtt', '/news/', '/news', '/privacy/', '/privacy', '/pro/', '/pro', '/shop/', '/shop', '/terms/', '/terms', '/find-partner/', '/find-partner', '/find-courts/', '/find-courts', '/ai-coach/', '/ai-coach', '/amateur-tournaments/', '/amateur-tournaments', '/community/', '/community', '/3d-tactics/', '/3d-tactics', '/tennis-diary/', '/tennis-diary', '/tenniix-rental/', '/tenniix-rental'];
 
   const getPublicRouteState = (pathname: string, search: string) => {
     const isValid = validPaths.some((path) => pathname === path || pathname.startsWith(path + '/'));
@@ -225,6 +233,10 @@ const App = () => {
 
     if (pathname.startsWith('/tennis-diary')) {
       return { isNotFound: false, nextView: 'tennis-diary-info' as ViewState, nextAuthMode: 'login' as const };
+    }
+
+    if (pathname.startsWith('/tenniix-rental')) {
+      return { isNotFound: false, nextView: 'tenniix-rental' as ViewState, nextAuthMode: 'login' as const };
     }
 
     if (pathname.startsWith('/trainer-crm') || pathname.startsWith('/crm')) {
@@ -305,6 +317,8 @@ const App = () => {
         return '/3d-tactics/';
       case 'tennis-diary-info':
         return '/tennis-diary/';
+      case 'tenniix-rental':
+        return '/tenniix-rental/';
       case 'auth':
         return mode === 'register' ? '/?auth=register' : '/?auth=login';
       default:
@@ -586,6 +600,18 @@ const App = () => {
       {view === 'tennis-diary-info' && (
           <TennisDiaryInfoPage onBack={() => handleNavigate('landing')} onRegister={() => handleAuthNavigate('register')} />
       )}
+
+      {view === 'tenniix-rental' && (
+          <>
+            <PublicHeader
+              onLogin={() => handleAuthNavigate('login')}
+              onRegister={() => handleAuthNavigate('register')}
+              onNavigate={handleNavigate}
+              transparent
+            />
+            <TenniixRentalPage onRegister={() => handleAuthNavigate('register')} />
+          </>
+      )}
     </div>
   );
 };
@@ -612,6 +638,9 @@ const PublicHeader = ({ onLogin, onRegister, onNavigate, transparent = false }: 
         </a>
         <a href="/shop/" className={`hover:text-lime-500 transition-colors flex items-center gap-1 ${transparent ? 'hover:text-white' : ''}`}>
            Магазин
+        </a>
+        <a href="/tenniix-rental/" className={`hover:text-lime-500 transition-colors flex items-center gap-1 ${transparent ? 'hover:text-white' : ''}`}>
+           Аренда пушки
         </a>
         <a href="/pro/" className={`hover:text-lime-500 transition-colors flex items-center gap-1 ${transparent ? 'hover:text-white' : ''}`}>
            PRO <Crown size={14} className="mb-1 text-amber-400"/>
@@ -1600,7 +1629,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
           </div>
 
           <div className="mt-5">
-            <div ref={bindFeatureReveal('feature-diary')} data-reveal-id="feature-diary" style={getFeatureRevealStyle('feature-diary', 'right')} className="bg-gradient-to-br from-lime-400 to-emerald-500 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-2xl hover:shadow-lime-400/30 transition-all duration-500">
+            <div ref={bindFeatureReveal('feature-diary')} data-reveal-id="feature-diary" style={getFeatureRevealStyle('feature-diary', 'up')} className="bg-gradient-to-br from-lime-400 to-emerald-500 rounded-[2rem] p-10 relative overflow-hidden group hover:-translate-y-1 hover:shadow-2xl hover:shadow-lime-400/30 transition-all duration-500">
               <div className="absolute -top-20 -right-20 w-80 h-80 bg-white/10 rounded-full blur-[100px] group-hover:bg-white/20 transition-all duration-700 z-0"></div>
               <div className="absolute -bottom-16 -left-16 w-64 h-64 bg-emerald-700/20 rounded-full blur-[80px] z-0"></div>
               <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
@@ -1710,6 +1739,7 @@ const LandingPage = ({ onLoginClick, onRegisterClick, onNavigate }: { onLoginCli
              <div>
                <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Возможности</h3>
                <ul className="space-y-2.5 text-sm">
+                 <li><a href="/tenniix-rental/" className="hover:text-lime-400 transition-colors text-left">Аренда пушки Tenniix Pro</a></li>
                  <li><a href="/find-partner/" className="hover:text-lime-400 transition-colors text-left">Поиск партнёра по теннису</a></li>
                  <li><a href="/find-courts/" className="hover:text-lime-400 transition-colors text-left">Бронирование теннисных кортов</a></li>
                  <li><a href="/ai-coach/" className="hover:text-lime-400 transition-colors text-left">AI-тренер по теннису</a></li>

@@ -1,4 +1,4 @@
-export type ViewState = 'landing' | 'auth' | 'dashboard' | 'pro' | 'shop' | 'admin' | 'news' | 'privacy' | 'terms' | 'rtt-info' | 'crm-info' | 'partner-search' | 'find-partner' | 'find-courts' | 'ai-coach-info' | 'amateur-tournaments' | 'community-info' | 'tactics-3d-info' | 'tennis-diary-info' | 'tournament-director-info';
+export type ViewState = 'landing' | 'auth' | 'dashboard' | 'pro' | 'shop' | 'admin' | 'news' | 'privacy' | 'terms' | 'rtt-info' | 'crm-info' | 'partner-search' | 'find-partner' | 'find-courts' | 'ai-coach-info' | 'amateur-tournaments' | 'community-info' | 'tactics-3d-info' | 'tennis-diary-info' | 'tournament-director-info' | 'tenniix-rental';
 export type DashboardTab = 'profile' | 'search' | 'courts' | 'ai_coach' | 'messages' | 'notifications' | 'tactics' | 'students' | 'tournaments' | 'tournament_organization' | 'video_analysis' | 'ladder' | 'community' | 'my_applications' | 'rtt_stats' | 'diary';
 
 export interface User {
@@ -478,4 +478,19 @@ export interface NewsArticle {
   published_at: string;
   is_published: boolean;
   views?: number;
+}
+
+export type TenniixRentalBookingStatus = 'new' | 'contacted' | 'confirmed' | 'cancelled';
+
+export interface TenniixRentalBooking {
+  id: string;
+  name: string;
+  phone: string;
+  city: string;
+  club: string;
+  preferred_date: string | null;
+  plan: string;
+  comment: string | null;
+  status: TenniixRentalBookingStatus;
+  created_at: string;
 }

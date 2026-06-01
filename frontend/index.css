@@ -30,6 +30,34 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; }
 	animation: diaryShimmer 6s linear infinite;
 }
 
+@keyframes tenniixKenBurns {
+	0% { transform: scale(1.08) translate(0, 0); }
+	100% { transform: scale(1.14) translate(-1.5%, -1%); }
+}
+
+@keyframes tenniixBallDrift {
+	0% { transform: translate(0, 0) rotate(0deg); opacity: 0.35; }
+	50% { opacity: 0.7; }
+	100% { transform: translate(24px, -48px) rotate(180deg); opacity: 0.2; }
+}
+
+@keyframes tenniixGlowPulse {
+	0%, 100% { opacity: 0.4; transform: scale(1); }
+	50% { opacity: 0.75; transform: scale(1.05); }
+}
+
+.animate-tenniix-ken-burns {
+	animation: tenniixKenBurns 22s ease-in-out infinite alternate;
+}
+
+.animate-tenniix-ball-drift {
+	animation: tenniixBallDrift 8s ease-in-out infinite;
+}
+
+.animate-tenniix-glow-pulse {
+	animation: tenniixGlowPulse 5s ease-in-out infinite;
+}
+
 .admin-theme-dark {
 	color: #e2e8f0;
 	background: #020617;

@@ -34,10 +34,12 @@ import {
     Send,
     Megaphone,
     Moon,
-    Sun
+    Sun,
+    Calendar
 } from 'lucide-react';
 import AdminTournamentsView from './dashboard/AdminTournamentsView';
 import AdminSupportChat from './dashboard/AdminSupportChat';
+import AdminTenniixBookingsView from './dashboard/AdminTenniixBookingsView';
 import Button from './Button';
 import { User, Product, SystemLog, Court, Group, Tournament, NewsArticle } from '../types';
 import { api } from '../services/api';
@@ -88,7 +90,7 @@ const CITIES = [
 const ADMIN_THEME_STORAGE_KEY = 'adminTheme';
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout, onImpersonateUser }) => {
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups' | 'tournaments' | 'support' | 'news' | 'health'>('support');
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups' | 'tournaments' | 'support' | 'news' | 'bookings' | 'health'>('support');
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [adminTheme, setAdminTheme] = useState<'light' | 'dark'>(() => {
         try {
@@ -981,7 +983,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout, onImpersonateUs
         setShowConfirmDeleteModal(true);
     };
 
-    const setActiveAdminTab = (tab: 'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups' | 'tournaments' | 'support' | 'news' | 'health') => {
+    const setActiveAdminTab = (tab: 'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups' | 'tournaments' | 'support' | 'news' | 'bookings' | 'health') => {
         setActiveTab(tab);
         setIsMobileSidebarOpen(false);
     };
@@ -1031,6 +1033,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout, onImpersonateUs
                     <SidebarLink icon={<Shield size={20}/>} label="Группы" active={activeTab === 'groups'} onClick={() => setActiveAdminTab('groups')} />
                     <SidebarLink icon={<Trophy size={20}/>} label="Турниры" active={activeTab === 'tournaments'} onClick={() => setActiveAdminTab('tournaments')} />
                     <SidebarLink icon={<MessageSquare size={20}/>} label="Поддержка" active={activeTab === 'support'} onClick={() => setActiveAdminTab('support')} />
+                    <SidebarLink icon={<Calendar size={20}/>} label="Бронирование" active={activeTab === 'bookings'} onClick={() => setActiveAdminTab('bookings')} />
                     <SidebarLink icon={<Newspaper size={20}/>} label="Новости" active={activeTab === 'news'} onClick={() => setActiveAdminTab('news')} />
                     <SidebarLink icon={<Map size={20}/>} label="Корты" active={activeTab === 'courts'} onClick={() => setActiveAdminTab('courts')} />
                     <SidebarLink icon={<ShoppingBag size={20}/>} label="Магазин" active={activeTab === 'shop'} onClick={() => setActiveAdminTab('shop')} />
@@ -1065,6 +1068,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout, onImpersonateUs
                         {activeTab === 'groups' && 'Управление группами'}
                         {activeTab === 'tournaments' && 'Управление турнирами'}
                         {activeTab === 'support' && 'Чат с пользователями'}
+                        {activeTab === 'bookings' && 'Аренда Tenniix Pro'}
                         {activeTab === 'shop' && 'Управление товарами'}
                         {activeTab === 'courts' && 'Управление кортами'}
                         {activeTab === 'logs' && 'Системный мониторинг'}
@@ -1248,6 +1252,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout, onImpersonateUs
 
                     {activeTab === 'support' && (
                         <AdminSupportChat user={user} isDarkTheme={isDarkTheme} />
+                    )}
+
+                    {activeTab === 'bookings' && (
+                        <AdminTenniixBookingsView
+                            isDarkTheme={isDarkTheme}
+                            panelCardClass={panelCardClass}
+                            panelHeaderDividerClass={panelHeaderDividerClass}
+                            panelRowClass={panelRowClass}
+                            panelMutedTextClass={panelMutedTextClass}
+                            panelHeadingClass={panelHeadingClass}
+                            onToast={toast}
+                        />
                     )}
 
                     {activeTab === 'health' && (() => {

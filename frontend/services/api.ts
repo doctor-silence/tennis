@@ -1,8 +1,8 @@
-import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Match, Product, PlayerProfile, Trajectory, Conversation, ChatMessage, MarketplaceItem, CrmStats, Skill, Lesson, Tournament, Group, NewsArticle, PlayerProgressProfile, WearableConnection, WearableProvider, WearableActivitiesResponse, WearableActivity, SamsungBridgeSetup, TournamentRegulationFile } from '../types';
+import { Partner, Court, User, Student, SystemLog, LadderPlayer, Challenge, Match, Product, PlayerProfile, Trajectory, Conversation, ChatMessage, MarketplaceItem, CrmStats, Skill, Lesson, Tournament, Group, NewsArticle, TenniixRentalBooking, TenniixRentalBookingStatus, PlayerProgressProfile, WearableConnection, WearableProvider, WearableActivitiesResponse, WearableActivity, SamsungBridgeSetup, TournamentRegulationFile } from '../types';
 import * as THREE from 'three'; // Import THREE for Vector3 deserialization
 
 // Frontend API Service
-export const API_URL = import.meta.env.DEV ? 'http://localhost:3001/api' : 'https://onthecourt.ru/api';
+export const API_URL = import.meta.env.DEV ? '/api' : 'https://onthecourt.ru/api';
 
 // --- MOCK DATA FALLBACKS (For Demo/Offline Mode) ---
 
@@ -1713,7 +1713,37 @@ export const api = {
                 console.error(e);
                 throw e;
             }
-        }
+        },
+        getTenniixBookings: async (): Promise<TenniixRentalBooking[]> => {
+            const res = await fetch(`${API_URL}/admin/tenniix-rental-bookings`, { headers: api.admin._headers() });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: res.statusText }));
+                throw new Error(err.error || 'Failed to fetch Tenniix bookings');
+            }
+            return await res.json();
+        },
+        updateTenniixBookingStatus: async (id: string, status: TenniixRentalBookingStatus): Promise<TenniixRentalBooking> => {
+            const res = await fetch(`${API_URL}/admin/tenniix-rental-bookings/${id}`, {
+                method: 'PATCH',
+                headers: api.admin._headers(),
+                body: JSON.stringify({ status }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: res.statusText }));
+                throw new Error(err.error || 'Failed to update booking');
+            }
+            return await res.json();
+        },
+        deleteTenniixBooking: async (id: string): Promise<void> => {
+            const res = await fetch(`${API_URL}/admin/tenniix-rental-bookings/${id}`, {
+                method: 'DELETE',
+                headers: api.admin._headers(),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: res.statusText }));
+                throw new Error(err.error || 'Failed to delete booking');
+            }
+        },
     },
 
     news: {
@@ -1771,7 +1801,36 @@ export const api = {
                 throw new Error(err.error || 'Failed to fetch all news');
             }
             return await res.json();
-        }
+        },
+    },
+
+    tenniixRental: {
+        submitBooking: async (data: {
+            name: string;
+            phone: string;
+            club: string;
+            preferred_date?: string;
+            plan: string;
+            comment?: string;
+        }): Promise<TenniixRentalBooking> => {
+            let res: Response;
+            try {
+                res = await fetch(`${API_URL}/tenniix-rental/bookings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                });
+            } catch {
+                throw new Error(
+                    'Сервер недоступен. Запустите backend: cd backend && npm run dev (порт 3001), затем обновите страницу.'
+                );
+            }
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(json.error || 'Не удалось отправить заявку');
+            }
+            return json;
+        },
     },
 
     ladder: {
