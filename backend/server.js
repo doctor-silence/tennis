@@ -53,7 +53,6 @@ app.use('/api', apiLimiter);
 // Constants
 const SUPPORT_ADMIN_ID = 1;
 const TOURNAMENT_STAGE_SYNC_INTERVAL_MS = Number(process.env.TOURNAMENT_STAGE_SYNC_INTERVAL_MS || 30 * 60 * 1000);
-const GHOST_DAILY_POST_CHECK_INTERVAL_MS = Number(process.env.GHOST_DAILY_POST_CHECK_INTERVAL_MS || 60 * 60 * 1000);
 
 // Initialize DeepSeek AI
 if (!process.env.DEEPSEEK_API_KEY) {
@@ -83,118 +82,6 @@ const isGhostIdentifier = (value) => /^ghost_\d+$/.test(String(value || ''));
 const extractGhostNumericId = (value) => {
     const matched = String(value || '').match(/^ghost_(\d+)$/);
     return matched ? Number(matched[1]) : null;
-};
-
-const pickRandom = (items = []) => items[Math.floor(Math.random() * items.length)];
-
-const GHOST_MALE_EMOTION_TEMPLATES = [
-    'Сегодня сыграл плотный матч и поймал хороший ритм на задней линии. Чувствую прогресс.',
-    'Матч получился нервным, но полезным: понял, над чем работать в решающие розыгрыши.',
-    'После сегодняшнего матча остался с отличными эмоциями — подача наконец-то начала стабильно заходить.',
-    'Проиграл, но доволен качеством борьбы. Беру с собой много полезных выводов на тренировки.',
-    'Тяжелый матч, но именно такие игры дают сильный рост. Продолжаем работать.'
-];
-
-const GHOST_FEMALE_EMOTION_TEMPLATES = [
-    'Сегодня сыграла плотный матч и поймала хороший ритм на задней линии. Чувствую прогресс.',
-    'Матч получился нервным, но полезным: поняла, над чем работать в решающие розыгрыши.',
-    'После сегодняшнего матча осталась с отличными эмоциями — подача наконец-то начала стабильно заходить.',
-    'Проиграла, но довольна качеством борьбы. Беру с собой много полезных выводов на тренировки.',
-    'Тяжелый матч, но именно такие игры дают сильный рост. Продолжаем работать.'
-];
-
-const GHOST_TRAINING_INVITES = [
-    { when: 'сегодня вечером', place: 'на открытом корте', ntrp: '3.0-4.0' },
-    { when: 'завтра утром', place: 'в зале', ntrp: '2.5-3.5' },
-    { when: 'в ближайшие выходные', place: 'на харде', ntrp: '3.5-4.5' },
-    { when: 'в будний день после 19:00', place: 'на любом удобном корте', ntrp: 'любой' }
-];
-
-const GHOST_FEMALE_FIRST_NAMES = new Set([
-    'Анна', 'Марина', 'Оксана', 'Екатерина', 'Анастасия', 'Ольга', 'Наталья', 'Дарья', 'Ирина', 'Юлия', 'Виктория', 'Ксения'
-]);
-
-const getGhostGenderByName = (fullName = '') => {
-    const firstName = String(fullName || '').trim().split(/\s+/)[0];
-    if (!firstName) return 'male';
-    if (GHOST_FEMALE_FIRST_NAMES.has(firstName)) return 'female';
-    return /[ая]$/.test(firstName) ? 'female' : 'male';
-};
-
-const buildGhostDailyPartnerPost = (ghost) => {
-    const invite = pickRandom(GHOST_TRAINING_INVITES);
-    return {
-        type: 'partner_search',
-        content: {
-            details: {
-                when: invite.when,
-                where: ghost.city ? `${ghost.city}, ${invite.place}` : invite.place,
-                text: 'Кто хочет потренироваться или сыграть тренировочный матч в комфортном темпе?',
-                requirement: `Уровень ${invite.ntrp}`,
-                ntrp: invite.ntrp
-            },
-            daily_auto: true
-        }
-    };
-};
-
-const buildGhostDailyEmotionPost = (ghost) => {
-    const gender = getGhostGenderByName(ghost?.name || '');
-    const templates = gender === 'female' ? GHOST_FEMALE_EMOTION_TEMPLATES : GHOST_MALE_EMOTION_TEMPLATES;
-    return {
-        type: 'text_post',
-        content: {
-            text: pickRandom(templates),
-            daily_auto: true
-        }
-    };
-};
-
-const ensureDailyGhostCommunityPost = async () => {
-    try {
-        const alreadyToday = await pool.query(
-            `SELECT id
-             FROM ghost_posts
-             WHERE (content ->> 'daily_auto') = 'true'
-               AND created_at::date = CURRENT_DATE
-             LIMIT 1`
-        );
-
-        if (alreadyToday.rows.length > 0) {
-            return;
-        }
-
-        const ghostResult = await pool.query(
-            `SELECT id, name, city, level
-             FROM ghost_users
-             ORDER BY random()
-             LIMIT 1`
-        );
-        const ghost = ghostResult.rows[0];
-        if (!ghost) {
-            return;
-        }
-
-        const postPayload = Math.random() < 0.5
-            ? buildGhostDailyEmotionPost(ghost)
-            : buildGhostDailyPartnerPost(ghost);
-
-        const inserted = await pool.query(
-            `INSERT INTO ghost_posts (ghost_user_id, type, content)
-             VALUES ($1, $2, $3::jsonb)
-             RETURNING id`,
-            [ghost.id, postPayload.type, JSON.stringify(postPayload.content)]
-        );
-        const ghostPostId = inserted.rows[0]?.id;
-
-        await logSystemEvent(
-            'info',
-            `Создан ежедневный ghost-пост #${ghostPostId}: ${ghost.name} (${postPayload.type})`,
-            'Community'
-        );
-    } catch (error) {
-        console.error('Ghost daily post scheduler error:', error.message);
-    }
 };
 
 const ensureGhostCommunityTables = async () => {
@@ -7204,12 +7091,6 @@ server.listen(PORT, async () => {
         console.log('✅ Tenniix rental bookings table ready');
         await ensureGhostCommunityTables();
         console.log('✅ Ghost community tables ready');
-        setTimeout(() => {
-            ensureDailyGhostCommunityPost().catch((err) => console.error('Initial ghost daily post failed:', err.message));
-        }, 8000);
-        setInterval(() => {
-            ensureDailyGhostCommunityPost().catch((err) => console.error('Scheduled ghost daily post failed:', err.message));
-        }, GHOST_DAILY_POST_CHECK_INTERVAL_MS);
         await ensurePlayerProgressTable();
         console.log('✅ Player progress table ready');
         await ensureWearableConnectionsTable();
