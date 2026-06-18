@@ -133,9 +133,6 @@ const TrainerCRMPage = ({
             <img src="/assets/logo.svg" alt="НаКорте" className="h-14 w-auto group-hover:opacity-90 transition-opacity" />
           </div>
           <nav className="hidden md:flex items-center gap-8 text-sm font-bold uppercase tracking-wider text-slate-300">
-            <a href="/news/" className="hover:text-white transition-colors">
-              Новости
-            </a>
             <a href="/shop/" className="hover:text-white transition-colors">
               Магазин
             </a>

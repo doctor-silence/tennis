@@ -5,7 +5,6 @@ const STATIC_ASSETS = [
   '/favicon.svg',
   '/favicon.ico',
   '/manifest.json',
-  '/news/',
   '/pro/',
 ];
 

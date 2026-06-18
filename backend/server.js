@@ -6849,119 +6849,6 @@ app.get('/api/groups/:groupId/members', async (req, res) => {
     }
 });
 
-// --- NEWS ROUTES ---
-
-// Ensure news table exists (safety net if initDb was skipped or failed)
-const ensureNewsTable = async () => {
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS news (
-            id SERIAL PRIMARY KEY,
-            title VARCHAR(500) NOT NULL,
-            summary TEXT NOT NULL DEFAULT '',
-            content TEXT NOT NULL DEFAULT '',
-            image TEXT DEFAULT '',
-            author VARCHAR(200) DEFAULT 'Редакция',
-            category VARCHAR(50) DEFAULT 'general',
-            is_published BOOLEAN DEFAULT TRUE,
-            views INTEGER DEFAULT 0,
-            published_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        )
-    `);
-    await pool.query(`ALTER TABLE news ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0`);
-};
-// ensureNewsTable вызывается внутри server.listen (см. ниже)
-
-// Public: Get all published news
-app.get('/api/news', async (req, res) => {
-    try {
-        const result = await pool.query(
-            `SELECT id, title, summary, content, image, author, category, published_at, is_published, views
-             FROM news WHERE is_published = true ORDER BY published_at DESC`
-        );
-        res.json(result.rows.map(r => ({ ...r, id: r.id.toString() })));
-    } catch (err) {
-        console.error("Get News Error:", err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Public: Get one news article
-app.get('/api/news/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        const result = await pool.query('SELECT * FROM news WHERE id = $1', [id]);
-        if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
-        // Increment views
-        await pool.query('UPDATE news SET views = views + 1 WHERE id = $1', [id]);
-        res.json({ ...result.rows[0], id: result.rows[0].id.toString() });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Public: Create news article
-app.post('/api/news', requireAdmin, async (req, res) => {
-    const { title, summary, content, image, author, category, is_published, views } = req.body;
-    try {
-        const result = await pool.query(
-            `INSERT INTO news (title, summary, content, image, author, category, is_published, views, published_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-             RETURNING *`,
-            [title, summary, content, image || '', author || 'Редакция', category || 'general', is_published ?? true, views ?? 0]
-        );
-        await logAdminAction(req, 'info', 'создал', 'новость', title, category ? `Категория: ${category}` : '');
-        res.json({ ...result.rows[0], id: result.rows[0].id.toString() });
-    } catch (err) {
-        console.error("Create News Error:", err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Public: Update news article
-app.put('/api/news/:id', requireAdmin, async (req, res) => {
-    const { id } = req.params;
-    const { title, summary, content, image, author, category, is_published, views } = req.body;
-    try {
-        const result = await pool.query(
-            `UPDATE news SET title=$1, summary=$2, content=$3, image=$4, author=$5, category=$6, is_published=$7, views=$8
-             WHERE id=$9 RETURNING *`,
-            [title, summary, content, image, author, category, is_published, views ?? 0, id]
-        );
-        if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
-        await logAdminAction(req, 'info', 'обновил', 'новость', title || `#${id}`, `ID: ${id}`);
-        res.json({ ...result.rows[0], id: result.rows[0].id.toString() });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Public: Delete news article
-app.delete('/api/news/:id', requireAdmin, async (req, res) => {
-    const { id } = req.params;
-    try {
-        const newsResult = await pool.query('SELECT title FROM news WHERE id = $1', [id]);
-        await pool.query('DELETE FROM news WHERE id = $1', [id]);
-        await logAdminAction(req, 'warning', 'удалил', 'новость', newsResult.rows[0]?.title || `#${id}`, `ID: ${id}`);
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Admin: Get ALL news (including drafts)
-app.get('/api/admin/news', requireAdmin, async (req, res) => {
-    try {
-        const result = await pool.query(
-            `SELECT id, title, summary, content, image, author, category, published_at, is_published, views
-             FROM news ORDER BY published_at DESC`
-        );
-        res.json(result.rows.map(r => ({ ...r, id: r.id.toString() })));
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
 // --- TENNIIX PRO RENTAL BOOKINGS ---
 
 const TENNIIX_RENTAL_CITY = 'Новосибирск';
@@ -7085,8 +6972,6 @@ server.listen(PORT, async () => {
     try {
         await ensureSystemLogsTable();
         console.log('✅ System logs table ready');
-        await ensureNewsTable();
-        console.log('✅ News table ready');
         await ensureTenniixRentalBookingsTable();
         console.log('✅ Tenniix rental bookings table ready');
         await ensureGhostCommunityTables();

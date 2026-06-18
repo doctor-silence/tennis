@@ -538,25 +538,6 @@ const initDb = async () => {
     `);
     console.log('✅ Table "tournament_applications" checked.');
 
-    // 17. Create News Table
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS news (
-        id SERIAL PRIMARY KEY,
-        title VARCHAR(500) NOT NULL,
-        summary TEXT NOT NULL,
-        content TEXT NOT NULL,
-        image TEXT DEFAULT '',
-        author VARCHAR(200) DEFAULT 'Редакция',
-        category VARCHAR(50) DEFAULT 'general',
-        is_published BOOLEAN DEFAULT TRUE,
-        views INTEGER DEFAULT 0,
-        published_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    await client.query(`ALTER TABLE news ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0;`);
-    console.log('✅ Table "news" checked.');
-
     // --- SEED DATA ---
     
     // Seed Default User (Coach) if none exist

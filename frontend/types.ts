@@ -1,4 +1,4 @@
-export type ViewState = 'landing' | 'auth' | 'dashboard' | 'pro' | 'shop' | 'admin' | 'news' | 'privacy' | 'terms' | 'rtt-info' | 'crm-info' | 'partner-search' | 'find-partner' | 'find-courts' | 'ai-coach-info' | 'amateur-tournaments' | 'community-info' | 'tactics-3d-info' | 'tennis-diary-info' | 'tournament-director-info' | 'tenniix-rental';
+export type ViewState = 'landing' | 'auth' | 'dashboard' | 'pro' | 'shop' | 'admin' | 'privacy' | 'terms' | 'rtt-info' | 'crm-info' | 'partner-search' | 'find-partner' | 'find-courts' | 'ai-coach-info' | 'amateur-tournaments' | 'community-info' | 'tactics-3d-info' | 'tennis-diary-info' | 'tournament-director-info' | 'tenniix-rental';
 export type DashboardTab = 'profile' | 'search' | 'courts' | 'ai_coach' | 'messages' | 'notifications' | 'tactics' | 'students' | 'tournaments' | 'tournament_organization' | 'video_analysis' | 'ladder' | 'community' | 'my_applications' | 'rtt_stats' | 'diary';
 
 export interface User {
@@ -465,19 +465,6 @@ export interface TournamentApplication {
   user_name?: string;
   user_avatar?: string;
   user_level?: string;
-}
-
-export interface NewsArticle {
-  id: string;
-  title: string;
-  summary: string;
-  content: string;
-  image: string;
-  author: string;
-  category: 'tournament' | 'player' | 'training' | 'equipment' | 'general';
-  published_at: string;
-  is_published: boolean;
-  views?: number;
 }
 
 export type TenniixRentalBookingStatus = 'new' | 'contacted' | 'confirmed' | 'cancelled';
