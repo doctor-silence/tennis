@@ -91,6 +91,10 @@ const ADMIN_THEME_STORAGE_KEY = 'adminTheme';
 const AdminPanel: React.FC<AdminPanelProps> = ({ user, onLogout, onImpersonateUser }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'shop' | 'logs' | 'courts' | 'groups' | 'tournaments' | 'support' | 'bookings' | 'health'>('support');
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const setActiveAdminTab = (tab: typeof activeTab) => {
+        setActiveTab(tab);
+        setIsMobileSidebarOpen(false);
+    };
     const [adminTheme, setAdminTheme] = useState<'light' | 'dark'>(() => {
         try {
             const savedTheme = localStorage.getItem(ADMIN_THEME_STORAGE_KEY);

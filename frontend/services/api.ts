@@ -871,6 +871,7 @@ export const api = {
             }
         },
         getUserGroups: async (userId: string): Promise<Group[]> => {
+            if (!/^\d+$/.test(userId)) return [];
             try {
                 const res = await fetch(`${API_URL}/users/${userId}/groups`);
                 if (!res.ok) throw new Error('Failed to fetch user groups');
@@ -1739,6 +1740,7 @@ export const api = {
             }
         },
         getChallenges: async (userId: string): Promise<Challenge[]> => {
+            if (!/^\d+$/.test(userId)) return MOCK_CHALLENGES;
             try {
                 const res = await fetch(`${API_URL}/ladder/challenges?userId=${userId}`);
                 if (!res.ok) throw new Error('Failed to fetch ladder challenges');

@@ -4563,8 +4563,12 @@ app.get('/api/ladder/challenges', async (req, res) => {
         const params = [];
 
         if (userId) {
+            const parsedUserId = parseInt(userId, 10);
+            if (!Number.isFinite(parsedUserId) || String(parsedUserId) !== userId) {
+                return res.json([]);
+            }
             query += ' WHERE c.challenger_id = $1 OR c.defender_id = $1';
-            params.push(userId);
+            params.push(parsedUserId);
         }
 
         query += ' ORDER BY c.deadline ASC';
@@ -5407,13 +5411,17 @@ app.get('/api/groups', async (req, res) => {
 
 app.get('/api/users/:userId/groups', async (req, res) => {
     const { userId } = req.params;
+    const parsedUserId = parseInt(userId, 10);
+    if (!Number.isFinite(parsedUserId) || String(parsedUserId) !== userId) {
+        return res.json([]);
+    }
     try {
         const result = await pool.query(
             `SELECT g.*, gm.role FROM groups g
              JOIN group_members gm ON g.id = gm.group_id
              WHERE gm.user_id = $1
              ORDER BY g.name ASC`,
-            [userId]
+            [parsedUserId]
         );
         res.json(result.rows.map(g => ({ ...g, id: g.id.toString() })));
     } catch (err) {
